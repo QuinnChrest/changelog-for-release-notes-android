@@ -43,6 +43,8 @@ data class NoteRequest(
     val text: String? = null,
     val date: String? = null,
     val writtenAt: String? = null,
+    /** With `media:write`. A note may be only its files. */
+    val uploads: List<UploadRef>? = null,
 )
 
 /** A note this token wrote, as the API names it. */

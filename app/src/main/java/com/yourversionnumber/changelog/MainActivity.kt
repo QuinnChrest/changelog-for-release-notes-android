@@ -1,6 +1,8 @@
 package com.yourversionnumber.changelog
 
 import android.content.Intent
+import android.net.Uri
+import androidx.core.content.IntentCompat
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -48,11 +50,19 @@ class MainActivity : ComponentActivity() {
         receive(intent)
     }
 
-    /** Text or a link shared from another app, with its subject if it has one. */
+    /** Text, a link or files shared from another app: the start of one note. */
     private fun receive(intent: Intent?) {
-        if (intent?.action != Intent.ACTION_SEND) return
-        val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
-        val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
-        model.receive(if (subject.isNullOrBlank() || text.contains(subject)) text else "$subject\n$text")
+        val action = intent?.action
+        if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return
+        intent.getStringExtra(Intent.EXTRA_TEXT)?.let { text ->
+            val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
+            model.receive(if (subject.isNullOrBlank() || text.contains(subject)) text else "$subject\n$text")
+        }
+        val streams = if (action == Intent.ACTION_SEND) {
+            listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
+        } else {
+            IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
+        }
+        if (streams.isNotEmpty()) model.addShared(streams, intent.type)
     }
 }

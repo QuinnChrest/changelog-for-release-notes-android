@@ -22,15 +22,21 @@ Upcoming and the activity log.
 3. **Tags.** Tap a tag in the row to add it, tap again to take it off.
    Touch and hold one: it goes on every note until Settings, "Stop adding
    #… to every note".
-4. **Share.** From Chrome, share a link to Changelog: it starts a note.
-   Commit makes exactly one note.
-5. **Offline.** Airplane mode, a note, Commit: it waits under "Waiting to
-   send". Airplane mode off: it sends, once.
-6. **The build.** The foot of Settings names the version and the commit
+4. **Photos.** "Photos" (two or three) and "Camera" on one note, then
+   Commit. The web note has every photo. A HEIC from the library arrives
+   as a JPEG.
+5. **A voice memo.** "Record", allow the microphone, ten seconds, Stop,
+   Commit. It plays on the web.
+6. **Share.** From Chrome, a link; from Photos, three or four big photos at
+   once; from Files, a PDF; from a recorder app, a recording. Each makes
+   exactly one note. A video too, to see what it says: Release Notes
+   doesn't keep video.
+7. **Offline.** Airplane mode, a note with a photo, Commit: it waits under
+   "Waiting to send". Airplane mode off: it sends, once.
+8. **The build.** The foot of Settings names the version and the commit
    (`Changelog 0.0.0, build 1a2b3c4`).
-7. **Activity.** Rows from every channel; a filter; "Older" loads more.
-8. *(later)* Pinned tags, photos, a voice memo, Here, Upcoming,
-   notifications.
-9. **Last, sign out.** Settings, "Sign out", then "Sign out and revoke this
+9. **Activity.** Rows from every channel; a filter; "Older" loads more.
+10. *(later)* Pinned tags, Here, Upcoming, notifications.
+11. **Last, sign out.** Settings, "Sign out", then "Sign out and revoke this
    token". The token shows as revoked on the web, and anything still
    waiting stays on the phone.

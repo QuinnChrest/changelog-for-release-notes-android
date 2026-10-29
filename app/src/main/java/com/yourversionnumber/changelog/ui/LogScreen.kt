@@ -47,6 +47,7 @@ import com.yourversionnumber.changelog.kit.Hashtags
 import com.yourversionnumber.changelog.kit.OutboxItem
 import com.yourversionnumber.changelog.kit.OutboxOperation
 import com.yourversionnumber.changelog.kit.NoteDetail
+import com.yourversionnumber.changelog.kit.MediaType
 import com.yourversionnumber.changelog.NoteTarget
 import com.yourversionnumber.changelog.target
 import androidx.compose.foundation.layout.Box
@@ -98,12 +99,12 @@ fun LogScreen(model: AppModel, onActivity: () -> Unit, onSettings: () -> Unit) {
                     modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Note" },
                 )
             }
+            if (model.draftFiles.isNotEmpty()) item { AttachmentStrip(model) }
             item { TagRowView(model) }
+            model.sticky?.let { item { Caption("#$it on every note") } }
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    model.sticky?.let {
-                        Text("#$it on every note", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    if (model.canAddFiles) ComposerTools(model)
                     Spacer(Modifier.weight(1f))
                     Button(onClick = model::commit, enabled = model.canCommit) { Text("Commit") }
                 }
@@ -239,9 +240,11 @@ private fun WaitingRow(item: OutboxItem, onDiscard: () -> Unit, onFix: () -> Uni
         is OutboxOperation.Edit -> "Edit: ${op.text}"
         is OutboxOperation.Delete -> "Delete a note"
         is OutboxOperation.Pins -> "Pinned tags"
+        is OutboxOperation.Post -> op.text.ifBlank { MediaType.count(op.files) }
     }
     Column {
         Text(summary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        if (item.files.isNotEmpty() && item.text?.isNotBlank() == true) Caption(MediaType.count(item.files))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Caption(item.refusal ?: if (item.attempts > 0) "Will try again" else "Waiting for a connection", Modifier.weight(1f))
             if (item.refusal != null && item.isNote) TextButton(onClick = onFix) { Text("Fix") }

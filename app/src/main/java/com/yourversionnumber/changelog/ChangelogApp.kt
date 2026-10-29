@@ -19,6 +19,7 @@ import com.yourversionnumber.changelog.kit.OutboxOperation
 import com.yourversionnumber.changelog.kit.OutboxResult
 import com.yourversionnumber.changelog.kit.Tags
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.Serializable
@@ -47,6 +48,14 @@ class AppGraph(private val context: Context) {
     // noBackupFilesDir: the queue holds words and never goes to a backup.
     val outbox = Outbox(File(context.noBackupFilesDir, "outbox.json"))
     private val sentFile = File(context.noBackupFilesDir, "sent.json")
+
+    init {
+        // A new process has no draft: files only a draft held when it last
+        // stopped, and no queued note holds, go. Before anything can add one.
+        runBlocking { outbox.sweep() }
+        // Scratch copies from the picker, the camera and the recorder are only ever mid-way.
+        File(context.cacheDir, "picked").deleteRecursively()
+    }
 
     private val _signedIn = MutableStateFlow(tokens.read() != null)
     val signedIn: StateFlow<Boolean> = _signedIn.asStateFlow()
@@ -139,7 +148,10 @@ class AppGraph(private val context: Context) {
         }
         if (report.sent.isNotEmpty()) _sends.value += 1
         report.sent.firstNotNullOfOrNull { (it.result as? OutboxResult.Pinned)?.tags }?.let { tags = it }
-        _problem.value = report.refused.lastOrNull()?.refusal ?: report.stopped?.takeUnless { it.code == "network" }?.message
+        // A run with nothing to say leaves whatever the owner is being told (a file that
+        // couldn't be read, say) in place.
+        (report.refused.lastOrNull()?.refusal ?: report.stopped?.takeUnless { it.code == "network" }?.message)
+            ?.let { _problem.value = it }
     }
 
     /** Takes a note off Log at once; its delete waits in the queue. */

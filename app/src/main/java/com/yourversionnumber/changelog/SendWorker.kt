@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.yourversionnumber.changelog.kit.perform
+import com.yourversionnumber.changelog.kit.prepare
 
 /**
  * Sends the Outbox, oldest first, each item under its own idempotency key.
@@ -14,7 +15,7 @@ class SendWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     override suspend fun doWork(): Result {
         val graph = applicationContext.graph
         val api = graph.api() ?: return Result.success()
-        val report = graph.outbox.flush { api.perform(it) }
+        val report = graph.outbox.flush(prepare = { api.prepare(it, graph.outbox) }) { api.perform(it) }
         graph.record(report)
         val stopped = report.stopped ?: return Result.success()
         return when {

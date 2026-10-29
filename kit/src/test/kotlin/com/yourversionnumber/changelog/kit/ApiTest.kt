@@ -99,6 +99,38 @@ class ApiTest {
     }
 
     @Test
+    fun aFilesFormGoesToStorageWithoutTheToken() = runTest {
+        answer = { exchange ->
+            if (exchange.requestURI.path == "/v1/uploads") {
+                201 to """{"upload":"up-1","type":"image/jpeg","url":"/dev-upload/","fields":{"key":"media/u/api/up-1","policy":"p"},"expires_in":300}"""
+            } else {
+                204 to ""
+            }
+        }
+        val file = java.io.File.createTempFile("photo", ".jpg").apply { writeBytes(byteArrayOf(-1, -40, -1, 1, 2, 3)) }
+        val form = api.startUpload(UploadStart("Photo 1.jpg", "image/jpeg", file.length()))
+        api.postFile(file, "Photo 1.jpg", form)
+        assertEquals("""{"name":"Photo 1.jpg","type":"image/jpeg","size":6}""", bodies[0])
+        val upload = seen[1]
+        // The dev server's form is a path on itself.
+        assertEquals("/dev-upload/", upload.requestURI.path)
+        assertEquals(null, upload.requestHeaders.getFirst("Authorization"))
+        assertTrue(upload.requestHeaders.getFirst("Content-Type").startsWith("multipart/form-data; boundary="))
+        assertTrue(bodies[1].contains("name=\"key\"\r\n\r\nmedia/u/api/up-1"))
+    }
+
+    @Test
+    fun aStorageRefusalIsWorthAnotherForm() = runTest {
+        answer = { 403 to "<Error>AccessDenied</Error>" }
+        val file = java.io.File.createTempFile("photo", ".jpg").apply { writeBytes(byteArrayOf(1)) }
+        val e = assertFailsWith<ApiException> {
+            api.postFile(file, "Photo 1.jpg", UploadForm("up-1", "image/jpeg", "/dev-upload/", emptyMap(), 300))
+        }
+        assertEquals("upload_failed", e.code)
+        assertTrue(e.retryable)
+    }
+
+    @Test
     fun noServerIsANetworkFailure() = runTest {
         val gone = Api("http://127.0.0.1:1", token, "Changelog/0.0.0")
         val e = assertFailsWith<ApiException> { gone.me() }

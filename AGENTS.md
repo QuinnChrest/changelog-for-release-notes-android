@@ -108,23 +108,31 @@ Done: sign-in by token, Log (version, tag row with a sticky tag, Commit),
 the Outbox and its sender, Waiting to send (fix, discard), editing and
 deleting a note this token wrote, Today on Log from every channel (with
 the `activity` scope; otherwise what this phone sent), the Activity screen
-(filters, "Older" paging, "Since you last looked"), sharing text in,
-Settings and sign-out. Activity rows read as in the iPhone app
-(`kit`'s `ActivityText.kt`).
+(filters, "Older" paging, "Since you last looked"), Settings and
+sign-out. Activity rows read as in the iPhone app (`kit`'s
+`ActivityText.kt`).
+
+Files on a note: photos from the system photo picker or the camera app
+(no storage or camera permission), voice memos (`Recorder`, MPEG_4 + AAC,
+`RECORD_AUDIO` asked on first use), and photos, recordings and PDFs shared
+in (`ACTION_SEND`, `ACTION_SEND_MULTIPLE`). `MediaReader` keeps JPEG, PNG,
+GIF and WebP as they are and makes anything else (HEIC) a JPEG with its
+time and place kept. A file waits in the Outbox's `outbox-files` folder
+from the moment it's added; the Outbox's `prepare` asks for each form only
+as the note sends, posts the file, and saves the uploads before the note
+goes, so a resend is the same request. Uploads found gone are made again
+once, under a new key.
 
 To come, in about this order (the iPhone app has each one):
 
 1. Pinned tags in Settings (`PUT /v1/tags/pinned`, through the Outbox).
-2. Files: photos (as JPEG), voice memos (`MediaRecorder`, MPEG_4 + AAC) and
-   PDFs, kept with the queued note, posted as it is sent; share sheet for
-   files (`ACTION_SEND` with streams, `ACTION_SEND_MULTIPLE`).
-3. Here: one `FusedLocationProviderClient.getCurrentLocation` (needs Play
+2. Here: one `FusedLocationProviderClient.getCurrentLocation` (needs Play
    services; ask Quinn before adding it), with the nearby businesses to pick.
-4. Upcoming: list, add, change and remove, with a dry run.
-5. Notifications: `POST_NOTIFICATIONS`, Upcoming reminders scheduled from
+3. Upcoming: list, add, change and remove, with a dry run.
+4. Notifications: `POST_NOTIFICATIONS`, Upcoming reminders scheduled from
    each day's `send_at`, the daily prompt, activity notices from WorkManager
    periodic work.
-6. A toast for a badge a note unlocked (`unlocked` in its receipt).
-7. A dev-server test cycle like the iPhone app's `ui-test-cycle.sh`.
+5. A toast for a badge a note unlocked (`unlocked` in its receipt).
+6. A dev-server test cycle like the iPhone app's `ui-test-cycle.sh`.
 
 `docs/PHONE-TEST.md` is the pass by hand each build gets on a real phone.

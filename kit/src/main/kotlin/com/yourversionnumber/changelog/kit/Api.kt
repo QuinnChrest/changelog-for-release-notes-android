@@ -8,10 +8,12 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNamingStrategy
 import kotlinx.serialization.serializer
+import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URLEncoder
+import java.util.UUID
 
 /** What went wrong with a request, sorted by what the app should do next. */
 class ApiException(
@@ -71,6 +73,47 @@ class Api(
             if (kinds.isNotEmpty()) add("kinds" to kinds.joinToString(","))
         }
         return send("GET", "v1/activity", query = query)
+    }
+
+    /** A signed form for one file. Needs `media:write`. No receipt: a retry gets a new form, and an unused one expires. */
+    suspend fun startUpload(start: UploadStart): UploadForm = send("POST", "v1/uploads", body = encode(start))
+
+    /**
+     * Posts a file on disk to its signed form, streamed, so it's never in
+     * memory whole. The form goes to file storage, not to Release Notes, so
+     * it carries no token and no cookie.
+     */
+    suspend fun postFile(file: File, name: String, form: UploadForm) = withContext(Dispatchers.IO) {
+        if (!file.exists()) throw ApiException(400, "file_missing", FILE_MISSING)
+        // S3's form is a full URL; the dev server's is a path on itself.
+        val address = URI(baseUrl.trimEnd('/') + "/").resolve(form.url).toString()
+        val boundary = "changelog-" + UUID.randomUUID()
+        val connection = try {
+            URI(address).toURL().openConnection() as HttpURLConnection
+        } catch (e: Exception) {
+            throw ApiException(0, "unreadable", "That upload address doesn't work.")
+        }
+        try {
+            connection.requestMethod = "POST"
+            connection.connectTimeout = 30_000
+            connection.readTimeout = 300_000
+            connection.useCaches = false
+            connection.doOutput = true
+            connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+            connection.setRequestProperty("User-Agent", userAgent)
+            connection.setFixedLengthStreamingMode(Multipart.length(form.fields, file, name, form.type, boundary))
+            connection.outputStream.use { Multipart.write(form.fields, file, name, form.type, boundary, it) }
+            val status = connection.responseCode
+            if (status !in 200..299) {
+                // A storage refusal (the form expired, the size was wrong) is worth one
+                // more try with a new form; its body is storage's, never shown.
+                throw ApiException(if (status >= 500) status else 0, "upload_failed", "A file didn't upload. It will be tried again.")
+            }
+        } catch (e: IOException) {
+            throw ApiException(0, "network", "Release Notes can't be reached right now.")
+        } finally {
+            connection.disconnect()
+        }
     }
 
     /** Sign out: the token revokes itself. */
@@ -162,6 +205,8 @@ class Api(
 
         /** `tools/dev-server.ts` in the Release Notes repo, as the emulator reaches it. */
         const val DEV_SERVER = "http://10.0.2.2:8790"
+
+        const val FILE_MISSING = "A file for this note is no longer on this phone. Discard it, or fix it to send the words alone."
 
         val json = Json {
             namingStrategy = JsonNamingStrategy.SnakeCase

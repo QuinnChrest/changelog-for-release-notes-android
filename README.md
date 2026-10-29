@@ -13,9 +13,12 @@ The Android pair of [Changelog for iPhone](https://github.com/jthingelstad/chang
   resend never makes a duplicate.
 - **Check** what happened: the activity log, from every channel, without
   the words. Edit or delete what this phone sent.
-- **Share** text or a link from any app into a note.
-- Coming: photos, voice memos, where you are, Upcoming dates and
-  reminders. See "What's next" in [AGENTS.md](AGENTS.md).
+- **Photos and voice memos** on a note: from the photo picker or the
+  camera, recorded in the app. They wait on the phone with the note until
+  it is sent. Files need a token with "Add files" ticked.
+- **Share** text, a link, photos, a recording or a PDF from any app: it
+  becomes one note.
+- Coming: where you are, Upcoming dates and reminders. See "What's next" in [AGENTS.md](AGENTS.md).
 
 It talks only to Release Notes' public `/v1` API, with a token you make in
 Release Notes' Settings, under API tokens. The API is designed in

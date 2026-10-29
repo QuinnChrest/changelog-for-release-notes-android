@@ -90,6 +90,11 @@ npm run build
 node --import tsx tools/dev-server.ts --fake-places
 ```
 
+On Windows, clone it with `git clone -c core.autocrlf=false` (its site
+build rejects CRLF front matter). `npm run build` then still fails on the
+guide pages (Windows path separators), but only after the app bundle is
+built, and the dev server runs fine.
+
 It listens on 8790 and prints a token for its made-up account; each start is
 a clean slate with a new token. A debug build's "Dev server" is
 `http://10.0.2.2:8790` (the emulator's view of this computer). On a phone

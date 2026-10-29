@@ -36,6 +36,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -70,9 +72,16 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
         ) {
             item { VersionHeader(model) }
             item {
+                // A tag tapped in the row, a share or a commit changes the draft from
+                // outside the box: the cursor goes to the end, after what was added.
+                var field by remember { mutableStateOf(TextFieldValue(model.draft, TextRange(model.draft.length))) }
+                if (field.text != model.draft) field = TextFieldValue(model.draft, TextRange(model.draft.length))
                 OutlinedTextField(
-                    value = model.draft,
-                    onValueChange = { model.draft = it },
+                    value = field,
+                    onValueChange = {
+                        field = it
+                        model.draft = it.text
+                    },
                     placeholder = { Text("What changed?") },
                     minLines = 3,
                     maxLines = 10,

@@ -1,0 +1,39 @@
+# Changelog for Android
+
+A fast Android app for sending notes into
+[Release Notes](https://notes.yourversionnumber.com), the daily journal from
+[Your Version Number](https://yourversionnumber.com/) where every day you're
+a new release of yourself. It is not a second Release Notes: you read, search
+and look back on the web. Changelog is for getting things in, in two taps.
+
+The Android pair of [Changelog for iPhone](https://github.com/jthingelstad/changelog-ios).
+
+- **Log** a line, with one-tap tags. The button says Commit.
+- **Never lose a note.** Everything goes through an offline queue, and a
+  resend never makes a duplicate.
+- **Share** text or a link from any app into a note.
+- Coming: activity, photos, voice memos, where you are, Upcoming dates and
+  reminders. See "What's next" in [AGENTS.md](AGENTS.md).
+
+It talks only to Release Notes' public `/v1` API, with a token you make in
+Release Notes' Settings, under API tokens. The API is designed in
+[`docs/API.md`](https://github.com/jthingelstad/yvn-release-notes/blob/main/docs/API.md)
+in the Release Notes repo.
+
+## Building
+
+JDK 17+, Android SDK 37, or just open the folder in Android Studio.
+
+```sh
+./gradlew :kit:test
+./gradlew :app:assembleDebug
+```
+
+To try it without touching real notes, run the Release Notes dev server
+(details in [AGENTS.md](AGENTS.md#the-dev-server)), choose "Dev server" on the
+sign-in screen of a debug build, and paste the token it prints.
+
+Changelog numbers its builds the way Release Notes does, by Your Version
+Number's arithmetic from its own start on 29 October 2026 to the day a build
+is made, in Chicago: 0.0.0 on the first day, 0.1.0 a year on. The foot of
+Settings shows it with the commit.

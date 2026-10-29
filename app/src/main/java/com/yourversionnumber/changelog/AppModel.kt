@@ -6,13 +6,25 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.yourversionnumber.changelog.kit.ActivityItem
+import com.yourversionnumber.changelog.kit.ActivityPage
 import com.yourversionnumber.changelog.kit.ApiException
 import com.yourversionnumber.changelog.kit.Hashtags
+import com.yourversionnumber.changelog.kit.NoteDetail
 import com.yourversionnumber.changelog.kit.OutboxNotKept
 import com.yourversionnumber.changelog.kit.OutboxOperation
 import com.yourversionnumber.changelog.kit.TagRow
 import com.yourversionnumber.changelog.kit.TokenFormat
+import com.yourversionnumber.changelog.kit.isMine
+import com.yourversionnumber.changelog.kit.isOn
 import kotlinx.coroutines.launch
+
+/** A note this token wrote, from Log's Today or its own sent list. */
+data class NoteTarget(val date: String, val id: String, val version: String?)
+
+val Sent.target get() = NoteTarget(note.date, note.id, note.version)
+
+val ActivityItem.target get() = NoteTarget(day!!, note!!, version)
 
 /** The screens' state, over AppGraph. */
 class AppModel(application: Application) : AndroidViewModel(application) {
@@ -31,6 +43,12 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         private set
     var draft by mutableStateOf("")
     var server by mutableStateOf(graph.server)
+
+    /** Today's activity from every channel, newest first. */
+    var today by mutableStateOf<List<ActivityItem>>(emptyList())
+        private set
+
+    val hasActivity: Boolean get() = me?.token?.scopes?.contains("activity") == true
 
     val tagRow: List<String> get() = TagRow.tags(tags)
     val canCommit: Boolean get() = draft.isNotBlank()
@@ -63,6 +81,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
             } catch (e: ApiException) {
                 if (e.signedOut) graph.tokenLost(e.message)
             }
+            loadToday()
             graph.send()
         }
     }
@@ -99,14 +118,64 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         graph.send()
     }
 
-    fun delete(sent: Sent) = viewModelScope.launch {
+    // Notes this token wrote: the only ones it may read back, change or delete.
+
+    /** Reads a note as it is now, so an edit made on the web isn't lost. */
+    suspend fun load(target: NoteTarget): NoteDetail? = try {
+        graph.api()?.note(target.date, target.id)
+    } catch (e: ApiException) {
+        handle(e)
+        null
+    }
+
+    /** Queues an edit from the revision read. A refusal (changed since) shows under Waiting to send. */
+    fun save(note: NoteDetail, text: String) = queue(OutboxOperation.Edit(note.date, note.id, text, note.revision))
+
+    fun delete(target: NoteTarget) {
+        queue(OutboxOperation.Delete(target.date, target.id))
+        graph.forget(target.id)
+        today = today.filterNot { it.note == target.id }
+    }
+
+    private fun queue(operation: OutboxOperation) = viewModelScope.launch {
         try {
-            graph.outbox.enqueue(OutboxOperation.Delete(sent.note.date, sent.note.id))
-            graph.forget(sent.note.id)
+            graph.outbox.enqueue(operation)
             graph.send()
         } catch (e: OutboxNotKept) {
             graph.report(e.message)
         }
+    }
+
+    // Activity
+
+    /** Today from every channel, for Log. Needs the `activity` scope. */
+    fun loadToday() {
+        val api = graph.api() ?: return
+        val day = me?.today ?: return
+        if (!hasActivity) return
+        viewModelScope.launch {
+            try {
+                today = api.activity(limit = 100).items.filter { it.isOn(day) }
+            } catch (e: ApiException) {
+                handle(e)
+            }
+        }
+    }
+
+    suspend fun activity(before: String?, kinds: List<String>): ActivityPage? = try {
+        graph.api()?.activity(before = before, kinds = kinds)
+    } catch (e: ApiException) {
+        handle(e)
+        null
+    }
+
+    fun isMine(item: ActivityItem) = item.isMine(me?.token?.name)
+
+    /** Offline is quiet: notes wait in the queue. Anything else, Release Notes says what to do. */
+    private fun handle(e: ApiException) = when {
+        e.signedOut -> graph.tokenLost(e.message)
+        e.status == 0 -> {}
+        else -> graph.report(e.message)
     }
 
     /** A share from another app becomes the start of a note. */
@@ -121,6 +190,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         me = null
         tags = null
         sticky = null
+        today = emptyList()
     }
 
     fun clearProblem() = graph.report(null)

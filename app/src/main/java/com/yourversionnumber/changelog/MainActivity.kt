@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.yourversionnumber.changelog.ui.ActivityScreen
 import com.yourversionnumber.changelog.ui.ChangelogTheme
 import com.yourversionnumber.changelog.ui.LogScreen
 import com.yourversionnumber.changelog.ui.SettingsScreen
@@ -26,11 +27,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             ChangelogTheme {
                 val signedIn by model.signedIn.collectAsStateWithLifecycle()
-                var settings by rememberSaveable { mutableStateOf(false) }
+                var screen by rememberSaveable { mutableStateOf("log") }
                 when {
                     !signedIn -> SignInScreen(model)
-                    settings -> SettingsScreen(model, onBack = { settings = false })
-                    else -> LogScreen(model, onSettings = { settings = true })
+                    screen == "settings" -> SettingsScreen(model, onBack = { screen = "log" })
+                    screen == "activity" -> ActivityScreen(model, onBack = { screen = "log" })
+                    else -> LogScreen(model, onActivity = { screen = "activity" }, onSettings = { screen = "settings" })
                 }
             }
         }

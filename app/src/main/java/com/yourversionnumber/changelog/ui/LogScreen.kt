@@ -46,22 +46,32 @@ import com.yourversionnumber.changelog.Sent
 import com.yourversionnumber.changelog.kit.Hashtags
 import com.yourversionnumber.changelog.kit.OutboxItem
 import com.yourversionnumber.changelog.kit.OutboxOperation
+import com.yourversionnumber.changelog.kit.NoteDetail
+import com.yourversionnumber.changelog.NoteTarget
+import com.yourversionnumber.changelog.target
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.LaunchedEffect
 
-/** The home screen: today's version, the box, the tag row, Commit, and what this phone sent. */
+/** The home screen: today's version, the box, the tag row, Commit, and what happened today. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LogScreen(model: AppModel, onSettings: () -> Unit) {
+fun LogScreen(model: AppModel, onActivity: () -> Unit, onSettings: () -> Unit) {
     val waiting by model.waiting.collectAsStateWithLifecycle()
     val sent by model.sent.collectAsStateWithLifecycle()
     val problem by model.problem.collectAsStateWithLifecycle()
     var fixing by remember { mutableStateOf<OutboxItem?>(null) }
-    var deleting by remember { mutableStateOf<Sent?>(null) }
+    var deleting by remember { mutableStateOf<NoteTarget?>(null) }
+    var editing by remember { mutableStateOf<NoteTarget?>(null) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Changelog") },
-                actions = { TextButton(onClick = onSettings) { Text("Settings") } },
+                actions = {
+                    TextButton(onClick = onActivity) { Text("Activity") }
+                    TextButton(onClick = onSettings) { Text("Settings") }
+                },
             )
         },
     ) { padding ->
@@ -114,8 +124,10 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
                     WaitingRow(item, onDiscard = { model.discard(item.id) }, onFix = { fixing = item })
                 }
             }
-            item { SectionTitle("Sent from this phone") }
-            if (sent.isEmpty()) {
+            // With the activity log, Today shows every channel; without it, what this phone sent.
+            item { SectionTitle(if (model.hasActivity) "Today" else "Sent from this phone") }
+            val empty = if (model.hasActivity) model.today.isEmpty() else sent.isEmpty()
+            if (empty) {
                 item {
                     Text(
                         model.me?.let { "No changes yet in ${it.version}." } ?: "Nothing yet.",
@@ -123,11 +135,32 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
                     )
                 }
             }
-            items(sent, key = { it.note.id }) { note ->
-                SentRow(note, onDelete = { deleting = note })
+            if (model.hasActivity) {
+                items(model.today, key = { it.id }) { item ->
+                    val mine = model.isMine(item)
+                    ActivityRow(
+                        item,
+                        actions = if (!mine) null else {
+                            {
+                                TextButton(onClick = { editing = item.target }) { Text("Edit") }
+                                TextButton(onClick = { deleting = item.target }) { Text("Delete") }
+                            }
+                        },
+                    )
+                }
+            } else {
+                items(sent, key = { it.note.id }) { note ->
+                    SentRow(note, onEdit = { editing = note.target }, onDelete = { deleting = note.target })
+                }
             }
         }
     }
+
+    // A send that delivered something changes what the server has for today.
+    val sends by model.graph.sends.collectAsStateWithLifecycle()
+    LaunchedEffect(sends) { model.loadToday() }
+
+    editing?.let { target -> EditNoteDialog(model, target, onDone = { editing = null }) }
 
     fixing?.let { item ->
         var text by remember(item.id) { mutableStateOf(item.text.orEmpty()) }
@@ -145,12 +178,12 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
         )
     }
 
-    deleting?.let { note ->
+    deleting?.let { target ->
         AlertDialog(
             onDismissRequest = { deleting = null },
             title = { Text("Delete this note?") },
-            text = { Text("It comes out of ${note.note.version} in Release Notes, with anything attached.") },
-            confirmButton = { TextButton(onClick = { model.delete(note); deleting = null }) { Text("Delete") } },
+            text = { Text("It comes out of ${target.version ?: "its day"} in Release Notes, with anything attached.") },
+            confirmButton = { TextButton(onClick = { model.delete(target); deleting = null }) { Text("Delete") } },
             dismissButton = { TextButton(onClick = { deleting = null }) { Text("Keep") } },
         )
     }
@@ -219,15 +252,45 @@ private fun WaitingRow(item: OutboxItem, onDiscard: () -> Unit, onFix: () -> Uni
 }
 
 @Composable
-private fun SentRow(sent: Sent, onDelete: () -> Unit) {
+private fun SentRow(sent: Sent, onEdit: () -> Unit, onDelete: () -> Unit) {
     Column {
         Text(sent.text, maxLines = 3, overflow = TextOverflow.Ellipsis)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Caption("Filed in ${sent.note.version}", Modifier.weight(1f))
+            TextButton(onClick = onEdit) { Text("Edit") }
             TextButton(onClick = onDelete) { Text("Delete") }
         }
         HorizontalDivider()
     }
+}
+
+/** Edits a note this token wrote, from the revision it reads as the dialog opens. */
+@Composable
+private fun EditNoteDialog(model: AppModel, target: NoteTarget, onDone: () -> Unit) {
+    var note by remember(target) { mutableStateOf<NoteDetail?>(null) }
+    var text by remember(target) { mutableStateOf("") }
+    LaunchedEffect(target) {
+        note = model.load(target)
+        note?.let { text = it.text } ?: onDone()
+    }
+    AlertDialog(
+        onDismissRequest = onDone,
+        title = { Text(target.version?.let { "Edit in $it" } ?: "Edit") },
+        text = {
+            if (note == null) {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            } else {
+                OutlinedTextField(value = text, onValueChange = { text = it }, minLines = 3, maxLines = 12)
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { note?.let { model.save(it, text) }; onDone() },
+                enabled = note != null && text.isNotBlank() && text != note?.text,
+            ) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDone) { Text("Cancel") } },
+    )
 }
 
 @Composable

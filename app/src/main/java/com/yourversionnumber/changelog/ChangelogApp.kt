@@ -15,6 +15,7 @@ import com.yourversionnumber.changelog.kit.FlushReport
 import com.yourversionnumber.changelog.kit.Me
 import com.yourversionnumber.changelog.kit.NoteRef
 import com.yourversionnumber.changelog.kit.Outbox
+import com.yourversionnumber.changelog.kit.OutboxOperation
 import com.yourversionnumber.changelog.kit.OutboxResult
 import com.yourversionnumber.changelog.kit.Tags
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,6 +53,15 @@ class AppGraph(private val context: Context) {
 
     private val _sent = MutableStateFlow(loadSent())
     val sent: StateFlow<List<Sent>> = _sent.asStateFlow()
+
+    /** Counts send runs that delivered something, so screens know to read the server again. */
+    private val _sends = MutableStateFlow(0)
+    val sends: StateFlow<Int> = _sends.asStateFlow()
+
+    /** The newest activity row seen when Activity was last left. Kept on the phone, never sent. */
+    var seenActivity: String?
+        get() = prefs.getString("activity.seen", null)
+        set(value) = prefs.edit().putString("activity.seen", value).apply()
 
     /** Why the last send stopped or what it refused, in Release Notes' words. */
     private val _problem = MutableStateFlow<String?>(null)
@@ -103,6 +113,7 @@ class AppGraph(private val context: Context) {
         me = null
         tags = null
         sticky = null
+        seenActivity = null
         _sent.value = emptyList()
         sentFile.delete()
         _signedIn.value = false
@@ -117,10 +128,16 @@ class AppGraph(private val context: Context) {
         val filed = report.sent.mapNotNull { sent ->
             (sent.result as? OutboxResult.Filed)?.let { Sent(it.receipt.note, sent.item.text.orEmpty()) }
         }
-        val deleted = report.sent.mapNotNull { (it.item.operation as? com.yourversionnumber.changelog.kit.OutboxOperation.Delete)?.id }.toSet()
-        if (filed.isNotEmpty() || deleted.isNotEmpty()) {
-            saveSent((filed.reversed() + _sent.value).filterNot { it.note.id in deleted }.take(50))
+        val deleted = report.sent.mapNotNull { (it.item.operation as? OutboxOperation.Delete)?.id }.toSet()
+        // An edit's answer is the note's new revision; its words are the ones sent.
+        val edited = report.sent.mapNotNull { sent ->
+            val note = (sent.result as? OutboxResult.Edited)?.note ?: return@mapNotNull null
+            note.id to Sent(note, (sent.item.operation as OutboxOperation.Edit).text)
+        }.toMap()
+        if (filed.isNotEmpty() || deleted.isNotEmpty() || edited.isNotEmpty()) {
+            saveSent((filed.reversed() + _sent.value).filterNot { it.note.id in deleted }.map { edited[it.note.id] ?: it }.take(50))
         }
+        if (report.sent.isNotEmpty()) _sends.value += 1
         report.sent.firstNotNullOfOrNull { (it.result as? OutboxResult.Pinned)?.tags }?.let { tags = it }
         _problem.value = report.refused.lastOrNull()?.refusal ?: report.stopped?.takeUnless { it.code == "network" }?.message
     }

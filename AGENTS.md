@@ -105,24 +105,26 @@ dev server is a path: put the server's address in front of it.
 ## What's next
 
 Done: sign-in by token, Log (version, tag row with a sticky tag, Commit),
-the Outbox and its sender, Waiting to send (fix, discard), deleting a note
-this phone sent, sharing text in, Settings and sign-out.
+the Outbox and its sender, Waiting to send (fix, discard), editing and
+deleting a note this token wrote, Today on Log from every channel (with
+the `activity` scope; otherwise what this phone sent), the Activity screen
+(filters, "Older" paging, "Since you last looked"), sharing text in,
+Settings and sign-out. Activity rows read as in the iPhone app
+(`kit`'s `ActivityText.kt`).
 
 To come, in about this order (the iPhone app has each one):
 
-1. Edit a sent note (`GET` then `PUT` with its revision).
-2. Activity: `GET /v1/activity`, "Older" paging, and Today from every
-   channel on Log.
-3. Pinned tags in Settings (`PUT /v1/tags/pinned`, through the Outbox).
-4. Files: photos (as JPEG), voice memos (`MediaRecorder`, MPEG_4 + AAC) and
+1. Pinned tags in Settings (`PUT /v1/tags/pinned`, through the Outbox).
+2. Files: photos (as JPEG), voice memos (`MediaRecorder`, MPEG_4 + AAC) and
    PDFs, kept with the queued note, posted as it is sent; share sheet for
    files (`ACTION_SEND` with streams, `ACTION_SEND_MULTIPLE`).
-5. Here: one `FusedLocationProviderClient.getCurrentLocation` (needs Play
+3. Here: one `FusedLocationProviderClient.getCurrentLocation` (needs Play
    services; ask Quinn before adding it), with the nearby businesses to pick.
-6. Upcoming: list, add, change and remove, with a dry run.
-7. Notifications: `POST_NOTIFICATIONS`, Upcoming reminders scheduled from
+4. Upcoming: list, add, change and remove, with a dry run.
+5. Notifications: `POST_NOTIFICATIONS`, Upcoming reminders scheduled from
    each day's `send_at`, the daily prompt, activity notices from WorkManager
    periodic work.
-8. A dev-server test cycle like the iPhone app's `ui-test-cycle.sh`.
+6. A toast for a badge a note unlocked (`unlocked` in its receipt).
+7. A dev-server test cycle like the iPhone app's `ui-test-cycle.sh`.
 
 `docs/PHONE-TEST.md` is the pass by hand each build gets on a real phone.

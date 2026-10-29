@@ -11,8 +11,10 @@ The Android pair of [Changelog for iPhone](https://github.com/jthingelstad/chang
 - **Log** a line, with one-tap tags. The button says Commit.
 - **Never lose a note.** Everything goes through an offline queue, and a
   resend never makes a duplicate.
+- **Check** what happened: the activity log, from every channel, without
+  the words. Edit or delete what this phone sent.
 - **Share** text or a link from any app into a note.
-- Coming: activity, photos, voice memos, where you are, Upcoming dates and
+- Coming: photos, voice memos, where you are, Upcoming dates and
   reminders. See "What's next" in [AGENTS.md](AGENTS.md).
 
 It talks only to Release Notes' public `/v1` API, with a token you make in

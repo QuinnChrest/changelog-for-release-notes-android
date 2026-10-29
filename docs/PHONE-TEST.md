@@ -17,8 +17,8 @@ Upcoming and the activity log.
 ## The list
 
 1. **Sign in.** "Paste token", then "Sign in". Log opens on today's version.
-2. **A note.** A line with a #tag, then Commit. It shows under "Sent from
-   this phone" and on the web. Delete it.
+2. **A note.** A line with a #tag, then Commit. It shows under Today and
+   on the web. Edit it (change a word, Save), then Delete it.
 3. **Tags.** Tap a tag in the row to add it, tap again to take it off.
    Touch and hold one: it goes on every note until Settings, "Stop adding
    #… to every note".
@@ -28,8 +28,9 @@ Upcoming and the activity log.
    send". Airplane mode off: it sends, once.
 6. **The build.** The foot of Settings names the version and the commit
    (`Changelog 0.0.0, build 1a2b3c4`).
-7. *(later)* Edit, Activity, pinned tags, photos, a voice memo, Here,
-   Upcoming, notifications.
-8. **Last, sign out.** Settings, "Sign out", then "Sign out and revoke this
+7. **Activity.** Rows from every channel; a filter; "Older" loads more.
+8. *(later)* Pinned tags, photos, a voice memo, Here, Upcoming,
+   notifications.
+9. **Last, sign out.** Settings, "Sign out", then "Sign out and revoke this
    token". The token shows as revoked on the web, and anything still
    waiting stays on the phone.

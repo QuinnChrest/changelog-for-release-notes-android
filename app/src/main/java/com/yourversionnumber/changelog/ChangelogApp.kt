@@ -58,7 +58,8 @@ class AppGraph(private val context: Context) {
     val problem: StateFlow<String?> = _problem.asStateFlow()
 
     var server: String
-        get() = if (BuildConfig.DEBUG) prefs.getString("server", Api.PRODUCTION)!! else Api.PRODUCTION
+        // Debug builds start on the dev server: development never touches real notes.
+        get() = if (BuildConfig.DEBUG) prefs.getString("server", BuildConfig.DEV_SERVER)!! else Api.PRODUCTION
         set(value) = prefs.edit().putString("server", value).apply()
 
     /** A tag added to every note until the owner stops it. */

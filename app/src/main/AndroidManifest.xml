@@ -6,6 +6,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- To set the reminders' alarms again after the phone restarts. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Here: one fix when the owner asks, in the foreground only. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-feature android:name="android.hardware.location" android:required="false" />
     <!-- Voice memos, asked for when the owner first taps Record. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Photos come from the system's camera app and photo picker, which need no permission here. -->

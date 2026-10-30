@@ -161,12 +161,20 @@ notes from elsewhere, problems, badges; never this token's own rows, never
 a note's words), read hourly in WorkManager from `/v1/activity?after=`.
 Each is off until turned on in Settings, each kind with its own channel.
 
+Pinned tags are set in Settings (`PUT /v1/tags/pinned`, through the
+Outbox) and come first in the tag row.
+
+Here (`Locator`): one fix when the owner taps Here, with Android's own
+`LocationManager.getCurrentLocation` (the fused provider where there is
+one, then GPS, then network, then a position from the last five minutes),
+so no Play services. `POST /v1/places/here` names it at once, and the
+nearby businesses are offered to pick, never picked for the owner. A spot
+that couldn't be named (offline) is named as the note sends (`prepare`); a
+place that can't be named at all is left off, never holding the note.
+
 To come, in about this order (the iPhone app has each one):
 
-1. Pinned tags in Settings (`PUT /v1/tags/pinned`, through the Outbox).
-2. Here: one `FusedLocationProviderClient.getCurrentLocation` (needs Play
-   services; ask Quinn before adding it), with the nearby businesses to pick.
-3. A toast for a badge a note unlocked (`unlocked` in its receipt).
-4. A dev-server test cycle like the iPhone app's `ui-test-cycle.sh`.
+1. A toast for a badge a note unlocked (`unlocked` in its receipt).
+2. A dev-server test cycle like the iPhone app's `ui-test-cycle.sh`.
 
 `docs/PHONE-TEST.md` is the pass by hand each build gets on a real phone.

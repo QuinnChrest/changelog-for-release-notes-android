@@ -43,9 +43,13 @@ Upcoming and the activity log.
     notifications. A reminder comes when the morning's email is due, in
     its words; tapping it opens Upcoming. Restart the phone: it still
     comes.
-12. **Prompt and notices.** "Ask me each morning" on: it comes at send
+12. **Here.** "Here", allow While using; the place shows: pick a business
+    nearby or "Leave the place off". The web note names it.
+13. **Pinned tags.** Settings, pin a tag: it leads the tag row, and the
+    web's Today agrees.
+14. **Prompt and notices.** "Ask me each morning" on: it comes at send
     time. "Notes from elsewhere" on, then a note from the web's agent or
-    another token: a notice within the hour. Later: pinned tags, Here.
-13. **Last, sign out.** Settings, "Sign out", then "Sign out and revoke this
+    another token: a notice within the hour. 
+15. **Last, sign out.** Settings, "Sign out", then "Sign out and revoke this
    token". The token shows as revoked on the web, and anything still
    waiting stays on the phone.

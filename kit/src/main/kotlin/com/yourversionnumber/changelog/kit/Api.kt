@@ -117,6 +117,13 @@ class Api(
         }
     }
 
+    /**
+     * Names the spot the phone is at, with the businesses nearby. Nothing is
+     * kept until a note takes the place. Each is a lookup Release Notes pays
+     * for, 100 a day: ask once a draft, never as words change.
+     */
+    suspend fun here(spot: Spot): Here = send("POST", "v1/places/here", body = encode(spot))
+
     // Upcoming, all needing the `upcoming` scope. Writes go at once, each with
     // a RequestKey, so a Save tapped again after a lost answer is the same save.
 

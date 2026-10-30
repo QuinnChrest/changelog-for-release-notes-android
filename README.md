@@ -24,7 +24,8 @@ The Android pair of [Changelog for iPhone](https://github.com/jthingelstad/chang
   that morning's email is due, in its words.
 - **A daily prompt** with the day's version, and **activity notices** from
   elsewhere, each off until you turn it on.
-- Coming: pinned tags and where you are. See "What's next" in [AGENTS.md](AGENTS.md).
+- **Where you are** on a note, the neighbourhood or a business nearby, and
+  **pinned tags** shared with the web. See "What's next" in [AGENTS.md](AGENTS.md).
 
 It talks only to Release Notes' public `/v1` API, with a token you make in
 Release Notes' Settings, under API tokens. The API is designed in

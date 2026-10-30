@@ -72,6 +72,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.yourversionnumber.changelog.R
 
@@ -498,7 +499,8 @@ fun withVersion(text: String, version: String?): androidx.compose.ui.text.Annota
             return@buildAnnotatedString
         }
         append(text.substring(0, at))
-        withStyle(SpanStyle(fontFamily = Mono, fontWeight = FontWeight.Bold, color = p.blue, letterSpacing = (-0.03).em(16.sp))) {
+        // Martian Mono runs wide: a size smaller than the words around it reads as the same.
+        withStyle(SpanStyle(fontFamily = Mono, fontWeight = FontWeight.Bold, color = p.blue, fontSize = 0.82.em, letterSpacing = (-0.04).em)) {
             version!!.forEach { c -> if (c == '.') withStyle(SpanStyle(color = p.orange)) { append(c) } else append(c) }
         }
         append(text.substring(at + version!!.length))

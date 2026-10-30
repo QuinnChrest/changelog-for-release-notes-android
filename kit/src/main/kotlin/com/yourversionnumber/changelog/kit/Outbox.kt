@@ -55,9 +55,13 @@ sealed interface OutboxOperation {
         val files: List<QueuedFile>,
         /** Times the uploads were made again after the note found them gone. */
         val reuploads: Int = 0,
+        /** Where the phone was, named by Here when the note is sent if it wasn't named already. */
+        val spot: Spot? = null,
+        /** The place, as Here named it (with a business, if one was picked). */
+        val place: DevicePlace? = null,
     ) : OutboxOperation {
-        /** Every file posted: ready to send. */
-        val ready: Boolean get() = files.all { it.upload != null }
+        /** Every file posted and the place named: ready to send. */
+        val ready: Boolean get() = files.all { it.upload != null } && (spot == null || place != null)
 
         val request: NoteRequest
             get() = NoteRequest(
@@ -65,6 +69,7 @@ sealed interface OutboxOperation {
                 date = date,
                 writtenAt = writtenAt,
                 uploads = files.map { UploadRef(it.upload.orEmpty(), it.type, it.name) }.ifEmpty { null },
+                place = place,
             )
     }
 }
@@ -137,15 +142,21 @@ class Outbox(private val file: File?, files: File? = null) {
         item
     }
 
-    /** Queues a new note, stamped with the moment it was typed; with files, a Post. */
+    /** Queues a new note, stamped with the moment it was typed; with files or a place, a Post. */
     suspend fun enqueueNote(
         text: String,
         date: String? = null,
         writtenAt: OffsetDateTime = OffsetDateTime.now(),
         files: List<QueuedFile> = emptyList(),
+        spot: Spot? = null,
+        place: DevicePlace? = null,
     ): OutboxItem {
         val stamp = Timestamp.format(writtenAt)
-        val op = if (files.isEmpty()) OutboxOperation.Note(text, date, stamp) else OutboxOperation.Post(text, date, stamp, files)
+        val op = if (files.isEmpty() && spot == null && place == null) {
+            OutboxOperation.Note(text, date, stamp)
+        } else {
+            OutboxOperation.Post(text, date, stamp, files, spot = spot ?: place?.let { Spot(it.lat, it.lon, it.accuracyM) }, place = place)
+        }
         return enqueue(op, writtenAt)
     }
 
@@ -330,7 +341,12 @@ suspend fun Api.perform(item: OutboxItem): OutboxResult {
     }
 }
 
-/** Posts a queued note's files, each asked for its form only as it goes, so it is ready to send. */
+/**
+ * Posts a queued note's files, each asked for its form only as it goes, and
+ * names its place, so it is ready to send. A place that can't be named (no
+ * city for the spot, or the day's 100 spots used) is left off: a note is
+ * never held back for its place.
+ */
 suspend fun Api.prepare(post: OutboxOperation.Post, outbox: Outbox): OutboxOperation.Post {
     val files = post.files.map { queued ->
         if (queued.upload != null) return@map queued
@@ -339,6 +355,16 @@ suspend fun Api.prepare(post: OutboxOperation.Post, outbox: Outbox): OutboxOpera
         val form = startUpload(UploadStart(queued.name, queued.type, bytes.length()))
         postFile(bytes, queued.name, form)
         queued.copy(upload = form.upload, type = form.type)
+    }
+    val spot = post.spot
+    if (spot != null && post.place == null) {
+        val place = try {
+            here(spot).place
+        } catch (e: ApiException) {
+            if (e.signedOut || (e.retryable && e.status != 429)) throw e
+            null
+        }
+        return post.copy(files = files, spot = place?.let { spot }, place = place)
     }
     return post.copy(files = files)
 }

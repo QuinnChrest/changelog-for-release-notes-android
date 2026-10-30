@@ -27,6 +27,8 @@ import com.yourversionnumber.changelog.kit.ActivityNoticeKind
 import com.yourversionnumber.changelog.kit.ActivityPage
 import com.yourversionnumber.changelog.kit.ApiException
 import com.yourversionnumber.changelog.kit.Hashtags
+import com.yourversionnumber.changelog.kit.Here
+import com.yourversionnumber.changelog.kit.Spot
 import com.yourversionnumber.changelog.kit.NoteDetail
 import com.yourversionnumber.changelog.kit.OutboxNotKept
 import com.yourversionnumber.changelog.kit.OutboxOperation
@@ -143,17 +145,79 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         val typed = draft.trim()
         if (typed.isEmpty() && files.isEmpty()) return
         val words = sticky?.let { Hashtags.adding(it, typed) } ?: typed
+        // Named by Here already, with the business picked; or a spot still to name as it sends.
+        val place = here?.place?.copy(venue = venue)
+        val unnamed = if (place == null) spot else null
         viewModelScope.launch {
             try {
-                graph.outbox.enqueueNote(words, files = files)
+                graph.outbox.enqueueNote(words, files = files, spot = unnamed, place = place)
                 draft = ""
                 draftFiles.clear()
                 files.forEach { thumbnails.remove(it.id) }
+                clearPlace()
                 graph.send()
             } catch (e: OutboxNotKept) {
                 graph.report(e.message)
             }
         }
+    }
+
+    // Where the draft was written. One fix and one Here a draft, when the
+    // owner asks: each Here is a lookup Release Notes pays for, 100 a day.
+
+    var here by mutableStateOf<Here?>(null)
+        private set
+    var spot by mutableStateOf<Spot?>(null)
+        private set
+    var venue by mutableStateOf<String?>(null)
+        private set
+    var locating by mutableStateOf(false)
+        private set
+
+    /** What the note will be named by, or null with no place. */
+    val placeLabel: String?
+        get() = here?.place?.copy(venue = venue)?.label ?: spot?.let { "Here, named as it sends" }
+
+    fun locate() {
+        if (locating) return
+        viewModelScope.launch {
+            locating = true
+            val found = Locator.fix(getApplication())
+            if (found == null) {
+                graph.report("This phone couldn't say where it is. Check that location is on.")
+            } else {
+                spot = found
+                here = null
+                venue = null
+                graph.api()?.let { api ->
+                    try {
+                        here = api.here(found)
+                    } catch (e: ApiException) {
+                        when {
+                            e.signedOut -> graph.tokenLost(e.message)
+                            // Offline: the note names its spot as it sends.
+                            e.status == 0 || (e.retryable && e.status != 429) -> {}
+                            else -> {
+                                spot = null
+                                graph.report(e.message)
+                            }
+                        }
+                    }
+                }
+            }
+            locating = false
+        }
+    }
+
+    /** A business nearby, or null for the neighbourhood or city alone. */
+    fun pick(venue: String?) {
+        this.venue = venue
+    }
+
+    fun clearPlace() {
+        here = null
+        spot = null
+        venue = null
     }
 
     // Files on the draft. They wait in the Outbox's folder from the moment

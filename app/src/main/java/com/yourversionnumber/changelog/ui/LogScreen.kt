@@ -86,13 +86,9 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
             }
             if (model.draftFiles.isNotEmpty()) item { AttachmentStrip(model) }
             item { TagRowView(model) }
-            item {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (model.canAddFiles) ComposerTools(model)
-                    Spacer(Modifier.weight(1f))
-                    GoButton("Commit", model::commit, enabled = model.canCommit)
-                }
-            }
+            item { ComposerTools(model) }
+            if (model.placeLabel != null) item { PlaceLine(model) }
+            item { GoButton("Commit", model::commit, enabled = model.canCommit) }
             problem?.let { message ->
                 item {
                     Row(verticalAlignment = Alignment.CenterVertically) {

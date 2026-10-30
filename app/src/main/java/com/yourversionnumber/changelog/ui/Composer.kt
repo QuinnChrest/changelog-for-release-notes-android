@@ -10,13 +10,19 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import com.yourversionnumber.changelog.Locator
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -52,7 +58,8 @@ import com.yourversionnumber.changelog.kit.QueuedFile
 import kotlinx.coroutines.delay
 import java.io.File
 
-/** Photos, the camera and a voice memo, beside Commit. Only for a token that can add files. */
+/** Photos, the camera and a voice memo (for a token that can add files), and Here. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ComposerTools(model: AppModel) {
     val context = LocalContext.current
@@ -68,17 +75,52 @@ fun ComposerTools(model: AppModel) {
         cameraFile = null
         if (taken && file != null && file.length() > 0) model.addCameraPhoto(file) else file?.delete()
     }
+    val whereAbouts = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+        if (granted.values.any { it }) model.locate()
+        else model.graph.report("Changelog can't add where you are without location. Allow it in Settings, Apps, Changelog.")
+    }
     val microphone = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) recording = true else model.graph.report("Changelog can't record without the microphone. Allow it in Settings, Apps, Changelog.")
     }
 
-    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+        if (model.canAddFiles) FileTools(model, room, context, photos, camera, { cameraFile = it }, microphone, { recording = true })
+        if (model.locating) {
+            QuietButton("Finding…", {}, enabled = false)
+        } else {
+            QuietButton(
+                if (model.placeLabel == null) "Here" else "Here again",
+                {
+                    if (Locator.allowed(context)) model.locate()
+                    else whereAbouts.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
+                },
+                modifier = Modifier.semantics { contentDescription = if (model.placeLabel == null) "Add where I am" else "Find where I am again" },
+            )
+        }
+    }
+
+    if (recording) RecorderDialog(model, onDone = { recording = false })
+}
+
+/** Photos, the camera and a voice memo, for a token that can add files. */
+@Composable
+private fun FileTools(
+    model: AppModel,
+    room: Int,
+    context: android.content.Context,
+    photos: androidx.activity.result.ActivityResultLauncher<PickVisualMediaRequest>,
+    camera: androidx.activity.result.ActivityResultLauncher<android.net.Uri>,
+    setCameraFile: (String) -> Unit,
+    microphone: androidx.activity.result.ActivityResultLauncher<String>,
+    record: () -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
         QuietButton("Photos", { photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = room > 0)
         QuietButton(
             "Camera",
             {
                 val file = model.scratch("jpg")
-                cameraFile = file.path
+                setCameraFile(file.path)
                 camera.launch(FileProvider.getUriForFile(context, "${context.packageName}.files", file))
             },
             enabled = room > 0,
@@ -87,7 +129,7 @@ fun ComposerTools(model: AppModel) {
             "Record",
             {
                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                    recording = true
+                    record()
                 } else {
                     microphone.launch(Manifest.permission.RECORD_AUDIO)
                 }
@@ -96,8 +138,6 @@ fun ComposerTools(model: AppModel) {
             modifier = Modifier.semantics { contentDescription = "Record a voice memo" },
         )
     }
-
-    if (recording) RecorderDialog(model, onDone = { recording = false })
 }
 
 /** Records while open: Stop puts the memo on the note, Cancel throws it away. */
@@ -188,6 +228,36 @@ private fun Attachment(file: QueuedFile, model: AppModel) {
                 modifier = Modifier.size(28.dp).semantics { contentDescription = "Take off ${file.name}" },
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
             ) { Text("✕", color = Color.White) }
+        }
+    }
+}
+
+/**
+ * Where the note was written: the neighbourhood or city Here named, a
+ * business nearby to pick (never picked for the owner), or none.
+ */
+@Composable
+fun PlaceLine(model: AppModel) {
+    val label = model.placeLabel ?: return
+    var open by remember { mutableStateOf(false) }
+    val here = model.here
+    Box {
+        Select("Place", label, { open = true }, Modifier.fillMaxWidth())
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            if (here != null) {
+                val place = here.place
+                DropdownMenuItem(
+                    text = { Text(place.district?.let { "$it, ${place.name}" } ?: place.name) },
+                    onClick = { model.pick(null); open = false },
+                )
+                here.nearby.forEach { n ->
+                    DropdownMenuItem(
+                        text = { Text("${n.name} · ${n.distanceM.toInt()} m") },
+                        onClick = { model.pick(n.name); open = false },
+                    )
+                }
+            }
+            DropdownMenuItem(text = { Text("Leave the place off", color = paper.orangeInk) }, onClick = { model.clearPlace(); open = false })
         }
     }
 }

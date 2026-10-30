@@ -130,6 +130,51 @@ class ApiTest {
         assertTrue(e.retryable)
     }
 
+    private val placeJson =
+        """{"place":{"name":"Minneapolis","region":"Minnesota","country":"United States","tz":"America/Chicago","district":"Old Town","lat":44.98,"lon":-93.26,"accuracy_m":20,"from":"device"},"nearby":[{"name":"Reading Room","lat":44.98,"lon":-93.2596,"distance_m":41}]}"""
+
+    @Test
+    fun hereNamesTheSpot() = runTest {
+        answer = { 200 to placeJson }
+        val here = api.here(Spot(44.98, -93.26, 20.0))
+        assertEquals("Old Town", here.place.label)
+        assertEquals("Reading Room", here.nearby.single().name)
+        assertEquals("""{"lat":44.98,"lon":-93.26,"accuracy_m":20.0}""", bodies.single())
+    }
+
+    @Test
+    fun aQueuedNotesSpotIsNamedAsItSends() = runTest {
+        answer = { 200 to placeJson }
+        val outbox = Outbox(null)
+        val item = outbox.enqueueNote("Coffee", spot = Spot(44.98, -93.26, 20.0))
+        val post = item.operation as OutboxOperation.Post
+        assertTrue(!post.ready)
+        val ready = api.prepare(post, outbox)
+        assertTrue(ready.ready)
+        assertEquals("Minneapolis", ready.request.place?.name)
+        assertEquals(null, ready.request.uploads)
+    }
+
+    @Test
+    fun aPlaceThatCantBeNamedIsLeftOff() = runTest {
+        answer = { 429 to """{"error":{"code":"rate_limited","message":"That's 100 places today."}}""" }
+        val outbox = Outbox(null)
+        val post = outbox.enqueueNote("Coffee", spot = Spot(44.98, -93.26)).operation as OutboxOperation.Post
+        val ready = api.prepare(post, outbox)
+        assertTrue(ready.ready)
+        assertEquals(null, ready.place)
+        assertEquals(null, ready.spot)
+    }
+
+    @Test
+    fun aPlaceAlreadyNamedGoesAsItCame() = runTest {
+        val outbox = Outbox(null)
+        val place = DevicePlace("Minneapolis", district = "Old Town", venue = "Reading Room", lat = 44.98, lon = -93.26)
+        val post = outbox.enqueueNote("Coffee", place = place).operation as OutboxOperation.Post
+        assertTrue(post.ready)
+        assertEquals("Reading Room", post.request.place?.label)
+    }
+
     @Test
     fun noServerIsANetworkFailure() = runTest {
         val gone = Api("http://127.0.0.1:1", token, "Changelog/0.0.0")

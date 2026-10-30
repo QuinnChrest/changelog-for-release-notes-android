@@ -127,3 +127,35 @@ object Multipart {
     /** A quote or a line break would end the header early. */
     private fun escape(s: String) = s.replace("\"", "%22").replace("\r", "").replace("\n", "")
 }
+
+/** Where the phone is, for `POST /v1/places/here`. */
+@Serializable
+data class Spot(val lat: Double, val lon: Double, val accuracyM: Double? = null)
+
+/**
+ * A spot with its names, sent back as a note's `place` as it came, with
+ * `venue` set only when the owner picked a business nearby.
+ */
+@Serializable
+data class DevicePlace(
+    val name: String,
+    val region: String? = null,
+    val country: String? = null,
+    val tz: String? = null,
+    val district: String? = null,
+    val venue: String? = null,
+    val lat: Double,
+    val lon: Double,
+    val accuracyM: Double? = null,
+    val from: String = "device",
+) {
+    /** What the note will be named by: the business picked, else the neighbourhood, else the city. */
+    val label: String get() = venue ?: district ?: name
+}
+
+/** `POST /v1/places/here`: the spot's names and up to 6 businesses nearby. Nothing is picked for the owner. */
+@Serializable
+data class Here(val place: DevicePlace, val nearby: List<Nearby> = emptyList())
+
+@Serializable
+data class Nearby(val name: String, val lat: Double, val lon: Double, val distanceM: Double)

@@ -51,3 +51,8 @@ Changelog numbers its builds the way Release Notes does, by Your Version
 Number's arithmetic from its own start on 29 October 2026 to the day a build
 is made, in Chicago: 0.0.0 on the first day, 0.1.0 a year on. The foot of
 Settings shows it with the commit.
+
+## License
+
+[MIT](LICENSE). The fonts are under the SIL Open Font License, in
+[docs/fonts](docs/fonts/OFL.txt).

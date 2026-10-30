@@ -4,7 +4,7 @@ What Changelog for Android does, what's left, and what's built but not yet
 checked. The iPhone app (`jthingelstad/changelog-ios`) is the reference;
 `AGENTS.md` says how each built piece works.
 
-**At a glance:** 38 built · 1 to do · 4 waiting on someone else · 7 to check
+**At a glance:** 39 built · 1 to do · 3 waiting on someone else · 7 to check
 
 Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 built, not yet checked
 
@@ -20,7 +20,6 @@ Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 b
 |---|---|---|
 | ⏳ | Sign in with Release Notes (OAuth) instead of pasting a token | Release Notes adding OAuth to `/v1` (its phase 5) |
 | ⏳ | Espresso 3.8 stable for the UI tests | Google; the tests use 3.8 alpha because 3.7 doesn't run on Android 17 |
-| ⏳ | License and sharing the repo with Jamie | Quinn (the iPhone app is MIT; this repo is private) |
 | ⏳ | Play Console internal testing | Quinn: a Play developer account and the upload key. The release build is checked and signs from `signing.properties` (`AGENTS.md`, Release builds). |
 
 ## Built, not yet checked
@@ -106,5 +105,6 @@ These are written and built; something about them couldn't be seen on the emulat
 | ✅ | Accessibility: switches labelled for TalkBack, 48dp targets, 4.5:1 text in both themes, every screen at 200% text |
 | ✅ | Release build: R8 keeps the JSON working (the UI test cycle passes shrunk), no plain HTTP, no local network permission |
 | ✅ | Release signing from a git-ignored `signing.properties` |
+| ✅ | MIT licensed, and the repo is public |
 | ✅ | Version numbers by Your Version Number's arithmetic from 2026-10-29 |
 | ✅ | Tests: unit tests, tests against the dev server, and a UI test cycle on the emulator; CI on every push |

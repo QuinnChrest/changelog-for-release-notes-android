@@ -1,6 +1,8 @@
 package com.yourversionnumber.changelog.ui
 
 import android.Manifest
+import androidx.core.net.toUri
+import android.content.Intent
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -62,6 +64,21 @@ private fun Toggle(title: String, about: String?, checked: Boolean, enabled: Boo
     }
 }
 
+/** A scope as the iPhone app says it. */
+private fun scopeName(scope: String) = when (scope) {
+    "notes:write" -> "add notes"
+    "media:write" -> "add files"
+    "upcoming" -> "Upcoming"
+    "activity" -> "read activity"
+    else -> scope
+}
+
+/** A token's expiry as a date, in the phone's way of writing one. */
+private fun expiry(at: String): String? = runCatching {
+    java.time.OffsetDateTime.parse(at).atZoneSameInstant(java.time.ZoneId.systemDefault())
+        .format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM))
+}.getOrNull()
+
 /** "06:30", the account's send time, as this phone writes a time. */
 private fun clock(time: String): String? = runCatching {
     LocalTime.parse(time).format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))
@@ -109,11 +126,11 @@ fun SettingsScreen(model: AppModel, onBack: () -> Unit) {
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Heading("Token", Modifier.padding(top = 12.dp))
+            Heading("This connection", Modifier.padding(top = 12.dp))
             me?.token?.let { token ->
                 Text(token.name)
-                Caption("Can: " + token.scopes.joinToString(", "))
-                Caption(token.expiresAt?.let { "Expires $it" } ?: "Never expires")
+                Caption("Can " + token.scopes.joinToString(", ") { scopeName(it) })
+                Caption(token.expiresAt?.let { expiry(it) }?.let { "Expires $it" } ?: "Never expires")
             }
             if (model.server != Api.PRODUCTION) Caption("Server: ${model.server}")
 
@@ -170,6 +187,17 @@ fun SettingsScreen(model: AppModel, onBack: () -> Unit) {
                 )
             } else {
                 Caption("To get them here, make a token with “Read the activity log” ticked.")
+            }
+
+            Heading("Release Notes", Modifier.padding(top = 12.dp))
+            // Always the real site: these are for the account, whichever server signed in.
+            listOf(
+                "Open Release Notes" to "",
+                "Settings on the web" to "settings/",
+                "The guide" to "guide/",
+                "Delete your account" to "delete/",
+            ).forEach { (label, path) ->
+                QuietButton(label, { context.startActivity(Intent(Intent.ACTION_VIEW, "${Api.PRODUCTION}/$path".toUri())) })
             }
 
             QuietButton("Sign out", { signingOut = true }, color = paper.orangeInk)

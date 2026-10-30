@@ -74,6 +74,19 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_version_info" />
         </receiver>
 
+        <!-- A Quick Settings tile: a tap to write, from the shade. -->
+        <service
+            android:name=".WriteTile"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="Changelog"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data android:name="android.service.quicksettings.TOGGLEABLE_TILE" android:value="false" />
+        </service>
+
         <!-- The camera writes a photo here, into the app's own cache. -->
         <provider
             android:name="androidx.core.content.FileProvider"

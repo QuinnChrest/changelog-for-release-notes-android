@@ -45,6 +45,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -131,6 +132,9 @@ private val Dark = Paper(
 )
 
 val LocalPaper = staticCompositionLocalOf { Light }
+
+/** How far up from the bottom the floating tab bar reaches, so a screen leaves that much room at the end of its list. */
+val LocalBarSpace = compositionLocalOf { 0.dp }
 
 /** The other palette, for a small thing drawn in reverse (ink paper, paper ink). */
 val Paper.inverse: Paper get() = if (this == Light) Dark else Light

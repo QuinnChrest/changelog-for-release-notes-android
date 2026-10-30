@@ -54,7 +54,15 @@ one tangerine button on a screen), `QuietButton` (blue words), `Pick` (the
 site's tag picks: underlined blue, the chosen one in bold ink), `PaperField`
 and `Select` (no box, a 2dp rule that turns tangerine), `Rule` and `Bar`.
 No boxes, no shadows, no Material chips or outlined fields: build new
-screens from these.
+screens from these. The one exception is the tab bar along the bottom
+(`FloatingTabs` in `MainActivity.kt`), a rounded bar lifted off the screen
+with a shadow, as the iPhone app's: an icon over its word, the one you're on
+in blue on a soft pill, with a fade of paper beneath it. Its icons, and the
+composer's (photos, camera, record, Here), are outline vectors in
+`res/drawable/ic_*.xml`, drawn by hand in one stroke weight and tinted by the
+screen: no icon library. A screen that scrolls leaves `LocalBarSpace` at the
+end of its list for the bar. On Log the streak sits at the right of the top
+bar, and Commit at the right of the composer's icons.
 
 ## Rules
 

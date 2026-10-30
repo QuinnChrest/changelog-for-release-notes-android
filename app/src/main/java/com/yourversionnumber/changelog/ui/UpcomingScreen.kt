@@ -83,7 +83,11 @@ fun UpcomingScreen(model: AppModel) {
             )
         },
     ) { padding ->
-        LazyColumn(Modifier.padding(padding), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        LazyColumn(
+            Modifier.padding(padding),
+            contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + LocalBarSpace.current),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             if (!model.hasUpcoming) {
                 item {
                     Text(

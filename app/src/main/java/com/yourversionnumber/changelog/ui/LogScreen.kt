@@ -82,10 +82,10 @@ fun LogScreen(model: AppModel) {
 
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
-        Bar()
+        Bar { Box(Modifier.padding(end = 12.dp)) { StreakNote(model) } }
         LazyColumn(
             Modifier.imePadding(),
-            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 32.dp),
+            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 32.dp + LocalBarSpace.current),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item { VersionHeader(model) }
@@ -111,7 +111,6 @@ fun LogScreen(model: AppModel) {
             item { TagRowView(model) }
             item { ComposerTools(model) }
             if (model.placeLabel != null) item { PlaceLine(model) }
-            item { GoButton(say(R.string.commit), model::commit, enabled = model.canCommit) }
             problem?.let { message ->
                 item {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -217,13 +216,17 @@ private fun VersionHeader(model: AppModel) {
         )
         Spacer(Modifier.height(8.dp))
         VersionText(me?.version, size = 52.sp)
-        Spacer(Modifier.height(10.dp))
-        when {
-            me == null -> {}
-            me.status == "stopped" -> Caption(say(R.string.your_email_is_stopped), color = paper.orangeInk)
-            me.streak > 1 -> Caption(sayCount(R.plurals.streak, me.streak, me.streak))
-            me.wroteToday -> Caption(say(R.string.written_today))
-        }
+    }
+}
+
+/** The email's state, or the streak, at the right of the top bar. */
+@Composable
+private fun StreakNote(model: AppModel) {
+    val me = model.me ?: return
+    when {
+        me.status == "stopped" -> Caption(say(R.string.your_email_is_stopped), color = paper.orangeInk)
+        me.streak > 1 -> Caption(sayCount(R.plurals.streak, me.streak, me.streak))
+        me.wroteToday -> Caption(say(R.string.written_today))
     }
 }
 

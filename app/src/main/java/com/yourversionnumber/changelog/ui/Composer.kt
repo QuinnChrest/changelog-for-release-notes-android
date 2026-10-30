@@ -5,14 +5,17 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -21,8 +24,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -43,7 +48,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
@@ -60,7 +68,7 @@ import com.yourversionnumber.changelog.say
 import java.io.File
 import kotlinx.coroutines.delay
 
-/** Photos, the camera and a voice memo (for a token that can add files), and Here. */
+/** Photos, the camera and a voice memo (for a token that can add files), and Here, as icons, with Commit at the right. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ComposerTools(model: AppModel) {
@@ -85,20 +93,24 @@ fun ComposerTools(model: AppModel) {
         if (granted) recording = true else model.graph.report(say(R.string.changelog_cant_record_without_the))
     }
 
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
         if (model.canAddFiles) FileTools(model, room, context, photos, camera, { cameraFile = it }, microphone, { recording = true })
         if (model.locating) {
-            QuietButton(say(R.string.finding), {}, enabled = false)
+            Box(Modifier.size(48.dp).semantics { contentDescription = say(R.string.finding) }, contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(Modifier.size(22.dp), color = paper.orange, strokeWidth = 2.dp)
+            }
         } else {
-            QuietButton(
-                if (model.placeLabel == null) say(R.string.here) else say(R.string.here_again),
+            ToolIcon(
+                R.drawable.ic_here,
+                if (model.placeLabel == null) say(R.string.add_where_i_am) else say(R.string.find_where_i_am_again),
                 {
                     if (Locator.allowed(context)) model.locate()
                     else whereAbouts.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
                 },
-                modifier = Modifier.semantics { contentDescription = if (model.placeLabel == null) say(R.string.add_where_i_am) else say(R.string.find_where_i_am_again) },
             )
         }
+        Spacer(Modifier.weight(1f))
+        GoButton(say(R.string.commit), model::commit, enabled = model.canCommit)
     }
 
     if (recording) RecorderDialog(model, onDone = { recording = false })
@@ -116,28 +128,52 @@ private fun FileTools(
     microphone: androidx.activity.result.ActivityResultLauncher<String>,
     record: () -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-        QuietButton(say(R.string.photos), { photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = room > 0)
-        QuietButton(
-            say(R.string.camera),
-            {
-                val file = model.scratch("jpg")
-                setCameraFile(file.path)
-                camera.launch(FileProvider.getUriForFile(context, "${context.packageName}.files", file))
-            },
-            enabled = room > 0,
-        )
-        QuietButton(
-            say(R.string.record),
-            {
-                if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                    record()
-                } else {
-                    microphone.launch(Manifest.permission.RECORD_AUDIO)
-                }
-            },
-            enabled = room > 0,
-            modifier = Modifier.semantics { contentDescription = say(R.string.record_a_voice_memo) },
+    ToolIcon(
+        R.drawable.ic_photos,
+        say(R.string.photos),
+        { photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+        enabled = room > 0,
+    )
+    ToolIcon(
+        R.drawable.ic_camera,
+        say(R.string.camera),
+        {
+            val file = model.scratch("jpg")
+            setCameraFile(file.path)
+            camera.launch(FileProvider.getUriForFile(context, "${context.packageName}.files", file))
+        },
+        enabled = room > 0,
+    )
+    ToolIcon(
+        R.drawable.ic_mic,
+        say(R.string.record_a_voice_memo),
+        {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                record()
+            } else {
+                microphone.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        },
+        enabled = room > 0,
+    )
+}
+
+/** One tool of the composer: an outline icon in blue, a 48dp target, named for TalkBack. */
+@Composable
+private fun ToolIcon(@DrawableRes icon: Int, description: String, onClick: () -> Unit, enabled: Boolean = true) {
+    Box(
+        Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painterResource(icon),
+            contentDescription = null,
+            Modifier.size(26.dp),
+            tint = if (enabled) paper.blue else paper.ink3.copy(alpha = 0.5f),
         )
     }
 }

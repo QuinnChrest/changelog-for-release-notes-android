@@ -4,7 +4,7 @@ What Changelog for Android does, what's left, and what's built but not yet
 checked. The iPhone app (`jthingelstad/changelog-ios`) is the reference;
 `AGENTS.md` says how each built piece works.
 
-**At a glance:** 43 built · 3 to do · 2 waiting on someone else · 5 to check
+**At a glance:** 45 built · 3 to do · 2 waiting on someone else · 5 to check
 
 Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 built, not yet checked
 
@@ -91,6 +91,8 @@ These are written and built; something about them couldn't be seen on the emulat
 | ✅ | Switches for reminders, the daily prompt and each kind of notice |
 | ✅ | Appearance: same as the phone, light or dark, kept on the phone |
 | ✅ | Settings is the fourth tab, along the bottom |
+| ✅ | A tab bar lifted off the screen, with an icon over each word, as the iPhone app's |
+| ✅ | Log: photos, camera, record and Here as icons with Commit at their right; the streak at the right of the top bar |
 
 ### Outside the app
 | | Feature |

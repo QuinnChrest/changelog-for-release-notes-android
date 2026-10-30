@@ -128,7 +128,8 @@ fun SettingsScreen(model: AppModel) {
         },
     ) { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
+            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())
+                .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + LocalBarSpace.current),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Heading(say(R.string.appearance), Modifier.padding(top = 12.dp))

@@ -7,6 +7,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Switch
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -23,6 +25,8 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -207,10 +211,23 @@ private fun PinnedTags(model: AppModel) {
     }
 
     if (pinned.isEmpty()) Caption("None yet. Pinned tags come first on Log, and on the web's Today.")
-    pinned.forEach { t ->
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    // In the order they come in the tag row. Up and Down rather than dragging,
+    // so the order can be changed with a screen reader too.
+    pinned.forEachIndexed { i, t ->
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("#$t", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            QuietButton("Unpin", { model.setPinned(pinned - t) }, color = paper.ink2)
+            // Fixed slots, so the buttons line up from row to row.
+            Box(Modifier.width(56.dp)) {
+                if (i > 0) {
+                    QuietButton("Up", { model.setPinned(pinned.moved(i, i - 1)) }, Modifier.semantics { contentDescription = "Move #$t up" })
+                }
+            }
+            Box(Modifier.width(72.dp)) {
+                if (i < pinned.lastIndex) {
+                    QuietButton("Down", { model.setPinned(pinned.moved(i, i + 1)) }, Modifier.semantics { contentDescription = "Move #$t down" })
+                }
+            }
+            QuietButton("Unpin", { model.setPinned(pinned - t) }, Modifier.semantics { contentDescription = "Unpin #$t" }, color = paper.ink2)
         }
     }
     if (pinned.size < MAX_PINS) {
@@ -219,7 +236,7 @@ private fun PinnedTags(model: AppModel) {
                 adding,
                 { adding = it },
                 Modifier.weight(1f),
-                placeholder = "#family",
+                placeholder = "Pin a tag, like #garden",
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done, autoCorrectEnabled = false),
                 keyboardActions = KeyboardActions(onDone = { add() }),
             )
@@ -232,3 +249,5 @@ private fun PinnedTags(model: AppModel) {
 }
 
 private const val MAX_PINS = 12
+
+private fun <T> List<T>.moved(from: Int, to: Int): List<T> = toMutableList().apply { add(to, removeAt(from)) }

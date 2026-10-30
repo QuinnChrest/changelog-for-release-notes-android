@@ -29,6 +29,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -216,7 +217,8 @@ private val type = Typography().let { t ->
 fun ChangelogTheme(content: @Composable () -> Unit) {
     val dark = isSystemInDarkTheme()
     val p = if (dark) Dark else Light
-    CompositionLocalProvider(LocalPaper provides p) {
+    // Text with no colour of its own takes the content colour, black unless something sets it.
+    CompositionLocalProvider(LocalPaper provides p, LocalContentColor provides p.ink) {
         MaterialTheme(colorScheme = scheme(p, dark), typography = type, content = content)
     }
 }

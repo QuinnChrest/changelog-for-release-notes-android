@@ -4,7 +4,7 @@ What Changelog for Android does, what's left, and what's built but not yet
 checked. The iPhone app (`jthingelstad/changelog-ios`) is the reference;
 `AGENTS.md` says how each built piece works.
 
-**At a glance:** 39 built · 1 to do · 3 waiting on someone else · 7 to check
+**At a glance:** 42 built · 1 to do · 3 waiting on someone else · 4 to check
 
 Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 built, not yet checked
 
@@ -28,11 +28,9 @@ These are written and built; something about them couldn't be seen on the emulat
 
 | | Feature | What still needs seeing |
 |---|---|---|
-| 🔍 | HEIC photos become JPEG | No HEIC sample on the emulator |
-| 🔍 | A shared video is refused with a message | No video sample on the emulator |
+| 🔍 | HEIC photos become JPEG | `MediaTest` runs a BMP through the same path (it comes out a JPEG); no real HEIC to hand |
 | 🔍 | Reminders and the daily prompt fire at 6 a.m. | The emulator can't jump its clock; scheduled times were checked, not the firing |
 | 🔍 | Reminders survive a phone restart | Not rebooted with alarms waiting |
-| 🔍 | Sign-in screen in dark mode | Seen in light only |
 | 🔍 | The whole pass on a real phone | `docs/PHONE-TEST.md`, by hand, on a real account |
 | 🔍 | UI test cycle in CI | Runs on emulators here; CI runs the unit tests and lint only |
 
@@ -66,7 +64,8 @@ These are written and built; something about them couldn't be seen on the emulat
 | ✅ | Files wait on the phone with the note; uploads go as it sends, and are made again if they expire |
 | ✅ | Here: where a note was written, the neighbourhood or a business nearby to pick |
 | ✅ | "Add where I am": each new draft finds its place, reused for ten minutes |
-| ✅ | Share text, links, photos, recordings and PDFs from any app |
+| ✅ | Share text, links, photos, recordings and PDFs from any app, landing on Log wherever the app was left |
+| ✅ | A shared video is refused with a message (`MediaTest`) |
 
 ### Upcoming
 | | Feature |
@@ -99,7 +98,7 @@ These are written and built; something about them couldn't be seen on the emulat
 ### Look and build
 | | Feature |
 |---|---|
-| ✅ | Release Notes' look, light and dark: its colours, fonts and version style |
+| ✅ | Release Notes' look, light and dark: its colours, fonts and version style (every screen seen in both) |
 | ✅ | Runs on Android 12 through 17 (tested on 16 and 17) |
 | ✅ | Words in `strings.xml`, with plurals, ready for translation |
 | ✅ | Accessibility: switches labelled for TalkBack, 48dp targets, 4.5:1 text in both themes, every screen at 200% text |

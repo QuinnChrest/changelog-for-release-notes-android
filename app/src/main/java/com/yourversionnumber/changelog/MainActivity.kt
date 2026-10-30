@@ -140,6 +140,8 @@ class MainActivity : ComponentActivity() {
         if (intent?.getBooleanExtra(WRITE, false) == true) model.writeNow = true
         val action = intent?.action
         if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return
+        // The draft, and any message about it, are on Log, wherever the app was left.
+        model.screen = "log"
         intent.getStringExtra(Intent.EXTRA_TEXT)?.let { text ->
             val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
             model.receive(if (subject.isNullOrBlank() || text.contains(subject)) text else "$subject\n$text")

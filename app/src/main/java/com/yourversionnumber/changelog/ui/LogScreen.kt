@@ -4,10 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.liveRegion
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +19,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -40,7 +37,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -50,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yourversionnumber.changelog.AppModel
 import com.yourversionnumber.changelog.NoteTarget
+import com.yourversionnumber.changelog.R
 import com.yourversionnumber.changelog.Sent
 import com.yourversionnumber.changelog.kit.Hashtags
 import com.yourversionnumber.changelog.kit.MediaType
@@ -57,8 +57,11 @@ import com.yourversionnumber.changelog.kit.NoteDetail
 import com.yourversionnumber.changelog.kit.OutboxItem
 import com.yourversionnumber.changelog.kit.OutboxOperation
 import com.yourversionnumber.changelog.kit.UpcomingDraft
+import com.yourversionnumber.changelog.say
+import com.yourversionnumber.changelog.sayCount
 import com.yourversionnumber.changelog.target
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.delay
 
 /** The home screen: today's version, the box, the tag row, Commit, and what happened today. */
 @Composable
@@ -79,7 +82,7 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
 
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
-        Bar { QuietButton("Settings", onSettings) }
+        Bar { QuietButton(say(R.string.settings), onSettings) }
         LazyColumn(
             Modifier.imePadding(),
             contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 32.dp),
@@ -98,8 +101,8 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
                         field = it
                         model.draft = it.text
                     },
-                    Modifier.fillMaxWidth().focusRequester(noteBox).semantics { contentDescription = "Note" },
-                    placeholder = "What changed?",
+                    Modifier.fillMaxWidth().focusRequester(noteBox).semantics { contentDescription = say(R.string.note) },
+                    placeholder = say(R.string.what_changed),
                     singleLine = false,
                     minLines = 3,
                 )
@@ -108,28 +111,28 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
             item { TagRowView(model) }
             item { ComposerTools(model) }
             if (model.placeLabel != null) item { PlaceLine(model) }
-            item { GoButton("Commit", model::commit, enabled = model.canCommit) }
+            item { GoButton(say(R.string.commit), model::commit, enabled = model.canCommit) }
             problem?.let { message ->
                 item {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(message, Modifier.weight(1f), color = paper.orangeInk, style = MaterialTheme.typography.bodyMedium)
-                        QuietButton("OK", model::clearProblem)
+                        QuietButton(say(R.string.ok), model::clearProblem)
                     }
                 }
             }
             if (waiting.isNotEmpty()) {
-                item { Heading("Waiting to send", Modifier.padding(top = 16.dp)) }
+                item { Heading(say(R.string.waiting_to_send), Modifier.padding(top = 16.dp)) }
                 items(waiting, key = { it.id }) { item ->
                     WaitingRow(item, onDiscard = { model.discard(item.id) }, onFix = { fixing = item })
                 }
             }
             // With the activity log, Today shows every channel; without it, what this phone sent.
-            item { Heading(if (model.hasActivity) "Today" else "Sent from this phone", Modifier.padding(top = 16.dp)) }
+            item { Heading(if (model.hasActivity) say(R.string.today) else say(R.string.sent_from_this_phone), Modifier.padding(top = 16.dp)) }
             val empty = if (model.hasActivity) model.today.isEmpty() else sent.isEmpty()
             if (empty) {
                 item {
                     Text(
-                        model.me?.let { "No changes yet in ${it.version}." } ?: "Nothing yet.",
+                        model.me?.let { say(R.string.no_changes_yet_in, it.version) } ?: say(R.string.nothing_yet),
                         color = paper.ink3,
                         style = MaterialTheme.typography.bodyMedium,
                     )
@@ -142,8 +145,8 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
                         item,
                         actions = if (!mine) null else {
                             {
-                                QuietButton("Edit", { editing = item.target })
-                                QuietButton("Delete", { deleting = item.target })
+                                QuietButton(say(R.string.edit), { editing = item.target })
+                                QuietButton(say(R.string.delete), { deleting = item.target })
                             }
                         },
                     )
@@ -172,25 +175,30 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
         var text by remember(item.id) { mutableStateOf(item.text.orEmpty()) }
         AlertDialog(
             onDismissRequest = { fixing = null },
-            title = { Text("Fix and send again") },
+            title = { Text(say(R.string.fix_and_send_again)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     item.refusal?.let { Text(it, color = paper.orangeInk) }
                     PaperField(text, { text = it }, singleLine = false)
                 }
             },
-            confirmButton = { QuietButton("Send", { model.fix(item.id, text); fixing = null }) },
-            dismissButton = { QuietButton("Cancel", { fixing = null }, color = paper.ink2) },
+            confirmButton = { QuietButton(say(R.string.send), { model.fix(item.id, text); fixing = null }) },
+            dismissButton = { QuietButton(say(R.string.cancel), { fixing = null }, color = paper.ink2) },
         )
     }
 
     deleting?.let { target ->
         AlertDialog(
             onDismissRequest = { deleting = null },
-            title = { Text("Delete this note?") },
-            text = { Text("It comes out of ${target.version ?: "its day"} in Release Notes, with anything attached.") },
-            confirmButton = { QuietButton("Delete", { model.delete(target); deleting = null }, color = paper.orangeInk) },
-            dismissButton = { QuietButton("Keep", { deleting = null }) },
+            title = { Text(say(R.string.delete_this_note)) },
+            text = {
+                Text(
+                    target.version?.let { say(R.string.it_comes_out_of_in, it) }
+                        ?: say(R.string.it_comes_out_of_its),
+                )
+            },
+            confirmButton = { QuietButton(say(R.string.delete), { model.delete(target); deleting = null }, color = paper.orangeInk) },
+            dismissButton = { QuietButton(say(R.string.keep), { deleting = null }) },
         )
     }
 }
@@ -212,9 +220,9 @@ private fun VersionHeader(model: AppModel) {
         Spacer(Modifier.height(10.dp))
         when {
             me == null -> {}
-            me.status == "stopped" -> Caption("Your email is stopped.", color = paper.orangeInk)
-            me.streak > 1 -> Caption("${me.streak} days in a row")
-            me.wroteToday -> Caption("Written today")
+            me.status == "stopped" -> Caption(say(R.string.your_email_is_stopped), color = paper.orangeInk)
+            me.streak > 1 -> Caption(sayCount(R.plurals.streak, me.streak, me.streak))
+            me.wroteToday -> Caption(say(R.string.written_today))
         }
     }
 }
@@ -241,7 +249,7 @@ private fun TagRowView(model: AppModel) {
                 )
             }
         }
-        model.sticky?.let { Caption("#$it goes on every note. Touch and hold it to stop.") }
+        model.sticky?.let { Caption(say(R.string.goes_on_every_note_touch, it)) }
     }
 }
 
@@ -249,9 +257,9 @@ private fun TagRowView(model: AppModel) {
 private fun WaitingRow(item: OutboxItem, onDiscard: () -> Unit, onFix: () -> Unit) {
     val summary = when (val op = item.operation) {
         is OutboxOperation.Note -> op.text
-        is OutboxOperation.Edit -> "Edit: ${op.text}"
-        is OutboxOperation.Delete -> "Delete a note"
-        is OutboxOperation.Pins -> "Pinned tags"
+        is OutboxOperation.Edit -> say(R.string.edit_2, op.text)
+        is OutboxOperation.Delete -> say(R.string.delete_a_note)
+        is OutboxOperation.Pins -> say(R.string.pinned_tags)
         is OutboxOperation.Post -> op.text.ifBlank { MediaType.count(op.files) }
     }
     Column {
@@ -259,12 +267,12 @@ private fun WaitingRow(item: OutboxItem, onDiscard: () -> Unit, onFix: () -> Uni
         if (item.files.isNotEmpty() && item.text?.isNotBlank() == true) Caption(MediaType.count(item.files))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Caption(
-                item.refusal ?: if (item.attempts > 0) "Will try again" else "Waiting for a connection",
+                item.refusal ?: if (item.attempts > 0) say(R.string.will_try_again) else say(R.string.waiting_for_a_connection),
                 Modifier.weight(1f),
                 color = if (item.refusal != null) paper.orangeInk else paper.ink3,
             )
-            if (item.refusal != null && item.isNote) QuietButton("Fix", onFix)
-            QuietButton("Discard", onDiscard, color = paper.ink2)
+            if (item.refusal != null && item.isNote) QuietButton(say(R.string.fix), onFix)
+            QuietButton(say(R.string.discard), onDiscard, color = paper.ink2)
         }
         Rule()
     }
@@ -276,11 +284,11 @@ private fun SentRow(sent: Sent, onEdit: () -> Unit, onDelete: () -> Unit) {
         Text(sent.text, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                Caption("Filed in ")
+                Caption(say(R.string.filed_in_2))
                 VersionText(sent.note.version, size = 13.sp)
             }
-            QuietButton("Edit", onEdit)
-            QuietButton("Delete", onDelete)
+            QuietButton(say(R.string.edit), onEdit)
+            QuietButton(say(R.string.delete), onDelete)
         }
         Rule()
     }
@@ -297,7 +305,7 @@ private fun EditNoteDialog(model: AppModel, target: NoteTarget, onDone: () -> Un
     }
     AlertDialog(
         onDismissRequest = onDone,
-        title = { Text(target.version?.let { "Edit in $it" } ?: "Edit") },
+        title = { Text(target.version?.let { say(R.string.edit_in, it) } ?: say(R.string.edit)) },
         text = {
             if (note == null) {
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = paper.orange) }
@@ -307,12 +315,12 @@ private fun EditNoteDialog(model: AppModel, target: NoteTarget, onDone: () -> Un
         },
         confirmButton = {
             QuietButton(
-                "Save",
+                say(R.string.save),
                 { note?.let { model.save(it, text) }; onDone() },
                 enabled = note != null && text.isNotBlank() && text != note?.text,
             )
         },
-        dismissButton = { QuietButton("Cancel", onDone, color = paper.ink2) },
+        dismissButton = { QuietButton(say(R.string.cancel), onDone, color = paper.ink2) },
     )
 }
 

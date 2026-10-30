@@ -44,23 +44,26 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.yourversionnumber.changelog.AppModel
+import com.yourversionnumber.changelog.R
 import com.yourversionnumber.changelog.kit.UpcomingDraft
 import com.yourversionnumber.changelog.kit.UpcomingEntry
 import com.yourversionnumber.changelog.kit.UpcomingKind
-import kotlinx.coroutines.launch
+import com.yourversionnumber.changelog.say
+import com.yourversionnumber.changelog.sayCount
 import java.time.Instant
 import java.time.LocalDate
 import java.time.Month
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
-import androidx.compose.ui.platform.LocalConfiguration
+import kotlinx.coroutines.launch
 
 /** Birthdays, anniversaries, trips and events ahead, each in the line the email gives it. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -74,8 +77,8 @@ fun UpcomingScreen(model: AppModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Upcoming") },
-                actions = { if (model.hasUpcoming) QuietButton("Add a date", { adding = true }) },
+                title = { Text(say(R.string.upcoming)) },
+                actions = { if (model.hasUpcoming) QuietButton(say(R.string.add_a_date), { adding = true }) },
             )
         },
     ) { padding ->
@@ -83,14 +86,14 @@ fun UpcomingScreen(model: AppModel) {
             if (!model.hasUpcoming) {
                 item {
                     Text(
-                        "This token can't read your Upcoming dates. Make one with “Read and change your Upcoming dates” ticked to see them here.",
+                        say(R.string.this_token_cant_read_your_2),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             } else if (list != null && list.entries.isEmpty()) {
                 item {
                     Text(
-                        "Nothing ahead. Add a birthday, an anniversary, a trip or an event, and the morning email reminds you.",
+                        say(R.string.nothing_ahead_add_a_birthday),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -99,7 +102,7 @@ fun UpcomingScreen(model: AppModel) {
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .clickable(role = Role.Button, onClickLabel = "Edit") { editing = entry }
+                        .clickable(role = Role.Button, onClickLabel = say(R.string.edit)) { editing = entry }
                         .padding(vertical = 10.dp),
                 ) {
                     Text(entry.line, style = MaterialTheme.typography.bodyLarge)
@@ -109,8 +112,8 @@ fun UpcomingScreen(model: AppModel) {
             }
             list?.let {
                 val notes = listOfNotNull(
-                    it.pastLeftOut.takeIf { n -> n > 0 }?.let { n -> if (n == 1) "1 date already over isn't shown." else "$n dates already over aren't shown." },
-                    it.unreadable.takeIf { n -> n > 0 }?.let { n -> "$n of a kind this version can't show yet: see them on the web." },
+                    it.pastLeftOut.takeIf { n -> n > 0 }?.let { n -> sayCount(R.plurals.past_left_out, n, n) },
+                    it.unreadable.takeIf { n -> n > 0 }?.let { n -> sayCount(R.plurals.unreadable, n, n) },
                 )
                 if (notes.isNotEmpty()) item { Caption(notes.joinToString(" "), Modifier.padding(top = 12.dp)) }
             }
@@ -125,8 +128,8 @@ fun UpcomingScreen(model: AppModel) {
 private val dayFormat = DateTimeFormatter.ofPattern("EEE, MMM d")
 
 private fun whenSaid(e: UpcomingEntry): String = when (e.status) {
-    "today" -> "Today"
-    "ongoing" -> "On now" + (e.through?.let { UpcomingDraft.parse(it) }?.let { ", through ${it.format(dayFormat)}" } ?: "")
+    "today" -> say(R.string.today)
+    "ongoing" -> e.through?.let { UpcomingDraft.parse(it) }?.let { say(R.string.on_now_through, it.format(dayFormat)) } ?: say(R.string.on_now)
     else -> UpcomingDraft.parse(e.next)?.format(dayFormat) ?: e.next
 }
 
@@ -156,9 +159,9 @@ private fun UpcomingEditor(model: AppModel, editing: UpcomingEntry?, onDone: () 
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text(if (editing == null) "Add a date" else "Edit") },
-                    navigationIcon = { QuietButton("Cancel", onDone, color = paper.ink2) },
-                    actions = { QuietButton("Save", ::save, enabled = !busy) },
+                    title = { Text(if (editing == null) say(R.string.add_a_date) else say(R.string.edit)) },
+                    navigationIcon = { QuietButton(say(R.string.cancel), onDone, color = paper.ink2) },
+                    actions = { QuietButton(say(R.string.save), ::save, enabled = !busy) },
                 )
             },
         ) { padding ->
@@ -175,7 +178,7 @@ private fun UpcomingEditor(model: AppModel, editing: UpcomingEntry?, onDone: () 
                     draft.title,
                     { draft = draft.copy(title = it.replace("\n", " ")) },
                     Modifier.fillMaxWidth(),
-                    label = if (draft.kind.annual) "Whose" else "Title",
+                    label = if (draft.kind.annual) say(R.string.whose) else say(R.string.title),
                     placeholder = placeholder(draft.kind),
                 )
 
@@ -183,14 +186,14 @@ private fun UpcomingEditor(model: AppModel, editing: UpcomingEntry?, onDone: () 
                     UpcomingKind.Birthday, UpcomingKind.Anniversary -> {
                         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                             Picker(
-                                title = "Month",
+                                title = say(R.string.month),
                                 label = Month.of(draft.month).getDisplayName(TextStyle.FULL, locale),
                                 options = (1..12).map { it to Month.of(it).getDisplayName(TextStyle.FULL, locale) },
                                 onPick = { draft = draft.withMonth(it) },
                                 modifier = Modifier.weight(2f),
                             )
                             Picker(
-                                title = "Day",
+                                title = say(R.string.day),
                                 label = draft.day.toString(),
                                 options = (1..UpcomingDraft.daysIn(draft.month)).map { it to it.toString() },
                                 onPick = { draft = draft.copy(day = it) },
@@ -201,20 +204,20 @@ private fun UpcomingEditor(model: AppModel, editing: UpcomingEntry?, onDone: () 
                             draft.year,
                             { draft = draft.copy(year = it.filter(Char::isDigit).take(4)) },
                             Modifier.fillMaxWidth(),
-                            label = if (draft.kind == UpcomingKind.Birthday) "Year born (optional)" else "Year it began (optional)",
+                            label = if (draft.kind == UpcomingKind.Birthday) say(R.string.year_born_optional) else say(R.string.year_it_began_optional),
                             placeholder = "YYYY",
-                            supporting = "With a year, the line says which one it is.",
+                            supporting = say(R.string.with_a_year_the_line),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         )
                     }
                     UpcomingKind.Trip -> {
                         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                            DayButton("First day", draft.start, Modifier.weight(1f)) { draft = draft.withStart(it) }
-                            DayButton("Last day", draft.end, Modifier.weight(1f)) { draft = draft.copy(end = it) }
+                            DayButton(say(R.string.first_day), draft.start, Modifier.weight(1f)) { draft = draft.withStart(it) }
+                            DayButton(say(R.string.last_day), draft.end, Modifier.weight(1f)) { draft = draft.copy(end = it) }
                         }
-                        Destination(draft.place, "Destination", found) { draft = draft.copy(place = it); found = null }
+                        Destination(draft.place, say(R.string.destination), found) { draft = draft.copy(place = it); found = null }
                         QuietButton(
-                            "Find the city",
+                            say(R.string.find_the_city),
                             {
                                 busy = true
                                 scope.launch {
@@ -229,18 +232,18 @@ private fun UpcomingEditor(model: AppModel, editing: UpcomingEntry?, onDone: () 
                         )
                     }
                     UpcomingKind.Event -> {
-                        DayButton("Day", draft.start, Modifier.fillMaxWidth()) { draft = draft.withStart(it) }
-                        Destination(draft.place, "Place (optional)", null) { draft = draft.copy(place = it) }
+                        DayButton(say(R.string.day), draft.start, Modifier.fillMaxWidth()) { draft = draft.withStart(it) }
+                        Destination(draft.place, say(R.string.place_optional), null) { draft = draft.copy(place = it) }
                     }
                 }
 
-                PaperField(draft.tag, { draft = draft.copy(tag = it) }, Modifier.fillMaxWidth(), label = "Tag (optional)", placeholder = "family")
+                PaperField(draft.tag, { draft = draft.copy(tag = it) }, Modifier.fillMaxWidth(), label = say(R.string.tag_optional), placeholder = "family")
 
-                Heading("Remind me")
+                Heading(say(R.string.remind_me))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                     (reminderChoices.keys + draft.reminders).distinct().sortedDescending().forEach { days ->
                         Pick(
-                            reminderChoices[days] ?: "$days days before",
+                            reminderChoices[days] ?: sayCount(R.plurals.days_before, days, days),
                             selected = days in draft.reminders,
                             onClick = {
                                 draft = draft.copy(reminders = if (days in draft.reminders) draft.reminders - days else draft.reminders + days)
@@ -250,16 +253,16 @@ private fun UpcomingEditor(model: AppModel, editing: UpcomingEntry?, onDone: () 
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("In the morning email")
-                        Caption("Off, this date reminds nowhere, this phone included.")
+                        Text(say(R.string.in_the_morning_email))
+                        Caption(say(R.string.off_this_date_reminds_nowhere))
                     }
                     Switch(checked = draft.email, onCheckedChange = { draft = draft.copy(email = it) }, colors = switchColors())
                 }
 
                 problem?.let { Text(it, color = paper.orangeInk) }
 
-                GoButton("Save", ::save, enabled = !busy)
-                if (editing != null) QuietButton("Delete this date", { removing = true }, enabled = !busy, color = paper.orangeInk)
+                GoButton(say(R.string.save), ::save, enabled = !busy)
+                if (editing != null) QuietButton(say(R.string.delete_this_date), { removing = true }, enabled = !busy, color = paper.orangeInk)
                 Spacer(Modifier.padding(8.dp))
             }
         }
@@ -268,8 +271,8 @@ private fun UpcomingEditor(model: AppModel, editing: UpcomingEntry?, onDone: () 
     if (removing && editing != null) {
         AlertDialog(
             onDismissRequest = { removing = false },
-            title = { Text("Delete this date?") },
-            text = { Text("Its reminders stop, in the email and on this phone.") },
+            title = { Text(say(R.string.delete_this_date_2)) },
+            text = { Text(say(R.string.its_reminders_stop_in_the)) },
             confirmButton = {
                 TextButton(onClick = {
                     removing = false
@@ -279,27 +282,27 @@ private fun UpcomingEditor(model: AppModel, editing: UpcomingEntry?, onDone: () 
                         busy = false
                         if (problem == null) onDone()
                     }
-                }) { Text("Delete", color = paper.orangeInk) }
+                }) { Text(say(R.string.delete), color = paper.orangeInk) }
             },
-            dismissButton = { QuietButton("Keep", { removing = false }) },
+            dismissButton = { QuietButton(say(R.string.keep), { removing = false }) },
         )
     }
 }
 
-private val reminderChoices = linkedMapOf(
-    30 to "A month before",
-    14 to "Two weeks before",
-    7 to "A week before",
-    3 to "3 days before",
-    1 to "The day before",
-    0 to "On the day",
+private val reminderChoices: Map<Int, String> get() = linkedMapOf(
+    30 to say(R.string.a_month_before),
+    14 to say(R.string.two_weeks_before),
+    7 to say(R.string.a_week_before),
+    3 to say(R.string.n_3_days_before),
+    1 to say(R.string.the_day_before),
+    0 to say(R.string.on_the_day),
 )
 
 private fun placeholder(kind: UpcomingKind) = when (kind) {
-    UpcomingKind.Birthday -> "Mom"
-    UpcomingKind.Anniversary -> "Our wedding"
-    UpcomingKind.Trip -> "Lake weekend"
-    UpcomingKind.Event -> "Recital"
+    UpcomingKind.Birthday -> say(R.string.mom)
+    UpcomingKind.Anniversary -> say(R.string.our_wedding)
+    UpcomingKind.Trip -> say(R.string.lake_weekend)
+    UpcomingKind.Event -> say(R.string.recital)
 }
 
 @Composable
@@ -309,8 +312,8 @@ private fun Destination(value: String, label: String, found: String?, onChange: 
         onChange,
         Modifier.fillMaxWidth(),
         label = label,
-        placeholder = "Zürich, or Paris, Texas",
-        supporting = found?.let { "Found: $it" },
+        placeholder = say(R.string.z_rich_or_paris_texas),
+        supporting = found?.let { say(R.string.found, it) },
     )
 }
 
@@ -342,9 +345,9 @@ private fun DayButton(label: String, day: String, modifier: Modifier = Modifier,
                 TextButton(onClick = {
                     state.selectedDateMillis?.let { onPick(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate().toString()) }
                     open = false
-                }) { Text("OK", color = paper.blue) }
+                }) { Text(say(R.string.ok), color = paper.blue) }
             },
-            dismissButton = { QuietButton("Cancel", { open = false }, color = paper.ink2) },
+            dismissButton = { QuietButton(say(R.string.cancel), { open = false }, color = paper.ink2) },
         ) { DatePicker(state) }
     }
 }

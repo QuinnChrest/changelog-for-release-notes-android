@@ -27,7 +27,10 @@ says how every client behaves.
 - `app/` is the Compose app: `AppGraph` (in `ChangelogApp.kt`) holds the
   shared state for the screens and for `SendWorker`; `AppModel` is the
   screens' ViewModel; `TokenStore` keeps the token sealed by an Android
-  Keystore key; `ui/` has the screens (sign-in, Log, Settings).
+  Keystore key; `ui/` has the screens (sign-in, Log, Settings). The app's
+  words are in `res/values/strings.xml`, read with `say()` and `sayCount()`
+  (in `ChangelogApp.kt`); `kit`'s words (activity rows, the daily prompt,
+  `UpcomingDraft`'s checks) are still English in Kotlin.
 - `SendWorker` sends the Outbox through WorkManager with a network
   constraint, oldest first, backing off while Release Notes can't be reached
   and waiting out `Retry-After`.

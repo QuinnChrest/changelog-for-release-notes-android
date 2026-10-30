@@ -47,7 +47,7 @@ import com.yourversionnumber.changelog.ui.SignInScreen
 /** Log, Upcoming and Activity, along the bottom. Back from Upcoming or Activity goes to Log. */
 @Composable
 private fun Tabs(model: AppModel) {
-    val tabs = listOf("log" to "Log", "upcoming" to "Upcoming", "activity" to "Activity")
+    val tabs = listOf("log" to say(R.string.log), "upcoming" to say(R.string.upcoming), "activity" to say(R.string.activity))
     BackHandler(enabled = model.screen != "log") { model.screen = "log" }
     // The tab's own screen handles the status bar; this one only makes room for the tabs.
     Scaffold(

@@ -30,21 +30,23 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.yourversionnumber.changelog.AppModel
+import com.yourversionnumber.changelog.R
 import com.yourversionnumber.changelog.kit.ActivityFilter
 import com.yourversionnumber.changelog.kit.ActivityItem
 import com.yourversionnumber.changelog.kit.detail
 import com.yourversionnumber.changelog.kit.headline
 import com.yourversionnumber.changelog.kit.isProblem
-import kotlinx.coroutines.launch
+import com.yourversionnumber.changelog.say
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import kotlinx.coroutines.launch
 
 /**
  * The activity log, newest first, from every channel: what came in, what
@@ -83,8 +85,8 @@ fun ActivityScreen(model: AppModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Activity") },
-                actions = { QuietButton("Refresh", { reloads++ }, enabled = !loading) },
+                title = { Text(say(R.string.activity)) },
+                actions = { QuietButton(say(R.string.refresh), { reloads++ }, enabled = !loading) },
             )
         },
     ) { padding ->
@@ -101,22 +103,22 @@ fun ActivityScreen(model: AppModel) {
             if (!model.hasActivity) {
                 item {
                     Text(
-                        "This token can't read the activity log. Make one with “Read the activity log” ticked to see it here.",
+                        say(R.string.this_token_cant_read_the),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             } else if (shown.isEmpty() && !loading) {
-                item { Text("Nothing here yet.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                item { Text(say(R.string.nothing_here_yet), color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             items(shown, key = { it.id }) { item ->
                 if (item.id == seenAtOpen && item.id != items.firstOrNull()?.id) {
-                    Caption("Since you last looked")
+                    Caption(say(R.string.since_you_last_looked))
                 }
                 ActivityRow(item)
             }
             if (next != null) {
                 item {
-                    QuietButton("Older", { scope.launch { load(more = true) } }, enabled = !loading)
+                    QuietButton(say(R.string.older), { scope.launch { load(more = true) } }, enabled = !loading)
                 }
             }
         }

@@ -11,6 +11,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.annotation.StringRes
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -26,11 +27,11 @@ import com.yourversionnumber.changelog.kit.ApiException
 import com.yourversionnumber.changelog.kit.DailyPrompt
 import com.yourversionnumber.changelog.kit.ReminderPlan
 import com.yourversionnumber.changelog.kit.Reminders
+import java.time.Instant
+import java.util.concurrent.TimeUnit
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
-import java.time.Instant
-import java.util.concurrent.TimeUnit
 
 /**
  * This phone's own notifications, with no push server, each off until the
@@ -58,10 +59,10 @@ object PhoneNotices {
     private const val ACTION = "com.yourversionnumber.changelog.NOTICE"
 
     /** Each kind has its own channel, so the owner can quiet one in Android's settings too. */
-    enum class Channel(val id: String, val title: String, val about: String, val opens: String) {
-        Reminder("upcoming", "Upcoming reminders", "Birthdays, anniversaries, trips and events, when each morning’s email is due.", "upcoming"),
-        Prompt("prompt", "Daily prompt", "Each morning, your version for the day and what changed.", "log"),
-        Activity("activity", "Activity", "Notes from elsewhere, problems and badges. Never a note’s words.", "activity"),
+    enum class Channel(val id: String, @StringRes val title: Int, @StringRes val about: Int, val opens: String) {
+        Reminder("upcoming", R.string.upcoming_reminders, R.string.birthdays_anniversaries_trips_and_events, "upcoming"),
+        Prompt("prompt", R.string.daily_prompt, R.string.each_morning_your_version_for, "log"),
+        Activity("activity", R.string.activity, R.string.notes_from_elsewhere_problems_and, "activity"),
     }
 
     @Serializable
@@ -109,7 +110,7 @@ object PhoneNotices {
         val plan = (if (graph.remindersOn && reminders != null) ReminderPlan.plan(reminders, now) else emptyList())
             .map { Kept(it.id, it.fireAt.toEpochMilli(), Channel.Reminder.name, it.`when`, it.line) } +
             (if (graph.promptOn) DailyPrompt.plan(me, reminders, now) else emptyList())
-                .map { Kept(it.id, it.fireAt.toEpochMilli(), Channel.Prompt.name, "Changelog", it.body) }
+                .map { Kept(it.id, it.fireAt.toEpochMilli(), Channel.Prompt.name, say(R.string.changelog), it.body) }
         schedule(context, plan)
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             REFRESH,
@@ -249,7 +250,7 @@ object PhoneNotices {
         if (!on) return
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(channel.id, channel.title, NotificationManager.IMPORTANCE_DEFAULT).apply { description = channel.about },
+            NotificationChannel(channel.id, say(channel.title), NotificationManager.IMPORTANCE_DEFAULT).apply { description = say(channel.about) },
         )
         val open = PendingIntent.getActivity(
             context,
@@ -262,7 +263,7 @@ object PhoneNotices {
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-            .apply { if (channel == Channel.Reminder) setSubText("Upcoming") }
+            .apply { if (channel == Channel.Reminder) setSubText(say(R.string.upcoming)) }
             .setContentIntent(open)
             .setAutoCancel(true)
             .build()

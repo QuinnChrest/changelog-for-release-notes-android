@@ -56,8 +56,8 @@ class MediaReader(private val context: Context) {
         if (type == null) {
             raw.delete()
             throw NotKept(
-                if (declared?.startsWith("video/") == true) "Release Notes doesn't keep video. Photos, voice memos and PDFs go on a note."
-                else "Release Notes keeps photos, voice memos and PDFs. That file isn't one.",
+                if (declared?.startsWith("video/") == true) say(R.string.release_notes_doesnt_keep_video)
+                else say(R.string.release_notes_keeps_photos_voice),
             )
         }
         return Picked(raw, type, displayName(uri))
@@ -81,7 +81,7 @@ class MediaReader(private val context: Context) {
             context.contentResolver.openInputStream(uri)
         } catch (e: Exception) {
             null
-        } ?: throw NotKept("That file couldn't be read.")
+        } ?: throw NotKept(say(R.string.that_file_couldnt_be_read))
         input.use { source ->
             out.outputStream().use { sink ->
                 val buffer = ByteArray(1 shl 16)
@@ -93,7 +93,7 @@ class MediaReader(private val context: Context) {
                     if (total > MediaType.MAX_BYTES) {
                         sink.close()
                         out.delete()
-                        throw NotKept("That file is over 50 MB, the most a note keeps.")
+                        throw NotKept(say(R.string.that_file_is_over_50))
                     }
                     sink.write(buffer, 0, n)
                 }
@@ -115,7 +115,7 @@ class MediaReader(private val context: Context) {
                 decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
             }
         } catch (e: Exception) {
-            throw NotKept("That photo couldn't be read.")
+            throw NotKept(say(R.string.that_photo_couldnt_be_read))
         }
         val out = newScratch("jpg")
         out.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 85, it) }

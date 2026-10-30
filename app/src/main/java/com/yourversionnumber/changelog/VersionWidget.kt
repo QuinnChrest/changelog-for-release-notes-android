@@ -39,15 +39,15 @@ class VersionWidget : AppWidgetProvider() {
             val signedIn = context.graph.signedIn.value
             val version = me?.version ?: "?.?.???"
             val prompt = when {
-                !signedIn -> "Sign in to Changelog"
-                me?.wroteToday == true -> "Written today. Anything else?"
-                else -> "What changed?"
+                !signedIn -> say(R.string.sign_in_to_changelog)
+                me?.wroteToday == true -> say(R.string.written_today_anything_else)
+                else -> say(R.string.what_changed)
             }
             val views = RemoteViews(context.packageName, R.layout.widget_version)
             // A widget can't use the app's fonts, so the words are drawn in them,
             // and said aloud from the description.
             views.setImageViewBitmap(R.id.widget_words, words(context, version, prompt))
-            views.setContentDescription(R.id.widget_words, "Version $version. $prompt")
+            views.setContentDescription(R.id.widget_words, say(R.string.version, version, prompt))
             val open = Intent(context, MainActivity::class.java)
                 .putExtra(MainActivity.OPEN, "log")
                 .putExtra(MainActivity.WRITE, true)

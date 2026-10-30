@@ -17,9 +17,9 @@ class WriteTile : TileService() {
         val tile = qsTile ?: return
         val graph = applicationContext.graph
         tile.state = if (graph.signedIn.value) Tile.STATE_INACTIVE else Tile.STATE_UNAVAILABLE
-        tile.label = "Changelog"
-        tile.subtitle = graph.me?.version ?: "Sign in first"
-        tile.contentDescription = graph.me?.version?.let { "Changelog, version $it. Write what changed." } ?: "Changelog"
+        tile.label = say(R.string.changelog)
+        tile.subtitle = graph.me?.version ?: say(R.string.sign_in_first)
+        tile.contentDescription = graph.me?.version?.let { say(R.string.changelog_version_write_what_changed, it) } ?: say(R.string.changelog)
         tile.updateTile()
     }
 

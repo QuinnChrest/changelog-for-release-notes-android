@@ -3,6 +3,8 @@ package com.yourversionnumber.changelog
 import android.app.Application
 import android.content.Context
 import android.os.Build
+import androidx.annotation.PluralsRes
+import androidx.annotation.StringRes
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
@@ -20,18 +22,35 @@ import com.yourversionnumber.changelog.kit.Outbox
 import com.yourversionnumber.changelog.kit.OutboxOperation
 import com.yourversionnumber.changelog.kit.OutboxResult
 import com.yourversionnumber.changelog.kit.Tags
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.ListSerializer
 import java.io.File
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
 
 class ChangelogApp : Application() {
     val graph: AppGraph by lazy { AppGraph(this) }
+
+    override fun onCreate() {
+        super.onCreate()
+        words = this
+    }
+
+    companion object {
+        /** The app itself, for its words in strings.xml. Set before any activity, service or receiver. */
+        lateinit var words: Context
+    }
 }
+
+/** The app's words from strings.xml, for screens and for code with no Context at hand. */
+fun say(@StringRes id: Int, vararg args: Any): String = ChangelogApp.words.getString(id, *args)
+
+/** The app's words that change with a count, from strings.xml's plurals. */
+fun sayCount(@PluralsRes id: Int, count: Int, vararg args: Any): String =
+    ChangelogApp.words.resources.getQuantityString(id, count, *args)
 
 val Context.graph: AppGraph get() = (applicationContext as ChangelogApp).graph
 
@@ -194,7 +213,7 @@ class AppGraph(private val context: Context) {
         report.sent.lastOrNull { it.result is OutboxResult.Filed }?.let { last ->
             val receipt = (last.result as OutboxResult.Filed).receipt
             val badges = report.sent.flatMap { (it.result as? OutboxResult.Filed)?.receipt?.unlocked.orEmpty() }
-            _toast.value = if (badges.isEmpty()) "Filed in ${receipt.note.version}." else "Unlocked: ${badges.joinToString { it.name }}"
+            _toast.value = if (badges.isEmpty()) say(R.string.filed_in, receipt.note.version) else say(R.string.unlocked, badges.joinToString { it.name })
         }
         // Written today: today's prompt has nothing left to ask.
         me?.let { me ->

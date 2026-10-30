@@ -5,7 +5,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -38,10 +37,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import com.yourversionnumber.changelog.AppModel
 import com.yourversionnumber.changelog.BuildConfig
+import com.yourversionnumber.changelog.R
 import com.yourversionnumber.changelog.kit.Api
+import com.yourversionnumber.changelog.say
 import kotlinx.coroutines.launch
 
 /**
@@ -77,7 +79,7 @@ fun SignInScreen(model: AppModel) {
         val raw = waiting
         waiting = null
         if (granted && raw != null) signIn(raw)
-        else problem = "The dev server is on this computer's local network. Allow Changelog to reach it, in Settings, Apps, Changelog, Permissions."
+        else problem = say(R.string.the_dev_server_is_on)
     }
 
     fun check(raw: String) {
@@ -99,14 +101,14 @@ fun SignInScreen(model: AppModel) {
         ) {
             Spacer(Modifier.height(28.dp))
             VersionText(null, size = 52.sp)
-            Text("Notes in, two taps.", style = MaterialTheme.typography.headlineLarge)
+            Text(say(R.string.notes_in_two_taps), style = MaterialTheme.typography.headlineLarge)
             Text(
-                "Changelog sends notes into your Release Notes. It reads back only the notes it sent, never the rest.",
+                say(R.string.changelog_sends_notes_into_your),
                 style = MaterialTheme.typography.bodyLarge,
                 color = paper.ink2,
             )
             Text(
-                "Make a token in Release Notes under Settings, API tokens, named for this phone, with “Add notes” ticked. Then paste it here.",
+                say(R.string.make_a_token_in_release),
                 style = MaterialTheme.typography.bodyMedium,
                 color = paper.ink2,
             )
@@ -115,32 +117,32 @@ fun SignInScreen(model: AppModel) {
                 pasted,
                 { pasted = it },
                 Modifier.fillMaxWidth(),
-                label = "Token",
+                label = say(R.string.token),
                 placeholder = "rn_…",
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
                 visualTransformation = PasswordVisualTransformation(),
             )
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                GoButton(if (checking) "Checking…" else "Sign in", { check(pasted) }, enabled = !checking && pasted.isNotBlank())
+                GoButton(if (checking) say(R.string.checking) else say(R.string.sign_in), { check(pasted) }, enabled = !checking && pasted.isNotBlank())
                 QuietButton(
-                    "Paste token",
+                    say(R.string.paste_token),
                     { scope.launch { clipboard.getClipEntry()?.clipData?.getItemAt(0)?.text?.toString()?.let(::check) } },
                     enabled = !checking,
                 )
             }
-            QuietButton("Open Release Notes Settings", {
+            QuietButton(say(R.string.open_release_notes_settings), {
                 context.startActivity(Intent(Intent.ACTION_VIEW, "${Api.PRODUCTION}/settings/".toUri()))
             })
 
             if (BuildConfig.DEBUG) {
                 Rule(Modifier.padding(top = 12.dp))
-                Heading("Development")
+                Heading(say(R.string.development))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                    listOf("Release Notes" to Api.PRODUCTION, "Dev server" to BuildConfig.DEV_SERVER).forEach { (name, url) ->
+                    listOf(say(R.string.release_notes) to Api.PRODUCTION, say(R.string.dev_server) to BuildConfig.DEV_SERVER).forEach { (name, url) ->
                         Pick(name, selected = model.server == url, onClick = { model.server = url })
                     }
                 }
-                Caption("${model.server}. The dev server prints a token for its fictional account when it starts.")
+                Caption(say(R.string.the_dev_server_prints_a, model.server))
             }
             Spacer(Modifier.height(24.dp))
         }

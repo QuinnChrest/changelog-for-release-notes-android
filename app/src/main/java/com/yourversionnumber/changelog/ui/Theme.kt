@@ -1,43 +1,30 @@
 package com.yourversionnumber.changelog.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ColorScheme
@@ -54,20 +41,33 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
@@ -75,6 +75,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.yourversionnumber.changelog.R
+import com.yourversionnumber.changelog.say
 
 // Release Notes' own look (web/src/styles/site.css in yvn-release-notes):
 // type on paper, the email's colours, light then dark. No boxes and no
@@ -232,7 +233,7 @@ fun VersionText(version: String?, size: TextUnit = 48.sp, modifier: Modifier = M
     }
     Text(
         text,
-        modifier.semantics { contentDescription = version?.let { "Version $it" } ?: "Version loading" },
+        modifier.semantics { contentDescription = version?.let { say(R.string.version_2, it) } ?: say(R.string.version_loading) },
         color = p.blue,
         style = TextStyle(fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = size, lineHeight = size, letterSpacing = (-0.02).em(size)),
     )
@@ -449,7 +450,7 @@ fun Bar(
         if (title == null) {
             Mark(Modifier.size(26.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Changelog", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold, fontSize = 18.sp))
+            Text(say(R.string.changelog), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold, fontSize = 18.sp))
         } else {
             Text(title, style = MaterialTheme.typography.titleLarge)
         }
@@ -462,7 +463,7 @@ fun Bar(
 @Composable
 fun Mark(modifier: Modifier = Modifier) {
     val p = paper
-    Canvas(modifier.semantics { contentDescription = "Changelog" }) {
+    Canvas(modifier.semantics { contentDescription = say(R.string.changelog) }) {
         val u = size.minDimension / 24f
         val lines = listOf(14f to 6.5f, 10f to 12f, 12f to 17.5f)
         lines.forEachIndexed { i, (length, y) ->
@@ -481,7 +482,7 @@ fun Mark(modifier: Modifier = Modifier) {
 @Composable
 fun Select(label: String, value: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val p = paper
-    Column(modifier.clickable(role = Role.DropdownList, onClickLabel = "Change $label", onClick = onClick)) {
+    Column(modifier.clickable(role = Role.DropdownList, onClickLabel = say(R.string.change, label), onClick = onClick)) {
         Text(label, style = MaterialTheme.typography.titleSmall, color = p.ink2)
         Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(value, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = p.ink, maxLines = 1)

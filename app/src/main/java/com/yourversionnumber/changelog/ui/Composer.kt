@@ -13,17 +13,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import com.yourversionnumber.changelog.Locator
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -53,10 +52,13 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.yourversionnumber.changelog.AppModel
+import com.yourversionnumber.changelog.Locator
+import com.yourversionnumber.changelog.R
 import com.yourversionnumber.changelog.Recorder
 import com.yourversionnumber.changelog.kit.QueuedFile
-import kotlinx.coroutines.delay
+import com.yourversionnumber.changelog.say
 import java.io.File
+import kotlinx.coroutines.delay
 
 /** Photos, the camera and a voice memo (for a token that can add files), and Here. */
 @OptIn(ExperimentalLayoutApi::class)
@@ -77,24 +79,24 @@ fun ComposerTools(model: AppModel) {
     }
     val whereAbouts = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
         if (granted.values.any { it }) model.locate()
-        else model.graph.report("Changelog can't add where you are without location. Allow it in Settings, Apps, Changelog.")
+        else model.graph.report(say(R.string.changelog_cant_add_where_you))
     }
     val microphone = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) recording = true else model.graph.report("Changelog can't record without the microphone. Allow it in Settings, Apps, Changelog.")
+        if (granted) recording = true else model.graph.report(say(R.string.changelog_cant_record_without_the))
     }
 
     FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
         if (model.canAddFiles) FileTools(model, room, context, photos, camera, { cameraFile = it }, microphone, { recording = true })
         if (model.locating) {
-            QuietButton("Finding…", {}, enabled = false)
+            QuietButton(say(R.string.finding), {}, enabled = false)
         } else {
             QuietButton(
-                if (model.placeLabel == null) "Here" else "Here again",
+                if (model.placeLabel == null) say(R.string.here) else say(R.string.here_again),
                 {
                     if (Locator.allowed(context)) model.locate()
                     else whereAbouts.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
                 },
-                modifier = Modifier.semantics { contentDescription = if (model.placeLabel == null) "Add where I am" else "Find where I am again" },
+                modifier = Modifier.semantics { contentDescription = if (model.placeLabel == null) say(R.string.add_where_i_am) else say(R.string.find_where_i_am_again) },
             )
         }
     }
@@ -115,9 +117,9 @@ private fun FileTools(
     record: () -> Unit,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-        QuietButton("Photos", { photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = room > 0)
+        QuietButton(say(R.string.photos), { photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = room > 0)
         QuietButton(
-            "Camera",
+            say(R.string.camera),
             {
                 val file = model.scratch("jpg")
                 setCameraFile(file.path)
@@ -126,7 +128,7 @@ private fun FileTools(
             enabled = room > 0,
         )
         QuietButton(
-            "Record",
+            say(R.string.record),
             {
                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                     record()
@@ -135,7 +137,7 @@ private fun FileTools(
                 }
             },
             enabled = room > 0,
-            modifier = Modifier.semantics { contentDescription = "Record a voice memo" },
+            modifier = Modifier.semantics { contentDescription = say(R.string.record_a_voice_memo) },
         )
     }
 }
@@ -149,7 +151,7 @@ private fun RecorderDialog(model: AppModel, onDone: () -> Unit) {
     var elapsed by remember { mutableLongStateOf(0L) }
 
     fun stop() {
-        recorder.stop()?.let(model::addRecording) ?: model.graph.report("That recording didn't work. Try again.")
+        recorder.stop()?.let(model::addRecording) ?: model.graph.report(say(R.string.that_recording_didnt_work_try))
         onDone()
     }
 
@@ -168,22 +170,22 @@ private fun RecorderDialog(model: AppModel, onDone: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = {},
-        title = { Text(if (failed) "The microphone isn't free" else "Recording") },
+        title = { Text(if (failed) say(R.string.the_microphone_isnt_free) else say(R.string.recording)) },
         text = {
             if (failed) {
-                Text("Another app may be using it. Try again in a moment.")
+                Text(say(R.string.another_app_may_be_using))
             } else {
                 val s = elapsed / 1000
                 Text(
                     "%d:%02d".format(s / 60, s % 60),
                     style = MaterialTheme.typography.displaySmall.copy(fontFamily = Mono, color = paper.blue),
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.semantics { contentDescription = "Recorded ${s / 60} minutes ${s % 60} seconds" },
+                    modifier = Modifier.semantics { contentDescription = say(R.string.recorded_minutes_seconds, s / 60, s % 60) },
                 )
             }
         },
-        confirmButton = { if (!failed) GoButton("Stop", ::stop) },
-        dismissButton = { QuietButton(if (failed) "OK" else "Cancel", { recorder.cancel(); onDone() }, color = paper.ink2) },
+        confirmButton = { if (!failed) GoButton(say(R.string.stop), ::stop) },
+        dismissButton = { QuietButton(if (failed) say(R.string.ok) else say(R.string.cancel), { recorder.cancel(); onDone() }, color = paper.ink2) },
     )
 }
 
@@ -225,7 +227,7 @@ private fun Attachment(file: QueuedFile, model: AppModel) {
         ) {
             TextButton(
                 onClick = { model.remove(file) },
-                modifier = Modifier.size(28.dp).semantics { contentDescription = "Take off ${file.name}" },
+                modifier = Modifier.size(28.dp).semantics { contentDescription = say(R.string.take_off, file.name) },
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
             ) { Text("✕", color = Color.White) }
         }
@@ -242,7 +244,7 @@ fun PlaceLine(model: AppModel) {
     var open by remember { mutableStateOf(false) }
     val here = model.here
     Box {
-        Select("Place", label, { open = true }, Modifier.fillMaxWidth())
+        Select(say(R.string.place), label, { open = true }, Modifier.fillMaxWidth())
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             if (here != null) {
                 val place = here.place
@@ -257,7 +259,7 @@ fun PlaceLine(model: AppModel) {
                     )
                 }
             }
-            DropdownMenuItem(text = { Text("Leave the place off", color = paper.orangeInk) }, onClick = { model.clearPlace(); open = false })
+            DropdownMenuItem(text = { Text(say(R.string.leave_the_place_off), color = paper.orangeInk) }, onClick = { model.clearPlace(); open = false })
         }
     }
 }

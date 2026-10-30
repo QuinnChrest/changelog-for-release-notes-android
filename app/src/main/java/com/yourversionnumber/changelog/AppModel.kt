@@ -76,7 +76,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     val canCommit: Boolean get() = draft.isNotBlank() || draftFiles.isNotEmpty()
     /** Checks a pasted token against the server, then keeps it. Answers a problem, or null. */
     suspend fun signIn(pasted: String): String? {
-        val token = TokenFormat.extract(pasted) ?: return "That doesn't look like a Release Notes token. It starts with rn_."
+        val token = TokenFormat.extract(pasted) ?: return say(R.string.that_doesnt_look_like_a)
         return try {
             val me = graph.api(token, server).me()
             graph.signIn(token, server, me)
@@ -208,7 +208,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
 
     /** What the note will be named by, or null with no place. */
     val placeLabel: String?
-        get() = here?.place?.copy(venue = venue)?.label ?: spot?.let { "Here, named as it sends" }
+        get() = here?.place?.copy(venue = venue)?.label ?: spot?.let { say(R.string.here_named_as_it_sends) }
 
     fun locate() {
         if (locating) return
@@ -217,7 +217,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
             placeOff = false
             val found = Locator.fix(getApplication())
             if (found == null) {
-                graph.report("This phone couldn't say where it is. Check that location is on.")
+                graph.report(say(R.string.this_phone_couldnt_say_where))
             } else {
                 spot = found
                 spotAt = System.currentTimeMillis()
@@ -291,8 +291,8 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     fun scratch(extension: String): File = media.newScratch(extension)
 
     private suspend fun add(read: () -> Picked) {
-        if (me != null && !canAddFiles) return graph.report("This token can't add files. Make a token with “Add files” ticked.")
-        if (roomForFiles == 0) return graph.report("A note holds up to ${MediaType.MAX_FILES} files.")
+        if (me != null && !canAddFiles) return graph.report(say(R.string.this_token_cant_add_files))
+        if (roomForFiles == 0) return graph.report(say(R.string.a_note_holds_up_to, MediaType.MAX_FILES))
         val picked = try {
             withContext(Dispatchers.IO) { read() }
         } catch (e: NotKept) {
@@ -314,7 +314,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         } catch (e: OutboxNotKept) {
             graph.report(e.message)
         } catch (e: java.io.IOException) {
-            graph.report("That file couldn't be read.")
+            graph.report(say(R.string.that_file_couldnt_be_read))
         } finally {
             picked.file.delete()
         }
@@ -444,7 +444,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     /** Saves a date: answers null once saved, or the sentence to show. */
     suspend fun save(draft: UpcomingDraft, editing: UpcomingEntry?): String? {
         val batch = draft.batch(editing).getOrElse { return it.message }
-        val api = graph.api() ?: return "Sign in again to keep your Upcoming dates."
+        val api = graph.api() ?: return say(R.string.sign_in_again_to_keep)
         return try {
             api.saveUpcoming(batch, upcomingKey.key(batch))
             upcomingKey.reset()
@@ -458,7 +458,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     /** A dry run that finds the destination's city: answers the place as the server named it, or why not. */
     suspend fun checkPlace(draft: UpcomingDraft, editing: UpcomingEntry?): Result<String> {
         val batch = draft.placeCheck(editing).getOrElse { return Result.failure(it) }
-        val api = graph.api() ?: return Result.failure(Exception("Sign in again to keep your Upcoming dates."))
+        val api = graph.api() ?: return Result.failure(Exception(say(R.string.sign_in_again_to_keep)))
         return try {
             Result.success(api.saveUpcoming(batch, null).saved?.place.orEmpty())
         } catch (e: ApiException) {
@@ -467,7 +467,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     }
 
     suspend fun remove(entry: UpcomingEntry): String? {
-        val api = graph.api() ?: return "Sign in again to keep your Upcoming dates."
+        val api = graph.api() ?: return say(R.string.sign_in_again_to_keep)
         val removal = UpcomingRemoval(entry.id, entry.revision)
         return try {
             api.deleteUpcoming(entry.id, entry.revision, removeKey.key(removal))
@@ -488,7 +488,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         if (e.signedOut) graph.tokenLost(e.message)
         if (e.code == "revision_mismatch") loadUpcoming()
         return when {
-            e.code == "revision_mismatch" -> "This date was changed somewhere else. It's been read again: make the change once more."
+            e.code == "revision_mismatch" -> say(R.string.this_date_was_changed_somewhere)
             else -> e.upcomingSentence
         }
     }

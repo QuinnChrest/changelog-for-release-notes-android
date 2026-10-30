@@ -108,6 +108,15 @@ build rejects CRLF front matter). `npm run build` then still fails on the
 guide pages (Windows path separators), but only after the app bundle is
 built, and the dev server runs fine.
 
+`kit`'s `DevServerTest` runs the client against it (a note sent twice
+under one key, an edit from a stale revision, a note with a file and a
+place through the Outbox, Upcoming and its reminders, activity without
+words, pins). It skips unless a token is set, and runs only on localhost:
+
+```sh
+CHANGELOG_DEV_TOKEN=rn_... ./gradlew :kit:test --tests '*DevServerTest'
+```
+
 It listens on 8790 and prints a token for its made-up account; each start is
 a clean slate with a new token. A debug build's "Dev server" is
 `http://10.0.2.2:8790` (the emulator's view of this computer). On a phone
@@ -178,6 +187,8 @@ place that can't be named at all is left off, never holding the note.
 
 To come, in about this order (the iPhone app has each one):
 
-1. A dev-server test cycle like the iPhone app's `ui-test-cycle.sh`.
+1. A UI test cycle on an emulator, like the iPhone app's
+   `ui-test-cycle.sh` (Compose UI tests driving Log, Upcoming and Settings
+   against the dev server).
 
 `docs/PHONE-TEST.md` is the pass by hand each build gets on a real phone.

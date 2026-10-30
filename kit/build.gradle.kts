@@ -26,4 +26,8 @@ dependencies {
 
 tasks.test {
     useJUnit()
+    // DevServerTest runs only with a dev server token: a run with one and a
+    // run without aren't the same, so neither is taken from the other's cache.
+    inputs.property("devServer", providers.environmentVariable("CHANGELOG_DEV_TOKEN").map { it.isNotEmpty() }.orElse(false))
+    inputs.property("devServerUrl", providers.environmentVariable("CHANGELOG_DEV_URL").orElse(""))
 }

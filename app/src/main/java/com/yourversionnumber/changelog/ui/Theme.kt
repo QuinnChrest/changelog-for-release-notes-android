@@ -124,6 +124,9 @@ private val Dark = Paper(
 
 val LocalPaper = staticCompositionLocalOf { Light }
 
+/** The other palette, for a small thing drawn in reverse (ink paper, paper ink). */
+val Paper.inverse: Paper get() = if (this == Light) Dark else Light
+
 /** The colours in use, light or dark. */
 val paper: Paper @Composable get() = LocalPaper.current
 

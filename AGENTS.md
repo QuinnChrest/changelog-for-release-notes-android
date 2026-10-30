@@ -161,6 +161,10 @@ notes from elsewhere, problems, badges; never this token's own rows, never
 a note's words), read hourly in WorkManager from `/v1/activity?after=`.
 Each is off until turned on in Settings, each kind with its own channel.
 
+After a send, Log says "Filed in 4.5.137." or, when the receipt's
+`unlocked` names badges, "Unlocked: …", in an ink capsule that goes by
+itself.
+
 Pinned tags are set in Settings (`PUT /v1/tags/pinned`, through the
 Outbox) and come first in the tag row.
 
@@ -174,7 +178,6 @@ place that can't be named at all is left off, never holding the note.
 
 To come, in about this order (the iPhone app has each one):
 
-1. A toast for a badge a note unlocked (`unlocked` in its receipt).
-2. A dev-server test cycle like the iPhone app's `ui-test-cycle.sh`.
+1. A dev-server test cycle like the iPhone app's `ui-test-cycle.sh`.
 
 `docs/PHONE-TEST.md` is the pass by hand each build gets on a real phone.

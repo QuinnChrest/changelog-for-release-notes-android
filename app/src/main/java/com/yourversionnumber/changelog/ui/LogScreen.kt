@@ -1,5 +1,13 @@
 package com.yourversionnumber.changelog.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +28,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +68,7 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
     var deleting by remember { mutableStateOf<NoteTarget?>(null) }
     var editing by remember { mutableStateOf<NoteTarget?>(null) }
 
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         Bar { QuietButton("Settings", onSettings) }
         LazyColumn(
@@ -134,6 +144,9 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
                 }
             }
         }
+    }
+
+    Toast(model, Modifier.align(Alignment.BottomCenter).padding(bottom = 20.dp))
     }
 
     // A send that delivered something changes what the server has for today.
@@ -291,4 +304,32 @@ private fun EditNoteDialog(model: AppModel, target: NoteTarget, onDone: () -> Un
         },
         dismissButton = { QuietButton("Cancel", onDone, color = paper.ink2) },
     )
+}
+
+/** A word after a note is filed, in an ink capsule that goes by itself. */
+@Composable
+private fun Toast(model: AppModel, modifier: Modifier = Modifier) {
+    val toast by model.graph.toast.collectAsStateWithLifecycle()
+    AnimatedVisibility(toast != null, modifier, enter = fadeIn(), exit = fadeOut()) {
+        var shown by remember { mutableStateOf("") }
+        toast?.let { shown = it }
+        // Drawn in reverse: the other palette's paper and ink, so its version reads.
+        CompositionLocalProvider(LocalPaper provides paper.inverse) {
+            Text(
+                withVersion(shown, Regex("""\d+\.\d+\.\d+""").find(shown)?.value),
+                Modifier
+                    .background(paper.paper, RoundedCornerShape(50))
+                    .padding(horizontal = 18.dp, vertical = 10.dp)
+                    .semantics { liveRegion = LiveRegionMode.Polite },
+                color = paper.ink,
+                style = MaterialTheme.typography.labelLarge,
+            )
+        }
+    }
+    LaunchedEffect(toast) {
+        if (toast != null) {
+            delay(2800)
+            model.graph.clearToast()
+        }
+    }
 }

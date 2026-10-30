@@ -74,6 +74,14 @@ class AppGraph(private val context: Context) {
         get() = prefs.getString("activity.seen", null)
         set(value) = prefs.edit().putString("activity.seen", value).apply()
 
+    /** A word after a note is filed: its version, or the badges it unlocked. */
+    private val _toast = MutableStateFlow<String?>(null)
+    val toast: StateFlow<String?> = _toast.asStateFlow()
+
+    fun clearToast() {
+        _toast.value = null
+    }
+
     /** Why the last send stopped or what it refused, in Release Notes' words. */
     private val _problem = MutableStateFlow<String?>(null)
     val problem: StateFlow<String?> = _problem.asStateFlow()
@@ -170,6 +178,11 @@ class AppGraph(private val context: Context) {
             val note = (sent.result as? OutboxResult.Edited)?.note ?: return@mapNotNull null
             note.id to Sent(note, (sent.item.operation as OutboxOperation.Edit).text)
         }.toMap()
+        report.sent.lastOrNull { it.result is OutboxResult.Filed }?.let { last ->
+            val receipt = (last.result as OutboxResult.Filed).receipt
+            val badges = report.sent.flatMap { (it.result as? OutboxResult.Filed)?.receipt?.unlocked.orEmpty() }
+            _toast.value = if (badges.isEmpty()) "Filed in ${receipt.note.version}." else "Unlocked: ${badges.joinToString { it.name }}"
+        }
         // Written today: today's prompt has nothing left to ask.
         me?.let { me ->
             if (filed.any { it.note.date == me.today }) {

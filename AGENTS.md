@@ -218,9 +218,8 @@ nearby businesses are offered to pick, never picked for the owner. A spot
 that couldn't be named (offline) is named as the note sends (`prepare`); a
 place that can't be named at all is left off, never holding the note.
 
-Everything the iPhone app does is here. Still to come, as it does: OAuth
-sign-in once Release Notes offers it on `/v1` (phase 5), Shortcuts' Android
-equivalents (a home-screen widget, quick settings tile), and a release
-build signed for Play's internal testing.
+`FEATURES.md` is the tracker: what's built, what's left, and what's built
+but not yet checked. Keep it current with each change: move a row when a
+feature lands or is checked, and update the counts at its top.
 
 `docs/PHONE-TEST.md` is the pass by hand each build gets on a real phone.

@@ -27,6 +27,8 @@ The Android pair of [Changelog for iPhone](https://github.com/jthingelstad/chang
 - **Where you are** on a note, the neighbourhood or a business nearby, and
   **pinned tags** shared with the web. See "What's next" in [AGENTS.md](AGENTS.md).
 
+[FEATURES.md](FEATURES.md) tracks what's built and what's left.
+
 It talks only to Release Notes' public `/v1` API, with a token you make in
 Release Notes' Settings, under API tokens. The API is designed in
 [`docs/API.md`](https://github.com/jthingelstad/yvn-release-notes/blob/main/docs/API.md)

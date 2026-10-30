@@ -101,6 +101,9 @@ class MainActivity : ComponentActivity() {
     companion object {
         /** The screen a notification opens. */
         const val OPEN = "open"
+
+        /** Opened to write: the note box takes the keyboard. */
+        const val WRITE = "write"
     }
 
     private val model: AppModel by viewModels()
@@ -134,6 +137,7 @@ class MainActivity : ComponentActivity() {
     /** Text, a link or files shared from another app: the start of one note. Or a tapped reminder, which opens Upcoming. */
     private fun receive(intent: Intent?) {
         intent?.getStringExtra(OPEN)?.let { model.screen = it }
+        if (intent?.getBooleanExtra(WRITE, false) == true) model.writeNow = true
         val action = intent?.action
         if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return
         intent.getStringExtra(Intent.EXTRA_TEXT)?.let { text ->

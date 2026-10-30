@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Today's version on paper, as the site's front page. The words are drawn
+     into the image in Release Notes' fonts (VersionWidget.words), since a
+     widget can't use an app's own; this layout is also the picker's preview. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:padding="16dp">
+
+    <ImageView
+        android:id="@+id/widget_words"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical|start"
+        android:adjustViewBounds="true"
+        android:contentDescription="@string/widget_description"
+        android:scaleType="fitStart"
+        android:src="@drawable/widget_preview_words" />
+</FrameLayout>

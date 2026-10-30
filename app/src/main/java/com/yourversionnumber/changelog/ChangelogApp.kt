@@ -126,7 +126,10 @@ class AppGraph(private val context: Context) {
 
     var me: Me?
         get() = prefs.getString("me", null)?.let { runCatching { Api.json.decodeFromString(Me.serializer(), it) }.getOrNull() }
-        set(value) = prefs.edit().putString("me", value?.let { Api.json.encodeToString(Me.serializer(), it) }).apply()
+        set(value) {
+            prefs.edit().putString("me", value?.let { Api.json.encodeToString(Me.serializer(), it) }).apply()
+            VersionWidget.refresh(context)
+        }
 
     var tags: Tags?
         get() = prefs.getString("tags", null)?.let { runCatching { Api.json.decodeFromString(Tags.serializer(), it) }.getOrNull() }
@@ -170,6 +173,7 @@ class AppGraph(private val context: Context) {
         _sent.value = emptyList()
         sentFile.delete()
         _signedIn.value = false
+        VersionWidget.refresh(context)
     }
 
     fun report(problem: String?) {

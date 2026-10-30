@@ -61,6 +61,9 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     var sticky by mutableStateOf(graph.sticky)
         private set
     var draft by mutableStateOf("")
+
+    /** Opened from the widget or the tile: the note box takes the keyboard. */
+    var writeNow by mutableStateOf(false)
     var server by mutableStateOf(graph.server)
 
     /** Today's activity from every channel, newest first. */

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The widget's lines before it has drawn its words: the picker's preview,
+     a version and a question, as the mark's dot and lines. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="52dp"
+    android:viewportWidth="200"
+    android:viewportHeight="52">
+    <path android:fillColor="@color/cobalt" android:pathData="M0,4h28v20h-28z M40,4h28v20h-28z M80,4h60v20h-60z" />
+    <path android:fillColor="@color/tangerine" android:pathData="M30,20h8v4h-8z M70,20h8v4h-8z" />
+    <path android:fillColor="@color/ink" android:pathData="M0,36h130a3,3 0,0 1,0 6h-130z" />
+</vector>

@@ -66,6 +66,14 @@
             </intent-filter>
         </receiver>
 
+        <!-- Today's version on the home screen, and a tap to write. -->
+        <receiver android:name=".VersionWidget" android:exported="false" android:label="Changelog">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_version_info" />
+        </receiver>
+
         <!-- The camera writes a photo here, into the app's own cache. -->
         <provider
             android:name="androidx.core.content.FileProvider"

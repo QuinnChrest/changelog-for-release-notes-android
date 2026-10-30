@@ -36,6 +36,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
@@ -67,6 +69,13 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
     var fixing by remember { mutableStateOf<OutboxItem?>(null) }
     var deleting by remember { mutableStateOf<NoteTarget?>(null) }
     var editing by remember { mutableStateOf<NoteTarget?>(null) }
+    val noteBox = remember { FocusRequester() }
+    LaunchedEffect(model.writeNow) {
+        if (model.writeNow) {
+            runCatching { noteBox.requestFocus() }
+            model.writeNow = false
+        }
+    }
 
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
@@ -89,7 +98,7 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
                         field = it
                         model.draft = it.text
                     },
-                    Modifier.fillMaxWidth().semantics { contentDescription = "Note" },
+                    Modifier.fillMaxWidth().focusRequester(noteBox).semantics { contentDescription = "Note" },
                     placeholder = "What changed?",
                     singleLine = false,
                     minLines = 3,

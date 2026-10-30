@@ -142,7 +142,10 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
 
     // A send that delivered something changes what the server has for today.
     val sends by model.graph.sends.collectAsStateWithLifecycle()
-    LaunchedEffect(sends) { model.loadToday() }
+    LaunchedEffect(sends) {
+        model.loadToday()
+        model.syncTags()
+    }
 
     editing?.let { target -> EditNoteDialog(model, target, onDone = { editing = null }) }
 

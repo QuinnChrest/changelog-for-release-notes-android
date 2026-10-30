@@ -12,6 +12,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yourversionnumber.changelog.PhoneNotices
 import com.yourversionnumber.changelog.kit.ActivityNoticeKind
+import com.yourversionnumber.changelog.kit.Hashtags
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import com.yourversionnumber.changelog.kit.DailyPrompt
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -103,12 +108,13 @@ fun SettingsScreen(model: AppModel, onBack: () -> Unit) {
             }
             if (model.server != Api.PRODUCTION) Caption("Server: ${model.server}")
 
-            Heading("Tags", Modifier.padding(top = 12.dp))
+            Heading("Pinned tags", Modifier.padding(top = 12.dp))
+            PinnedTags(model)
             val sticky = model.sticky
             if (sticky != null) {
                 QuietButton("Stop adding #$sticky to every note", { model.stick(null) })
             } else {
-                Caption("Touch and hold a tag on Log to add it to every note.")
+                Caption("Touch and hold a tag on Log to add it to every note from this phone.")
             }
 
             Heading("Notifications", Modifier.padding(top = 12.dp))
@@ -166,3 +172,44 @@ fun SettingsScreen(model: AppModel, onBack: () -> Unit) {
         )
     }
 }
+
+/** The pinned tags, first in the tag row: the same here, on the web and on every phone. Up to 12. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PinnedTags(model: AppModel) {
+    val pinned = model.tags?.pinned.orEmpty()
+    var adding by remember { mutableStateOf("") }
+    val tag = Hashtags.normalize(adding)
+    val canAdd = tag != null && tag !in pinned && pinned.size < MAX_PINS
+
+    fun add() {
+        if (canAdd) model.setPinned(pinned + tag!!)
+        adding = ""
+    }
+
+    if (pinned.isEmpty()) Caption("None yet. Pinned tags come first on Log, and on the web's Today.")
+    pinned.forEach { t ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("#$t", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            QuietButton("Unpin", { model.setPinned(pinned - t) }, color = paper.ink2)
+        }
+    }
+    if (pinned.size < MAX_PINS) {
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            PaperField(
+                adding,
+                { adding = it },
+                Modifier.weight(1f),
+                placeholder = "#family",
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done, autoCorrectEnabled = false),
+                keyboardActions = KeyboardActions(onDone = { add() }),
+            )
+            QuietButton("Pin", ::add, enabled = canAdd)
+        }
+        if (adding.isNotBlank() && tag == null) Caption("A tag is letters and numbers, with at least one letter.", color = paper.orangeInk)
+    } else {
+        Caption("That's 12, the most that can be pinned.")
+    }
+}
+
+private const val MAX_PINS = 12

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -364,6 +365,7 @@ fun PaperField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     textStyle: TextStyle = MaterialTheme.typography.bodyLarge,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
 ) {
     val p = paper
     var focused by remember { mutableStateOf(false) }
@@ -376,6 +378,7 @@ fun PaperField(
             singleLine = singleLine,
             minLines = if (singleLine) 1 else minLines,
             keyboardOptions = keyboardOptions,
+            keyboardActions = keyboardActions,
             visualTransformation = visualTransformation,
             textStyle = textStyle.copy(color = p.ink),
             cursorBrush = SolidColor(p.orange),
@@ -406,6 +409,7 @@ fun PaperField(
     minLines: Int = 1,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
 ) {
     // Kept as a value with a selection, so typing never jumps the cursor.
     var field by remember { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
@@ -414,6 +418,7 @@ fun PaperField(
         field,
         { field = it; if (it.text != value) onValueChange(it.text) },
         modifier, label, placeholder, supporting, singleLine, minLines, keyboardOptions, visualTransformation,
+        keyboardActions = keyboardActions,
     )
 }
 

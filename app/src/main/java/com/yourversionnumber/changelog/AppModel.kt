@@ -108,6 +108,29 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         draft = Hashtags.toggling(tag, draft)
     }
 
+    /**
+     * Pinned tags, the same here, on the web and on every phone. Shown at
+     * once, queued through the Outbox, and Release Notes' answer replaces them.
+     */
+    fun setPinned(pinned: List<String>) {
+        val before = tags
+        tags = (tags ?: com.yourversionnumber.changelog.kit.Tags()).copy(pinned = pinned)
+        viewModelScope.launch {
+            try {
+                graph.outbox.enqueue(OutboxOperation.Pins(pinned))
+                graph.send()
+            } catch (e: OutboxNotKept) {
+                tags = before
+                graph.report(e.message)
+            }
+        }
+    }
+
+    /** After a send: the tags as Release Notes answered them. */
+    fun syncTags() {
+        graph.tags?.let { tags = it }
+    }
+
     /** Touch and hold: this tag goes on every note until stopped in Settings. */
     fun stick(tag: String?) {
         graph.sticky = tag

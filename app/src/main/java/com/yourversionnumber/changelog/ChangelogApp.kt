@@ -55,6 +55,9 @@ class AppGraph(private val context: Context) {
         // A new process has no draft: files only a draft held when it last
         // stopped, and no queued note holds, go. Before anything can add one.
         runBlocking { outbox.sweep() }
+        // Development builds before 0.0.0's alarms scheduled reminders as jobs of a worker
+        // that's gone now; WorkManager would keep trying them.
+        WorkManager.getInstance(context).cancelAllWorkByTag("upcoming-reminder")
         // Scratch copies from the picker, the camera and the recorder are only ever mid-way.
         File(context.cacheDir, "picked").deleteRecursively()
     }

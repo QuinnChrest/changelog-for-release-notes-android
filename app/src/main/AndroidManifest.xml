@@ -53,8 +53,8 @@
             </intent-filter>
         </activity>
 
-        <!-- Upcoming reminders: each comes as an alarm, set again after a restart. -->
-        <receiver android:name=".ReminderReceiver" android:exported="false" />
+        <!-- Reminders and the daily prompt: each comes as an alarm, set again after a restart. -->
+        <receiver android:name=".NoticeReceiver" android:exported="false" />
         <receiver android:name=".RestoreReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

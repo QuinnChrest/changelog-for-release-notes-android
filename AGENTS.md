@@ -141,14 +141,19 @@ every 12 hours in WorkManager); a read that fails leaves what was
 scheduled. The plan is kept so `RestoreReceiver` sets it again after a
 restart or an update. A tapped reminder opens Upcoming.
 
+`PhoneNotices` also holds the daily prompt ("You're 4.5.137 today. What
+changed?", `kit`'s `DailyPrompt`, the server's version for each day, taken
+back once a note is filed today) and activity notices (`ActivityNotices`:
+notes from elsewhere, problems, badges; never this token's own rows, never
+a note's words), read hourly in WorkManager from `/v1/activity?after=`.
+Each is off until turned on in Settings, each kind with its own channel.
+
 To come, in about this order (the iPhone app has each one):
 
-1. The daily prompt ("You're 4.5.137 today. What changed?") and activity
-   notices, in Settings beside the reminders.
-2. Pinned tags in Settings (`PUT /v1/tags/pinned`, through the Outbox).
-3. Here: one `FusedLocationProviderClient.getCurrentLocation` (needs Play
+1. Pinned tags in Settings (`PUT /v1/tags/pinned`, through the Outbox).
+2. Here: one `FusedLocationProviderClient.getCurrentLocation` (needs Play
    services; ask Quinn before adding it), with the nearby businesses to pick.
-4. A toast for a badge a note unlocked (`unlocked` in its receipt).
-5. A dev-server test cycle like the iPhone app's `ui-test-cycle.sh`.
+3. A toast for a badge a note unlocked (`unlocked` in its receipt).
+4. A dev-server test cycle like the iPhone app's `ui-test-cycle.sh`.
 
 `docs/PHONE-TEST.md` is the pass by hand each build gets on a real phone.

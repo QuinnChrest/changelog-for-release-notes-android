@@ -22,7 +22,9 @@ The Android pair of [Changelog for iPhone](https://github.com/jthingelstad/chang
   add, change and remove, each in the line the email gives it.
 - **Reminders** on the phone, off until you turn them on: each comes when
   that morning's email is due, in its words.
-- Coming: the daily prompt, activity notices, and where you are. See "What's next" in [AGENTS.md](AGENTS.md).
+- **A daily prompt** with the day's version, and **activity notices** from
+  elsewhere, each off until you turn it on.
+- Coming: pinned tags and where you are. See "What's next" in [AGENTS.md](AGENTS.md).
 
 It talks only to Release Notes' public `/v1` API, with a token you make in
 Release Notes' Settings, under API tokens. The API is designed in

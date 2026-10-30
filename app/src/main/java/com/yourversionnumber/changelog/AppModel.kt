@@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.yourversionnumber.changelog.kit.ActivityItem
+import com.yourversionnumber.changelog.kit.ActivityNoticeKind
 import com.yourversionnumber.changelog.kit.ActivityPage
 import com.yourversionnumber.changelog.kit.ApiException
 import com.yourversionnumber.changelog.kit.Hashtags
@@ -99,7 +100,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
             loadToday()
             graph.send()
             // Opening the app tops up the reminders, as the client guide asks.
-            PhoneReminders.refresh(getApplication())
+            PhoneNotices.refresh(getApplication())
         }
     }
 
@@ -351,7 +352,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun afterUpcomingChange(api: com.yourversionnumber.changelog.kit.Api) {
         runCatching { upcoming = api.upcoming() }
-        PhoneReminders.refresh(getApplication())
+        PhoneNotices.refresh(getApplication())
     }
 
     private fun whyNot(e: ApiException): String {
@@ -363,15 +364,35 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Reminders on this phone.
+    // This phone's own notifications, each off until turned on in Settings.
+    // Reminders and prompts are scheduled again from the server's latest
+    // read whenever either changes; turning both off takes back what waits.
 
     var remindersOn by mutableStateOf(graph.remindersOn)
+        private set
+    var promptOn by mutableStateOf(graph.promptOn)
+        private set
+    var noticeKinds by mutableStateOf(graph.noticeKinds)
         private set
 
     fun setReminders(on: Boolean) {
         graph.remindersOn = on
         remindersOn = on
-        if (on) viewModelScope.launch { PhoneReminders.refresh(getApplication()) } else PhoneReminders.clear(getApplication())
+        viewModelScope.launch { PhoneNotices.refresh(getApplication()) }
+    }
+
+    fun setPrompt(on: Boolean) {
+        graph.promptOn = on
+        promptOn = on
+        viewModelScope.launch { PhoneNotices.refresh(getApplication()) }
+    }
+
+    fun setNotice(kind: ActivityNoticeKind, on: Boolean) {
+        val wasOff = graph.noticeKinds.isEmpty()
+        val kinds = if (on) graph.noticeKinds + kind else graph.noticeKinds - kind
+        graph.noticeKinds = kinds
+        noticeKinds = kinds
+        viewModelScope.launch { PhoneNotices.activityChanged(getApplication(), wasOff) }
     }
 
     /** Which screen shows: Log, Upcoming, Activity or Settings. A tapped reminder opens Upcoming. */

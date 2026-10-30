@@ -10,7 +10,9 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
+import com.yourversionnumber.changelog.kit.ActivityNoticeKind
 import com.yourversionnumber.changelog.kit.Api
+import com.yourversionnumber.changelog.kit.DailyPrompt
 import com.yourversionnumber.changelog.kit.FlushReport
 import com.yourversionnumber.changelog.kit.Me
 import com.yourversionnumber.changelog.kit.NoteRef
@@ -86,6 +88,21 @@ class AppGraph(private val context: Context) {
         get() = prefs.getBoolean("reminders", false)
         set(value) = prefs.edit().putBoolean("reminders", value).apply()
 
+    /** The daily prompt, "You're 4.5.137 today. What changed?" Off until the owner turns it on. */
+    var promptOn: Boolean
+        get() = prefs.getBoolean("prompt", false)
+        set(value) = prefs.edit().putBoolean("prompt", value).apply()
+
+    /** The kinds of activity to be told about. None until the owner chooses. */
+    var noticeKinds: Set<ActivityNoticeKind>
+        get() = prefs.getStringSet("notices", emptySet())!!.mapNotNull { runCatching { ActivityNoticeKind.valueOf(it) }.getOrNull() }.toSet()
+        set(value) = prefs.edit().putStringSet("notices", value.map { it.name }.toSet()).apply()
+
+    /** The newest activity row already told of. Kept on the phone, never sent. */
+    var activityCursor: String?
+        get() = prefs.getString("activity.cursor", null)
+        set(value) = prefs.edit().putString("activity.cursor", value).apply()
+
     /** A tag added to every note until the owner stops it. */
     var sticky: String?
         get() = prefs.getString("sticky", null)
@@ -129,7 +146,10 @@ class AppGraph(private val context: Context) {
         sticky = null
         seenActivity = null
         remindersOn = false
-        PhoneReminders.clear(context)
+        promptOn = false
+        noticeKinds = emptySet()
+        activityCursor = null
+        PhoneNotices.clear(context)
         _sent.value = emptyList()
         sentFile.delete()
         _signedIn.value = false
@@ -150,6 +170,13 @@ class AppGraph(private val context: Context) {
             val note = (sent.result as? OutboxResult.Edited)?.note ?: return@mapNotNull null
             note.id to Sent(note, (sent.item.operation as OutboxOperation.Edit).text)
         }.toMap()
+        // Written today: today's prompt has nothing left to ask.
+        me?.let { me ->
+            if (filed.any { it.note.date == me.today }) {
+                this.me = me.copy(wroteToday = true)
+                PhoneNotices.takeBack(context, DailyPrompt.id(me.today))
+            }
+        }
         if (filed.isNotEmpty() || deleted.isNotEmpty() || edited.isNotEmpty()) {
             saveSent((filed.reversed() + _sent.value).filterNot { it.note.id in deleted }.map { edited[it.note.id] ?: it }.take(50))
         }

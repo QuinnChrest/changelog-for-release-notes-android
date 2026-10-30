@@ -127,6 +127,29 @@ skips without a token:
 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.devToken=rn_...
 ```
 
+### Android 17 and its emulator
+
+Changelog targets Android 17 (API 37), and TestCycle passes there and on
+Android 16. Three things to know:
+
+- **Local network.** Android 17 lets an app reach a private address (the
+  emulator's 10.0.2.2) only with `ACCESS_LOCAL_NETWORK`, a runtime
+  permission Android words as "nearby devices". Debug builds declare it
+  (`app/src/debug/AndroidManifest.xml`) and ask as they sign in to the dev
+  server; TestCycle grants it. Release builds never need it: Release Notes
+  is on the public internet.
+- **The emulator image.** The `android-37.0` Google Play x86_64 image
+  (revision 7, also listed as 8.0.0, the same bytes) was built for emulator
+  37.2.11; on emulator 37.2.13 its SurfaceFlinger aborts every few seconds
+  ("Assertion failed: !rcEnc->featureInfo()->hasReadColorBufferDma") and
+  the phone restarts its system in a loop. Use the `android-37.1` image
+  instead (`system-images/android-37.1/google_apis_playstore_ps16k/x86_64`,
+  16 KB pages), with at least 4 GB of RAM; `avdmanager`'s default 1.5 GB is
+  too little for Android 17.
+- **Espresso.** Android 17 removed `InputManager.getInstance`, which
+  Espresso 3.7 (under Compose's UI tests) calls. The tests use the 3.8
+  alpha, the first that runs there; move to 3.8 stable when it ships.
+
 It listens on 8790 and prints a token for its made-up account; each start is
 a clean slate with a new token. A debug build's "Dev server" is
 `http://10.0.2.2:8790` (the emulator's view of this computer). On a phone

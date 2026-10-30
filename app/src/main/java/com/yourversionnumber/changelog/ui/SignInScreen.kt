@@ -1,6 +1,11 @@
 package com.yourversionnumber.changelog.ui
 
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -55,12 +60,34 @@ fun SignInScreen(model: AppModel) {
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
 
-    fun check(raw: String) {
+    fun signIn(raw: String) {
         checking = true
         scope.launch {
             problem = model.signIn(raw)
             checking = false
             if (problem != null) pasted = ""
+        }
+    }
+
+    // Android 17 lets an app reach a private address (the dev server, from the
+    // emulator) only with the local network permission, which debug builds ask
+    // for as they sign in there. Release Notes itself needs nothing.
+    var waiting by remember { mutableStateOf<String?>(null) }
+    val localNetwork = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val raw = waiting
+        waiting = null
+        if (granted && raw != null) signIn(raw)
+        else problem = "The dev server is on this computer's local network. Allow Changelog to reach it, in Settings, Apps, Changelog, Permissions."
+    }
+
+    fun check(raw: String) {
+        val needsLocal = BuildConfig.DEBUG && model.server != Api.PRODUCTION && Build.VERSION.SDK_INT >= 37 &&
+            ContextCompat.checkSelfPermission(context, LOCAL_NETWORK) != PackageManager.PERMISSION_GRANTED
+        if (needsLocal) {
+            waiting = raw
+            localNetwork.launch(LOCAL_NETWORK)
+        } else {
+            signIn(raw)
         }
     }
 
@@ -119,3 +146,6 @@ fun SignInScreen(model: AppModel) {
         }
     }
 }
+
+/** Android 17's permission to reach a private address; only debug builds declare it. */
+private const val LOCAL_NETWORK = "android.permission.ACCESS_LOCAL_NETWORK"

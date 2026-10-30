@@ -47,6 +47,11 @@ class TestCycle {
         object : Statement() {
             override fun evaluate() {
                 assumeTrue("Pass -Pandroid.testInstrumentationRunnerArguments.devToken=rn_... to run the test cycle", token.isNotEmpty())
+                // Android 17: the dev server is on the local network.
+                if (android.os.Build.VERSION.SDK_INT >= 37) {
+                    InstrumentationRegistry.getInstrumentation().uiAutomation
+                        .grantRuntimePermission(app.packageName, "android.permission.ACCESS_LOCAL_NETWORK")
+                }
                 val graph = app.graph
                 graph.signOut()
                 graph.server = BuildConfig.DEV_SERVER

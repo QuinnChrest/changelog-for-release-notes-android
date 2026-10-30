@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only. Android 17 lets an app reach a private address, like
+     the emulator's 10.0.2.2 for the Release Notes dev server, only with this
+     permission; Release Notes itself is on the public internet and needs none. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+</manifest>

@@ -65,7 +65,7 @@ import kotlinx.coroutines.delay
 
 /** The home screen: today's version, the box, the tag row, Commit, and what happened today. */
 @Composable
-fun LogScreen(model: AppModel, onSettings: () -> Unit) {
+fun LogScreen(model: AppModel) {
     val waiting by model.waiting.collectAsStateWithLifecycle()
     val sent by model.sent.collectAsStateWithLifecycle()
     val problem by model.problem.collectAsStateWithLifecycle()
@@ -82,7 +82,7 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
 
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
-        Bar { QuietButton(say(R.string.settings), onSettings) }
+        Bar()
         LazyColumn(
             Modifier.imePadding(),
             contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 32.dp),

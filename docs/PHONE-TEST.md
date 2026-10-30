@@ -20,7 +20,7 @@ Upcoming and the activity log.
 2. **A note.** A line with a #tag, then Commit. It shows under Today and
    on the web. Edit it (change a word, Save), then Delete it.
 3. **Tags.** Tap a tag in the row to add it, tap again to take it off.
-   Touch and hold one: it goes on every note until Settings, "Stop adding
+   Touch and hold one: it goes on every note until Settings (the tab at the right), "Stop adding
    #… to every note".
 4. **Photos.** "Photos" (two or three) and "Camera" on one note, then
    Commit. The web note has every photo. A HEIC from the library arrives

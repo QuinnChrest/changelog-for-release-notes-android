@@ -249,6 +249,11 @@ itself.
 Pinned tags are set in Settings (`PUT /v1/tags/pinned`, through the
 Outbox) and come first in the tag row.
 
+Log, Upcoming, Activity and Settings are the four tabs along the bottom.
+Settings' Appearance (`ThemeMode`: same as the phone, light or dark) is about
+the phone, so it's kept in `AppGraph` and signing out leaves it. The widget
+and the tile follow the phone's own theme.
+
 Here (`Locator`): one fix when the owner taps Here, with Android's own
 `LocationManager.getCurrentLocation` (the fused provider where there is
 one, then GPS, then network, then a position from the last five minutes),

@@ -23,6 +23,7 @@ import com.yourversionnumber.changelog.kit.OutboxOperation
 import com.yourversionnumber.changelog.kit.OutboxResult
 import com.yourversionnumber.changelog.kit.Tags
 import com.yourversionnumber.changelog.kit.Words
+import com.yourversionnumber.changelog.ui.ThemeMode
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -139,6 +140,11 @@ class AppGraph(private val context: Context) {
     var hereByDefault: Boolean
         get() = prefs.getBoolean("here", false)
         set(value) = prefs.edit().putBoolean("here", value).apply()
+
+    /** Light, dark or as the phone is: a choice about this phone, so signing out keeps it. */
+    var themeMode: String
+        get() = prefs.getString("theme", null) ?: ThemeMode.System.name
+        set(value) = prefs.edit().putString("theme", value).apply()
 
     /** A tag added to every note until the owner stops it. */
     var sticky: String?

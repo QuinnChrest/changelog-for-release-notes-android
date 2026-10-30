@@ -7,18 +7,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
-import com.yourversionnumber.changelog.kit.MediaType
-import com.yourversionnumber.changelog.kit.RequestKey
-import com.yourversionnumber.changelog.kit.UpcomingBatch
-import com.yourversionnumber.changelog.kit.UpcomingDraft
-import com.yourversionnumber.changelog.kit.UpcomingEntry
-import com.yourversionnumber.changelog.kit.UpcomingList
-import com.yourversionnumber.changelog.kit.UpcomingRemoval
-import com.yourversionnumber.changelog.kit.upcomingSentence
-import com.yourversionnumber.changelog.kit.QueuedFile
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.io.File
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -28,15 +16,28 @@ import com.yourversionnumber.changelog.kit.ActivityPage
 import com.yourversionnumber.changelog.kit.ApiException
 import com.yourversionnumber.changelog.kit.Hashtags
 import com.yourversionnumber.changelog.kit.Here
-import com.yourversionnumber.changelog.kit.Spot
+import com.yourversionnumber.changelog.kit.MediaType
 import com.yourversionnumber.changelog.kit.NoteDetail
 import com.yourversionnumber.changelog.kit.OutboxNotKept
 import com.yourversionnumber.changelog.kit.OutboxOperation
+import com.yourversionnumber.changelog.kit.QueuedFile
+import com.yourversionnumber.changelog.kit.RequestKey
+import com.yourversionnumber.changelog.kit.Spot
 import com.yourversionnumber.changelog.kit.TagRow
 import com.yourversionnumber.changelog.kit.TokenFormat
+import com.yourversionnumber.changelog.kit.UpcomingBatch
+import com.yourversionnumber.changelog.kit.UpcomingDraft
+import com.yourversionnumber.changelog.kit.UpcomingEntry
+import com.yourversionnumber.changelog.kit.UpcomingList
+import com.yourversionnumber.changelog.kit.UpcomingRemoval
 import com.yourversionnumber.changelog.kit.isMine
 import com.yourversionnumber.changelog.kit.isOn
+import com.yourversionnumber.changelog.kit.upcomingSentence
+import com.yourversionnumber.changelog.ui.ThemeMode
+import java.io.File
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** A note this token wrote, from Log's Today or its own sent list. */
 data class NoteTarget(val date: String, val id: String, val version: String?)
@@ -184,6 +185,15 @@ class AppModel(application: Application) : AndroidViewModel(application) {
 
     /** The owner left the place off this draft. */
     private var placeOff = false
+
+    /** Light, dark or as the phone is. */
+    var theme by mutableStateOf(ThemeMode.of(graph.themeMode))
+        private set
+
+    fun chooseTheme(mode: ThemeMode) {
+        graph.themeMode = mode.name
+        theme = mode
+    }
 
     /** "Add where I am": every note takes its place without asking. Kept on this phone. */
     var hereByDefault by mutableStateOf(graph.hereByDefault)

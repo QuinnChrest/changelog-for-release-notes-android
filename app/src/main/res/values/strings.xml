@@ -200,6 +200,11 @@
         <item quantity="one">%1$d day before</item>
         <item quantity="other">%1$d days before</item>
     </plurals>
+    <string name="appearance">Appearance</string>
+    <string name="same_as_the_phone">Same as the phone</string>
+    <string name="light">Light</string>
+    <string name="dark">Dark</string>
+    <string name="the_home_screen_widget_follows">The home-screen widget and the Quick Settings tile always follow the phone.</string>
     <!-- kit:begin -->
     <!-- The kit's phrases, named in kit's Words.kt. -->
     <string name="kit_via_token">via %1$s</string>

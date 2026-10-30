@@ -3,13 +3,13 @@ package com.yourversionnumber.changelog.ui
 import android.Manifest
 import android.content.Intent
 import android.os.Build
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -53,6 +53,7 @@ import com.yourversionnumber.changelog.kit.Api
 import com.yourversionnumber.changelog.kit.DailyPrompt
 import com.yourversionnumber.changelog.kit.Hashtags
 import com.yourversionnumber.changelog.say
+import com.yourversionnumber.changelog.ui.ThemeMode
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -92,10 +93,9 @@ private fun clock(time: String): String? = runCatching {
     LocalTime.parse(time).format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))
 }.getOrNull()
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun SettingsScreen(model: AppModel, onBack: () -> Unit) {
-    BackHandler(onBack = onBack)
+fun SettingsScreen(model: AppModel) {
     var signingOut by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val problem by model.problem.collectAsStateWithLifecycle()
@@ -124,16 +124,23 @@ fun SettingsScreen(model: AppModel, onBack: () -> Unit) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(say(R.string.settings)) },
-                navigationIcon = { QuietButton(say(R.string.done), onBack) },
-            )
+            TopAppBar(title = { Text(say(R.string.settings)) })
         },
     ) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            Heading(say(R.string.appearance), Modifier.padding(top = 12.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                listOf(
+                    ThemeMode.System to say(R.string.same_as_the_phone),
+                    ThemeMode.Light to say(R.string.light),
+                    ThemeMode.Dark to say(R.string.dark),
+                ).forEach { (mode, name) -> Pick(name, selected = model.theme == mode, onClick = { model.chooseTheme(mode) }) }
+            }
+            Caption(say(R.string.the_home_screen_widget_follows))
+
             Heading(say(R.string.this_connection), Modifier.padding(top = 12.dp))
             me?.token?.let { token ->
                 Text(token.name)
@@ -220,12 +227,12 @@ fun SettingsScreen(model: AppModel, onBack: () -> Unit) {
             title = { Text(say(R.string.sign_out_2)) },
             text = { Text(say(R.string.anything_still_waiting_to_send)) },
             confirmButton = {
-                TextButton(onClick = { signingOut = false; model.signOut(revoke = true); onBack() }) {
+                TextButton(onClick = { signingOut = false; model.signOut(revoke = true); model.screen = "log" }) {
                     Text(say(R.string.sign_out_and_revoke_this))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { signingOut = false; model.signOut(revoke = false); onBack() }) {
+                TextButton(onClick = { signingOut = false; model.signOut(revoke = false); model.screen = "log" }) {
                     Text(say(R.string.sign_out_keep_the_token))
                 }
             },

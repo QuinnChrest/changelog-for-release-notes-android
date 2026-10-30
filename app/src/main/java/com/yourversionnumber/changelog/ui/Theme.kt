@@ -1,5 +1,7 @@
 package com.yourversionnumber.changelog.ui
 
+import android.app.Activity
+import android.content.ContextWrapper
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -42,6 +44,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,6 +58,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -76,6 +80,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import com.yourversionnumber.changelog.R
 import com.yourversionnumber.changelog.say
 
@@ -212,11 +217,38 @@ private val type = Typography().let { t ->
     )
 }
 
-/** Release Notes' paper and ink, light or dark as the phone is. */
+/** Light or dark as the phone is, or whichever the owner chose in Settings. */
+enum class ThemeMode {
+    System, Light, Dark;
+
+    companion object {
+        fun of(name: String?) = entries.firstOrNull { it.name == name } ?: System
+    }
+}
+
+/** Release Notes' paper and ink, light or dark as the phone is, unless the owner chose. */
 @Composable
-fun ChangelogTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+fun ChangelogTheme(mode: ThemeMode = ThemeMode.System, content: @Composable () -> Unit) {
+    val dark = when (mode) {
+        ThemeMode.System -> isSystemInDarkTheme()
+        ThemeMode.Light -> false
+        ThemeMode.Dark -> true
+    }
     val p = if (dark) Dark else Light
+    // The clock and the navigation icons follow the paper, not the phone's own theme.
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            var context = view.context
+            while (context is ContextWrapper && context !is Activity) context = context.baseContext
+            (context as? Activity)?.window?.let { window ->
+                WindowCompat.getInsetsController(window, view).apply {
+                    isAppearanceLightStatusBars = !dark
+                    isAppearanceLightNavigationBars = !dark
+                }
+            }
+        }
+    }
     // Text with no colour of its own takes the content colour, black unless something sets it.
     CompositionLocalProvider(LocalPaper provides p, LocalContentColor provides p.ink) {
         MaterialTheme(colorScheme = scheme(p, dark), typography = type, content = content)

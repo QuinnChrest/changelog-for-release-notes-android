@@ -95,7 +95,8 @@ class TestCycle {
         val words = "Test cycle $mark #devtest"
         compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput(words)
         compose.tap("Commit")
-        compose.see("Filed in")
+        // The send waits for a connection, and a freshly started emulator or dev server is slow to give one.
+        compose.see("Filed in", timeout = 60_000)
         val filed = runBlocking {
             api.activity(kinds = listOf("note"), limit = 20).items.mapNotNull { row ->
                 // Rows for notes deleted since are still in the log: skip those.

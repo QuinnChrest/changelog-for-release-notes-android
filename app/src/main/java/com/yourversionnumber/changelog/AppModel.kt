@@ -154,7 +154,9 @@ class AppModel(application: Application) : AndroidViewModel(application) {
                 draft = ""
                 draftFiles.clear()
                 files.forEach { thumbnails.remove(it.id) }
-                clearPlace()
+                // With "Add where I am" on, the next note within ten minutes takes the
+                // same place; a Here asked for once goes with this note alone.
+                if (hereByDefault) placeOff = false else clearPlace(off = false)
                 graph.send()
             } catch (e: OutboxNotKept) {
                 graph.report(e.message)
@@ -174,6 +176,33 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     var locating by mutableStateOf(false)
         private set
 
+    /** When the spot was found, so a draft reuses one from the last ten minutes. */
+    private var spotAt = 0L
+
+    /** The owner left the place off this draft. */
+    private var placeOff = false
+
+    /** "Add where I am": every note takes its place without asking. Kept on this phone. */
+    var hereByDefault by mutableStateOf(graph.hereByDefault)
+        private set
+
+    fun addWhereIAm(on: Boolean) {
+        graph.hereByDefault = on
+        hereByDefault = on
+        if (on) draftStarted()
+    }
+
+    /**
+     * A new draft: with "Add where I am" on, find the phone now, while the words
+     * are typed, so the note never waits for it. A spot more than ten minutes
+     * old is found again.
+     */
+    fun draftStarted() {
+        if (!hereByDefault || placeOff || locating || !Locator.allowed(getApplication())) return
+        if (spot != null && System.currentTimeMillis() - spotAt < TEN_MINUTES) return
+        locate()
+    }
+
     /** What the note will be named by, or null with no place. */
     val placeLabel: String?
         get() = here?.place?.copy(venue = venue)?.label ?: spot?.let { "Here, named as it sends" }
@@ -182,11 +211,13 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         if (locating) return
         viewModelScope.launch {
             locating = true
+            placeOff = false
             val found = Locator.fix(getApplication())
             if (found == null) {
                 graph.report("This phone couldn't say where it is. Check that location is on.")
             } else {
                 spot = found
+                spotAt = System.currentTimeMillis()
                 here = null
                 venue = null
                 graph.api()?.let { api ->
@@ -214,10 +245,13 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         this.venue = venue
     }
 
-    fun clearPlace() {
+    /** Leaves the place off this draft (`off`), or clears it once a note took it. */
+    fun clearPlace(off: Boolean = true) {
         here = null
         spot = null
         venue = null
+        spotAt = 0L
+        placeOff = off
     }
 
     // Files on the draft. They wait in the Outbox's folder from the moment
@@ -273,6 +307,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
                 if (queued.isPhoto) graph.outbox.fileFor(queued)?.let(media::thumbnail)?.let { thumbnails[queued.id] = it }
             }
             draftFiles += queued
+            draftStarted()
         } catch (e: OutboxNotKept) {
             graph.report(e.message)
         } catch (e: java.io.IOException) {
@@ -371,6 +406,10 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearProblem() = graph.report(null)
+
+    private companion object {
+        const val TEN_MINUTES = 10 * 60 * 1000L
+    }
 
     // Upcoming. Saves and deletes go at once, not through the Outbox: each is
     // made from a revision, and a refusal (a city the search doesn't know) is

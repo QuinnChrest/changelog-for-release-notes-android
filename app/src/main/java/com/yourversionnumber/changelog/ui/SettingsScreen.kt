@@ -10,6 +10,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.yourversionnumber.changelog.Locator
 import com.yourversionnumber.changelog.PhoneNotices
 import com.yourversionnumber.changelog.kit.ActivityNoticeKind
 import com.yourversionnumber.changelog.kit.Hashtags
@@ -86,6 +87,10 @@ fun SettingsScreen(model: AppModel, onBack: () -> Unit) {
         }
         else -> model.graph.report("Notifications are off for Changelog. Turn them on in Settings, Apps, Changelog.")
     }
+    val whereAbouts = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+        if (granted.values.any { it }) model.addWhereIAm(true)
+        else model.graph.report("Changelog can't add where you are without location. Allow it in Settings, Apps, Changelog.")
+    }
     val me = model.me
 
     Scaffold(
@@ -107,6 +112,20 @@ fun SettingsScreen(model: AppModel, onBack: () -> Unit) {
                 Caption(token.expiresAt?.let { "Expires $it" } ?: "Never expires")
             }
             if (model.server != Api.PRODUCTION) Caption("Server: ${model.server}")
+
+            Heading("Place", Modifier.padding(top = 12.dp))
+            Toggle(
+                "Add where I am",
+                "Each note from this phone takes the neighbourhood or city it was written in, and you can pick a business " +
+                    "nearby. Off, tap Here for a note that should have one.",
+                checked = model.hereByDefault,
+            ) { on ->
+                when {
+                    !on -> model.addWhereIAm(false)
+                    Locator.allowed(context) -> model.addWhereIAm(true)
+                    else -> whereAbouts.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
+                }
+            }
 
             Heading("Pinned tags", Modifier.padding(top = 12.dp))
             PinnedTags(model)

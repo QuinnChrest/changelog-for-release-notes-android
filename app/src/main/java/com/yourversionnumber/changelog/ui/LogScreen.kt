@@ -85,6 +85,7 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
                 PaperField(
                     field,
                     {
+                        if (field.text.isBlank() && it.text.isNotBlank()) model.draftStarted()
                         field = it
                         model.draft = it.text
                     },

@@ -114,6 +114,11 @@ class AppGraph(private val context: Context) {
         get() = prefs.getString("activity.cursor", null)
         set(value) = prefs.edit().putString("activity.cursor", value).apply()
 
+    /** "Add where I am": every note from this phone takes its place without asking. */
+    var hereByDefault: Boolean
+        get() = prefs.getBoolean("here", false)
+        set(value) = prefs.edit().putBoolean("here", value).apply()
+
     /** A tag added to every note until the owner stops it. */
     var sticky: String?
         get() = prefs.getString("sticky", null)
@@ -158,6 +163,7 @@ class AppGraph(private val context: Context) {
         seenActivity = null
         remindersOn = false
         promptOn = false
+        hereByDefault = false
         noticeKinds = emptySet()
         activityCursor = null
         PhoneNotices.clear(context)

@@ -25,7 +25,7 @@ The Android pair of [Changelog for iPhone](https://github.com/jthingelstad/chang
 - **A daily prompt** with the day's version, and **activity notices** from
   elsewhere, each off until you turn it on.
 - **Where you are** on a note, the neighbourhood or a business nearby, and
-  **pinned tags** shared with the web. See "What's next" in [AGENTS.md](AGENTS.md).
+  **pinned tags** shared with the web.
 
 [FEATURES.md](FEATURES.md) tracks what's built and what's left.
 

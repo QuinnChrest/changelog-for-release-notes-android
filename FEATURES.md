@@ -4,7 +4,7 @@ What Changelog for Android does, what's left, and what's built but not yet
 checked. The iPhone app (`jthingelstad/changelog-ios`) is the reference;
 `AGENTS.md` says how each built piece works.
 
-**At a glance:** 30 built · 9 to do · 3 waiting on Release Notes · 8 to check
+**At a glance:** 38 built · 1 to do · 4 waiting on someone else · 7 to check
 
 Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 built, not yet checked
 
@@ -12,15 +12,7 @@ Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 b
 
 | | Feature | Notes |
 |---|---|---|
-| 🔲 | "Add where I am" setting | The iPhone app's Settings switch: each new draft finds its place by itself, and the next note within ten minutes reuses it. Android has only the Here button. |
-| 🔲 | Reorder pinned tags | Pinning and unpinning work; the iPhone app also lets you drag them into order. |
-| 🔲 | Links in Settings | The iPhone app links to Release Notes, its settings on the web, the API guide, and deleting the account (on the web). |
-| 🔲 | Home-screen widget | Android's answer to the iPhone app's planned Shortcuts and widgets: today's version, and a tap to write. |
-| 🔲 | Quick Settings tile | Write a note from the pull-down shade. |
-| 🔲 | Release build | Never built yet. Check that code shrinking (R8) keeps the JSON classes working, then sign it. |
-| 🔲 | Play Console internal testing | Needs a Play developer account (Quinn's call) and the signed release build. |
-| 🔲 | Strings in resources | Every word is written in the code today; move them to `strings.xml` before any translation. |
-| 🔲 | Accessibility pass | TalkBack through each screen, font size at 200%, contrast in both themes. |
+| 🔲 | `kit`'s words in resources | The app's words are in `strings.xml`; `kit`'s (activity rows, the daily prompt, `UpcomingDraft`'s checks) are still English in Kotlin, since `kit` has no Android. Needed only before a translation. |
 
 ## Waiting on someone else
 
@@ -29,6 +21,7 @@ Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 b
 | ⏳ | Sign in with Release Notes (OAuth) instead of pasting a token | Release Notes adding OAuth to `/v1` (its phase 5) |
 | ⏳ | Espresso 3.8 stable for the UI tests | Google; the tests use 3.8 alpha because 3.7 doesn't run on Android 17 |
 | ⏳ | License and sharing the repo with Jamie | Quinn (the iPhone app is MIT; this repo is private) |
+| ⏳ | Play Console internal testing | Quinn: a Play developer account and the upload key. The release build is checked and signs from `signing.properties` (`AGENTS.md`, Release builds). |
 
 ## Built, not yet checked
 
@@ -41,7 +34,6 @@ These are written and built; something about them couldn't be seen on the emulat
 | 🔍 | Reminders and the daily prompt fire at 6 a.m. | The emulator can't jump its clock; scheduled times were checked, not the firing |
 | 🔍 | Reminders survive a phone restart | Not rebooted with alarms waiting |
 | 🔍 | Sign-in screen in dark mode | Seen in light only |
-| 🔍 | Plain-HTTP rule in release builds | Release build not made yet |
 | 🔍 | The whole pass on a real phone | `docs/PHONE-TEST.md`, by hand, on a real account |
 | 🔍 | UI test cycle in CI | Runs on emulators here; CI runs the unit tests and lint only |
 
@@ -74,6 +66,7 @@ These are written and built; something about them couldn't be seen on the emulat
 | ✅ | Voice memos (AAC .m4a) |
 | ✅ | Files wait on the phone with the note; uploads go as it sends, and are made again if they expire |
 | ✅ | Here: where a note was written, the neighbourhood or a business nearby to pick |
+| ✅ | "Add where I am": each new draft finds its place, reused for ten minutes |
 | ✅ | Share text, links, photos, recordings and PDFs from any app |
 
 ### Upcoming
@@ -94,13 +87,24 @@ These are written and built; something about them couldn't be seen on the emulat
 | | Feature |
 |---|---|
 | ✅ | Token details and the build (version and commit) |
-| ✅ | Pinned tags, shared with the web |
+| ✅ | Pinned tags, shared with the web, in an order you set (Up and Down) |
+| ✅ | Links to Release Notes, its settings on the web, the guide, and deleting the account |
 | ✅ | Switches for reminders, the daily prompt and each kind of notice |
+
+### Outside the app
+| | Feature |
+|---|---|
+| ✅ | Home-screen widget: today's version and the prompt, a tap to write |
+| ✅ | Quick Settings tile: today's version, a tap to write from the shade |
 
 ### Look and build
 | | Feature |
 |---|---|
 | ✅ | Release Notes' look, light and dark: its colours, fonts and version style |
 | ✅ | Runs on Android 12 through 17 (tested on 16 and 17) |
+| ✅ | Words in `strings.xml`, with plurals, ready for translation |
+| ✅ | Accessibility: switches labelled for TalkBack, 48dp targets, 4.5:1 text in both themes, every screen at 200% text |
+| ✅ | Release build: R8 keeps the JSON working (the UI test cycle passes shrunk), no plain HTTP, no local network permission |
+| ✅ | Release signing from a git-ignored `signing.properties` |
 | ✅ | Version numbers by Your Version Number's arithmetic from 2026-10-29 |
 | ✅ | Tests: unit tests, tests against the dev server, and a UI test cycle on the emulator; CI on every push |

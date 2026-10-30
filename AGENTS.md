@@ -123,16 +123,32 @@ as the note sends, posts the file, and saves the uploads before the note
 goes, so a resend is the same request. Uploads found gone are made again
 once, under a new key.
 
+Upcoming (its own tab): birthdays, anniversaries, trips and events, each in
+the server's own line, added, changed and removed at once rather than
+through the Outbox (each is made from a revision, and a refusal is for the
+owner to fix there and then), each with a `RequestKey`. "Find the city" is
+a dry run. `kit`'s `UpcomingDraft` checks what the phone can before
+sending; the server stays the authority.
+
+Reminders on the phone (`PhoneReminders`), off until turned on in
+Settings (`POST_NOTIFICATIONS` asked then, on Android 13 and later): each
+comes from `GET /v1/upcoming/reminders` at its day's `send_at`, in the
+email's words, never worked out here. Each is an inexact alarm with a
+ten-minute window (`AlarmManager.setWindow`): no exact-alarm permission,
+and not held for hours the way a background job can be. Everything is
+replaced with each read (on opening the app, after a date is saved, and
+every 12 hours in WorkManager); a read that fails leaves what was
+scheduled. The plan is kept so `RestoreReceiver` sets it again after a
+restart or an update. A tapped reminder opens Upcoming.
+
 To come, in about this order (the iPhone app has each one):
 
-1. Pinned tags in Settings (`PUT /v1/tags/pinned`, through the Outbox).
-2. Here: one `FusedLocationProviderClient.getCurrentLocation` (needs Play
+1. The daily prompt ("You're 4.5.137 today. What changed?") and activity
+   notices, in Settings beside the reminders.
+2. Pinned tags in Settings (`PUT /v1/tags/pinned`, through the Outbox).
+3. Here: one `FusedLocationProviderClient.getCurrentLocation` (needs Play
    services; ask Quinn before adding it), with the nearby businesses to pick.
-3. Upcoming: list, add, change and remove, with a dry run.
-4. Notifications: `POST_NOTIFICATIONS`, Upcoming reminders scheduled from
-   each day's `send_at`, the daily prompt, activity notices from WorkManager
-   periodic work.
-5. A toast for a badge a note unlocked (`unlocked` in its receipt).
-6. A dev-server test cycle like the iPhone app's `ui-test-cycle.sh`.
+4. A toast for a badge a note unlocked (`unlocked` in its receipt).
+5. A dev-server test cycle like the iPhone app's `ui-test-cycle.sh`.
 
 `docs/PHONE-TEST.md` is the pass by hand each build gets on a real phone.

@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Upcoming reminders, asked for when the owner turns them on in Settings. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- To set the reminders' alarms again after the phone restarts. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Voice memos, asked for when the owner first taps Record. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Photos come from the system's camera app and photo picker, which need no permission here. -->
@@ -48,6 +52,15 @@
                 <data android:mimeType="application/pdf" />
             </intent-filter>
         </activity>
+
+        <!-- Upcoming reminders: each comes as an alarm, set again after a restart. -->
+        <receiver android:name=".ReminderReceiver" android:exported="false" />
+        <receiver android:name=".RestoreReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <!-- The camera writes a photo here, into the app's own cache. -->
         <provider

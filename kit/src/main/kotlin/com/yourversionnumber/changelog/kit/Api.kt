@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNamingStrategy
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.serializer
 import java.io.File
 import java.io.IOException
@@ -115,6 +116,29 @@ class Api(
             connection.disconnect()
         }
     }
+
+    // Upcoming, all needing the `upcoming` scope. Writes go at once, each with
+    // a RequestKey, so a Save tapped again after a lost answer is the same save.
+
+    /** Every date ahead, soonest first, each with the server's own line. */
+    suspend fun upcoming(): UpcomingList = UpcomingList.from(send<JsonObject>("GET", "v1/upcoming"))
+
+    /**
+     * Adds, changes and removes dates, all or nothing. A refusal's `field`
+     * names the entry (`add[0]`); `revision_mismatch` means read the list
+     * again. A dry run saves nothing and needs no key.
+     */
+    suspend fun saveUpcoming(batch: UpcomingBatch, idempotencyKey: String?): UpcomingSaved =
+        send("POST", "v1/upcoming/batch", body = encode(batch), idempotencyKey = idempotencyKey)
+
+    /** Removes one date, from the revision read. */
+    suspend fun deleteUpcoming(id: String, revision: Int, idempotencyKey: String) {
+        send<Unit>("DELETE", "v1/upcoming/$id", query = listOf("revision" to revision.toString()), idempotencyKey = idempotencyKey)
+    }
+
+    /** The reminders each morning brings, from today through `days` ahead (at most 31). */
+    suspend fun reminders(days: Int = ReminderPlan.DAYS): Reminders =
+        send("GET", "v1/upcoming/reminders", query = listOf("days" to days.toString()))
 
     /** Sign out: the token revokes itself. */
     suspend fun revokeToken() {

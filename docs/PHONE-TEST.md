@@ -36,7 +36,14 @@ Upcoming and the activity log.
 8. **The build.** The foot of Settings names the version and the commit
    (`Changelog 0.0.0, build 1a2b3c4`).
 9. **Activity.** Rows from every channel; a filter; "Older" loads more.
-10. *(later)* Pinned tags, Here, Upcoming, notifications.
-11. **Last, sign out.** Settings, "Sign out", then "Sign out and revoke this
+10. **Upcoming.** "Add a date" (a birthday), Save, then edit it and delete
+    it. A trip: "Find the city" names it. The web's Upcoming agrees at each
+    step.
+11. **Reminders.** Settings, "Remind me on this phone", allow
+    notifications. A reminder comes when the morning's email is due, in
+    its words; tapping it opens Upcoming. Restart the phone: it still
+    comes.
+12. *(later)* The daily prompt, activity notices, pinned tags, Here.
+13. **Last, sign out.** Settings, "Sign out", then "Sign out and revoke this
    token". The token shows as revoked on the web, and anything still
    waiting stays on the phone.

@@ -57,7 +57,7 @@ import androidx.compose.runtime.LaunchedEffect
 /** The home screen: today's version, the box, the tag row, Commit, and what happened today. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LogScreen(model: AppModel, onActivity: () -> Unit, onSettings: () -> Unit) {
+fun LogScreen(model: AppModel, onSettings: () -> Unit) {
     val waiting by model.waiting.collectAsStateWithLifecycle()
     val sent by model.sent.collectAsStateWithLifecycle()
     val problem by model.problem.collectAsStateWithLifecycle()
@@ -70,7 +70,6 @@ fun LogScreen(model: AppModel, onActivity: () -> Unit, onSettings: () -> Unit) {
             TopAppBar(
                 title = { Text("Changelog") },
                 actions = {
-                    TextButton(onClick = onActivity) { Text("Activity") }
                     TextButton(onClick = onSettings) { Text("Settings") }
                 },
             )

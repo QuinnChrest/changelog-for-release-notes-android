@@ -8,18 +8,63 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yourversionnumber.changelog.ui.ActivityScreen
+import com.yourversionnumber.changelog.ui.UpcomingScreen
 import com.yourversionnumber.changelog.ui.ChangelogTheme
 import com.yourversionnumber.changelog.ui.LogScreen
 import com.yourversionnumber.changelog.ui.SettingsScreen
 import com.yourversionnumber.changelog.ui.SignInScreen
 
+/** Log, Upcoming and Activity, along the bottom. Back from Upcoming or Activity goes to Log. */
+@Composable
+private fun Tabs(model: AppModel) {
+    val tabs = listOf("log" to "Log", "upcoming" to "Upcoming", "activity" to "Activity")
+    BackHandler(enabled = model.screen != "log") { model.screen = "log" }
+    // The tab's own screen handles the status bar; this one only makes room for the tabs.
+    Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        bottomBar = {
+            NavigationBar {
+                tabs.forEach { (id, label) ->
+                    NavigationBarItem(
+                        selected = model.screen == id,
+                        onClick = { model.screen = id },
+                        icon = { Text(label, style = MaterialTheme.typography.labelLarge) },
+                    )
+                }
+            }
+        },
+    ) { padding ->
+        Box(Modifier.padding(bottom = padding.calculateBottomPadding()).consumeWindowInsets(padding)) {
+            when (model.screen) {
+                "upcoming" -> UpcomingScreen(model)
+                "activity" -> ActivityScreen(model)
+                else -> LogScreen(model, onSettings = { model.screen = "settings" })
+            }
+        }
+    }
+}
+
 class MainActivity : ComponentActivity() {
+    companion object {
+        /** The screen a notification opens. */
+        const val OPEN = "open"
+    }
+
     private val model: AppModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,12 +74,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             ChangelogTheme {
                 val signedIn by model.signedIn.collectAsStateWithLifecycle()
-                var screen by rememberSaveable { mutableStateOf("log") }
                 when {
                     !signedIn -> SignInScreen(model)
-                    screen == "settings" -> SettingsScreen(model, onBack = { screen = "log" })
-                    screen == "activity" -> ActivityScreen(model, onBack = { screen = "log" })
-                    else -> LogScreen(model, onActivity = { screen = "activity" }, onSettings = { screen = "settings" })
+                    model.screen == "settings" -> SettingsScreen(model, onBack = { model.screen = "log" })
+                    else -> Tabs(model)
                 }
             }
         }
@@ -50,8 +93,9 @@ class MainActivity : ComponentActivity() {
         receive(intent)
     }
 
-    /** Text, a link or files shared from another app: the start of one note. */
+    /** Text, a link or files shared from another app: the start of one note. Or a tapped reminder, which opens Upcoming. */
     private fun receive(intent: Intent?) {
+        intent?.getStringExtra(OPEN)?.let { model.screen = it }
         val action = intent?.action
         if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return
         intent.getStringExtra(Intent.EXTRA_TEXT)?.let { text ->

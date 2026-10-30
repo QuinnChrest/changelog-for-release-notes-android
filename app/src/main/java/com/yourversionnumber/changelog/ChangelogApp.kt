@@ -81,6 +81,11 @@ class AppGraph(private val context: Context) {
         get() = if (BuildConfig.DEBUG) prefs.getString("server", BuildConfig.DEV_SERVER)!! else Api.PRODUCTION
         set(value) = prefs.edit().putString("server", value).apply()
 
+    /** Upcoming reminders as this phone's own notifications. Off until the owner turns them on. */
+    var remindersOn: Boolean
+        get() = prefs.getBoolean("reminders", false)
+        set(value) = prefs.edit().putBoolean("reminders", value).apply()
+
     /** A tag added to every note until the owner stops it. */
     var sticky: String?
         get() = prefs.getString("sticky", null)
@@ -123,6 +128,8 @@ class AppGraph(private val context: Context) {
         tags = null
         sticky = null
         seenActivity = null
+        remindersOn = false
+        PhoneReminders.clear(context)
         _sent.value = emptyList()
         sentFile.delete()
         _signedIn.value = false

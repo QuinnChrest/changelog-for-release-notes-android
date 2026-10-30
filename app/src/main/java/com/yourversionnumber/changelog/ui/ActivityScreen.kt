@@ -1,6 +1,5 @@
 package com.yourversionnumber.changelog.ui
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -54,8 +53,7 @@ import java.time.format.FormatStyle
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun ActivityScreen(model: AppModel, onBack: () -> Unit) {
-    BackHandler(onBack = onBack)
+fun ActivityScreen(model: AppModel) {
     var filter by rememberSaveable { mutableStateOf(ActivityFilter.All) }
     var items by remember { mutableStateOf<List<ActivityItem>>(emptyList()) }
     var next by remember { mutableStateOf<String?>(null) }
@@ -86,7 +84,6 @@ fun ActivityScreen(model: AppModel, onBack: () -> Unit) {
         topBar = {
             TopAppBar(
                 title = { Text("Activity") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Done") } },
                 actions = { TextButton(onClick = { reloads++ }, enabled = !loading) { Text("Refresh") } },
             )
         },

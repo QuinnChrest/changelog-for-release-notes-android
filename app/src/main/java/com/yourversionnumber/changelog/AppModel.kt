@@ -8,6 +8,13 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import com.yourversionnumber.changelog.kit.MediaType
+import com.yourversionnumber.changelog.kit.RequestKey
+import com.yourversionnumber.changelog.kit.UpcomingBatch
+import com.yourversionnumber.changelog.kit.UpcomingDraft
+import com.yourversionnumber.changelog.kit.UpcomingEntry
+import com.yourversionnumber.changelog.kit.UpcomingList
+import com.yourversionnumber.changelog.kit.UpcomingRemoval
+import com.yourversionnumber.changelog.kit.upcomingSentence
 import com.yourversionnumber.changelog.kit.QueuedFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -91,6 +98,8 @@ class AppModel(application: Application) : AndroidViewModel(application) {
             }
             loadToday()
             graph.send()
+            // Opening the app tops up the reminders, as the client guide asks.
+            PhoneReminders.refresh(getApplication())
         }
     }
 
@@ -274,4 +283,97 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearProblem() = graph.report(null)
+
+    // Upcoming. Saves and deletes go at once, not through the Outbox: each is
+    // made from a revision, and a refusal (a city the search doesn't know) is
+    // for the owner to fix there and then. Each still carries a RequestKey.
+
+    val hasUpcoming: Boolean get() = me?.token?.scopes?.contains("upcoming") == true
+
+    var upcoming by mutableStateOf<UpcomingList?>(null)
+        private set
+    var upcomingLoading by mutableStateOf(false)
+        private set
+    private val upcomingKey = RequestKey<UpcomingBatch>()
+    private val removeKey = RequestKey<UpcomingRemoval>()
+
+    fun loadUpcoming() {
+        val api = graph.api() ?: return
+        if (!hasUpcoming) return
+        viewModelScope.launch {
+            upcomingLoading = true
+            try {
+                upcoming = api.upcoming()
+            } catch (e: ApiException) {
+                handle(e)
+            }
+            upcomingLoading = false
+        }
+    }
+
+    /** Saves a date: answers null once saved, or the sentence to show. */
+    suspend fun save(draft: UpcomingDraft, editing: UpcomingEntry?): String? {
+        val batch = draft.batch(editing).getOrElse { return it.message }
+        val api = graph.api() ?: return "Sign in again to keep your Upcoming dates."
+        return try {
+            api.saveUpcoming(batch, upcomingKey.key(batch))
+            upcomingKey.reset()
+            afterUpcomingChange(api)
+            null
+        } catch (e: ApiException) {
+            whyNot(e)
+        }
+    }
+
+    /** A dry run that finds the destination's city: answers the place as the server named it, or why not. */
+    suspend fun checkPlace(draft: UpcomingDraft, editing: UpcomingEntry?): Result<String> {
+        val batch = draft.placeCheck(editing).getOrElse { return Result.failure(it) }
+        val api = graph.api() ?: return Result.failure(Exception("Sign in again to keep your Upcoming dates."))
+        return try {
+            Result.success(api.saveUpcoming(batch, null).saved?.place.orEmpty())
+        } catch (e: ApiException) {
+            Result.failure(Exception(whyNot(e)))
+        }
+    }
+
+    suspend fun remove(entry: UpcomingEntry): String? {
+        val api = graph.api() ?: return "Sign in again to keep your Upcoming dates."
+        val removal = UpcomingRemoval(entry.id, entry.revision)
+        return try {
+            api.deleteUpcoming(entry.id, entry.revision, removeKey.key(removal))
+            removeKey.reset()
+            afterUpcomingChange(api)
+            null
+        } catch (e: ApiException) {
+            whyNot(e)
+        }
+    }
+
+    private suspend fun afterUpcomingChange(api: com.yourversionnumber.changelog.kit.Api) {
+        runCatching { upcoming = api.upcoming() }
+        PhoneReminders.refresh(getApplication())
+    }
+
+    private fun whyNot(e: ApiException): String {
+        if (e.signedOut) graph.tokenLost(e.message)
+        if (e.code == "revision_mismatch") loadUpcoming()
+        return when {
+            e.code == "revision_mismatch" -> "This date was changed somewhere else. It's been read again: make the change once more."
+            else -> e.upcomingSentence
+        }
+    }
+
+    // Reminders on this phone.
+
+    var remindersOn by mutableStateOf(graph.remindersOn)
+        private set
+
+    fun setReminders(on: Boolean) {
+        graph.remindersOn = on
+        remindersOn = on
+        if (on) viewModelScope.launch { PhoneReminders.refresh(getApplication()) } else PhoneReminders.clear(getApplication())
+    }
+
+    /** Which screen shows: Log, Upcoming, Activity or Settings. A tapped reminder opens Upcoming. */
+    var screen by mutableStateOf("log")
 }

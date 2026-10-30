@@ -56,6 +56,7 @@ android {
         buildConfigField("String", "COMMIT", "\"$commit\"")
         // Where a debug build's "Dev server" points. On a phone over USB,
         // `adb reverse tcp:8790 tcp:8790` and http://localhost:8790.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "DEV_SERVER", "\"${providers.gradleProperty("changelog.devServer").getOrElse("http://10.0.2.2:8790")}\"")
     }
 
@@ -91,4 +92,9 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
+    debugImplementation(libs.compose.ui.test.manifest)
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.junit)
 }

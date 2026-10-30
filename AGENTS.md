@@ -117,6 +117,16 @@ words, pins). It skips unless a token is set, and runs only on localhost:
 CHANGELOG_DEV_TOKEN=rn_... ./gradlew :kit:test --tests '*DevServerTest'
 ```
 
+`app`'s `TestCycle` (Compose UI tests, like the iPhone app's
+`ui-test-cycle.sh`) drives the real app on an emulator against it: sign
+in, a note committed and checked on the server as filed once, a date added
+in Upcoming, Activity and Settings, then everything it made removed. It
+skips without a token:
+
+```sh
+./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.devToken=rn_...
+```
+
 It listens on 8790 and prints a token for its made-up account; each start is
 a clean slate with a new token. A debug build's "Dev server" is
 `http://10.0.2.2:8790` (the emulator's view of this computer). On a phone
@@ -185,10 +195,9 @@ nearby businesses are offered to pick, never picked for the owner. A spot
 that couldn't be named (offline) is named as the note sends (`prepare`); a
 place that can't be named at all is left off, never holding the note.
 
-To come, in about this order (the iPhone app has each one):
-
-1. A UI test cycle on an emulator, like the iPhone app's
-   `ui-test-cycle.sh` (Compose UI tests driving Log, Upcoming and Settings
-   against the dev server).
+Everything the iPhone app does is here. Still to come, as it does: OAuth
+sign-in once Release Notes offers it on `/v1` (phase 5), Shortcuts' Android
+equivalents (a home-screen widget, quick settings tile), and a release
+build signed for Play's internal testing.
 
 `docs/PHONE-TEST.md` is the pass by hand each build gets on a real phone.

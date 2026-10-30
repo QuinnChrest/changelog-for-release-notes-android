@@ -4,7 +4,7 @@ What Changelog for Android does, what's left, and what's built but not yet
 checked. The iPhone app (`jthingelstad/changelog-ios`) is the reference;
 `AGENTS.md` says how each built piece works.
 
-**At a glance:** 42 built · 1 to do · 3 waiting on someone else · 4 to check
+**At a glance:** 40 built · 1 to do · 3 waiting on someone else · 5 to check
 
 Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 built, not yet checked
 

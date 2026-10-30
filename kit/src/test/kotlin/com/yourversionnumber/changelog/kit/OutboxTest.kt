@@ -12,6 +12,10 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OutboxTest {
+    init {
+        English.use()
+    }
+
     // A folder with a space in it, as an app's storage may have.
     private fun folder(): File = Files.createTempDirectory("outbox test").toFile()
 

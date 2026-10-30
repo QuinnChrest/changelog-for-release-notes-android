@@ -22,7 +22,7 @@ object DailyPrompt {
     /** The prompt's id for a day, the same on every top-up. */
     fun id(day: String) = PREFIX + day
 
-    fun text(version: String) = "You're $version today. What changed?"
+    fun text(version: String) = Words.say(Phrase.DailyPrompt, version)
 
     /**
      * One prompt for each day `/v1/me` lists whose moment is still ahead,
@@ -69,13 +69,15 @@ object DailyPrompt {
 }
 
 /** The kinds of activity a phone can be told about, each turned on by itself in Settings. */
-enum class ActivityNoticeKind(val label: String) {
+enum class ActivityNoticeKind(private val phrase: Phrase) {
     /** Notes added by someone else: an agent, another token, an import, an email reply. */
-    Others("Notes from elsewhere"),
+    Others(Phrase.NoticeOthers),
 
     /** An email that wasn't filed, the email stopping, a connection ending. */
-    Problems("Problems"),
-    Badges("Badges earned"),
+    Problems(Phrase.NoticeProblems),
+    Badges(Phrase.NoticeBadges);
+
+    val label: String get() = Words.say(phrase)
 }
 
 /** A notification for one activity row, or for several of one kind. It never carries a note's words: the log has none. */
@@ -143,37 +145,37 @@ object ActivityNotices {
 
     internal fun notice(item: ActivityItem, kind: ActivityNoticeKind): ActivityNotice {
         val id = PREFIX + item.id
-        val v = item.version?.let { " $it" }.orEmpty()
+        fun inVersion(with: Phrase, bare: Phrase) = item.version?.let { Words.say(with, it) } ?: Words.say(bare)
         return when {
             item.kind == "note.added" -> {
                 val who = when (item.via) {
-                    "assistant" -> item.client ?: "An agent"
-                    "import" -> "An import"
-                    else -> item.token ?: "Another token"
+                    "assistant" -> item.client ?: Words.say(Phrase.AnAgent)
+                    "import" -> Words.say(Phrase.AnImport)
+                    else -> item.token ?: Words.say(Phrase.AnotherToken)
                 }
-                ActivityNotice(id, kind, "Added to$v", "$who added a note.")
+                ActivityNotice(id, kind, inVersion(Phrase.AddedTo, Phrase.AddedToBare), Words.say(Phrase.NoteAddedBody, who))
             }
-            item.kind == "import.notes" -> ActivityNotice(id, kind, "Notes imported", "An import added notes to your release notes.")
-            item.kind == "mail" && kind == ActivityNoticeKind.Others -> ActivityNotice(id, kind, "Reply filed in$v", "An email you sent was filed.")
-            item.kind == "mail" -> ActivityNotice(
-                id, kind, "An email wasn't filed", "Release Notes couldn't file an email. The mail log on the web says why.",
+            item.kind == "import.notes" -> ActivityNotice(id, kind, Words.say(Phrase.ImportNotes), Words.say(Phrase.ImportBody))
+            item.kind == "mail" && kind == ActivityNoticeKind.Others ->
+                ActivityNotice(id, kind, inVersion(Phrase.MailFiled, Phrase.MailFiledBare), Words.say(Phrase.MailFiledBody))
+            item.kind == "mail" -> ActivityNotice(id, kind, Words.say(Phrase.MailNotFiledTitle), Words.say(Phrase.MailNotFiledBody))
+            item.kind == "badge.earned" -> ActivityNotice(id, kind, Words.say(Phrase.BadgeEarned), item.name ?: Words.say(Phrase.BadgeFallbackBody))
+            item.kind == "status.stopped" -> ActivityNotice(id, kind, Words.say(Phrase.EmailStoppedTitle), Words.say(Phrase.EmailStoppedBody))
+            else -> ActivityNotice(
+                id, kind, Words.say(Phrase.ConnectionEndedTitle),
+                Words.say(Phrase.ConnectionEndedBody, item.client ?: item.token ?: Words.say(Phrase.AConnection)),
             )
-            item.kind == "badge.earned" -> ActivityNotice(id, kind, "Badge earned", item.name ?: "A new badge.")
-            item.kind == "status.stopped" -> ActivityNotice(
-                id, kind, "Your email stopped", "The morning email isn't going out. Settings on the web says why.",
-            )
-            else -> ActivityNotice(id, kind, "A connection ended", "${item.client ?: item.token ?: "A connection"} was disconnected.")
         }
     }
 
     internal fun summary(kind: ActivityNoticeKind, count: Int, newest: ActivityItem): ActivityNotice {
         val id = "$PREFIX${kind.name.lowercase()}.${newest.id}"
         val title = when (kind) {
-            ActivityNoticeKind.Others -> "$count notes from elsewhere"
-            ActivityNoticeKind.Problems -> "$count things need a look"
-            ActivityNoticeKind.Badges -> "$count badges earned"
+            ActivityNoticeKind.Others -> Words.say(Phrase.SummaryOthers, count)
+            ActivityNoticeKind.Problems -> Words.say(Phrase.SummaryProblems, count)
+            ActivityNoticeKind.Badges -> Words.say(Phrase.SummaryBadges, count)
         }
-        return ActivityNotice(id, kind, title, "Open Activity to see them.")
+        return ActivityNotice(id, kind, title, Words.say(Phrase.SummaryBody))
     }
 }
 

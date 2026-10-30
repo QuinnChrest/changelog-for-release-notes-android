@@ -22,6 +22,7 @@ import com.yourversionnumber.changelog.kit.Outbox
 import com.yourversionnumber.changelog.kit.OutboxOperation
 import com.yourversionnumber.changelog.kit.OutboxResult
 import com.yourversionnumber.changelog.kit.Tags
+import com.yourversionnumber.changelog.kit.Words
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +38,7 @@ class ChangelogApp : Application() {
     override fun onCreate() {
         super.onCreate()
         words = this
+        Words.book = AppPhrases
     }
 
     companion object {

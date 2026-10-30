@@ -13,6 +13,10 @@ import kotlin.test.assertTrue
 
 /** The client against a stand-in server on localhost, never Release Notes itself. */
 class ApiTest {
+    init {
+        English.use()
+    }
+
     private lateinit var server: HttpServer
     private val seen = mutableListOf<HttpExchange>()
     private val bodies = mutableListOf<String>()

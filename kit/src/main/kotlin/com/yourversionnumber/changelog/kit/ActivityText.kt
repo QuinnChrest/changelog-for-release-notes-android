@@ -6,44 +6,45 @@ package com.yourversionnumber.changelog.kit
 /** Through what it came, in the owner's words. */
 val ActivityItem.source: String?
     get() = when (via) {
-        "token" -> token?.let { "via $it" } ?: "via a token"
-        "assistant" -> client?.let { "by $it" } ?: "by an agent"
-        "email" -> "by email"
-        "web" -> "on the web"
-        "import" -> "by import"
+        "token" -> token?.let { Words.say(Phrase.ViaToken, it) } ?: Words.say(Phrase.ViaAToken)
+        "assistant" -> client?.let { Words.say(Phrase.ByClient, it) } ?: Words.say(Phrase.ByAnAgent)
+        "email" -> Words.say(Phrase.ByEmail)
+        "web" -> Words.say(Phrase.OnTheWeb)
+        "import" -> Words.say(Phrase.ByImport)
         else -> null
     }
 
 val ActivityItem.headline: String
     get() {
-        val v = version?.let { " $it" }.orEmpty()
+        // A phrase with the version, or without it when the row has none.
+        fun inVersion(with: Phrase, bare: Phrase) = version?.let { Words.say(with, it) } ?: Words.say(bare)
+        fun named(with: Phrase, bare: Phrase, who: String?) = who?.let { Words.say(with, it) } ?: Words.say(bare)
         return when (kind) {
-            "note.added" -> "Filed in$v"
-            "note.edited" -> "Edited in$v"
-            "note.deleted" -> "Deleted from$v"
-            "note.files" -> "Files added in$v"
-            "mail" -> if (outcome == "filed") "Reply filed in$v" else "Email not filed"
-            "email.sent" -> "Email sent for$v"
-            "reminder" -> title?.let { "Reminder: $it" } ?: "Reminder in the email"
-            "badge.earned" -> name?.let { "Badge: $it" } ?: "Badge earned"
-            "transcript.added" -> "Recording written out"
-            "description.added" -> "Photos described"
-            "import.notes" -> "Notes imported"
-            "upcoming.added", "upcoming.changed", "upcoming.removed" -> {
-                val verb = kind.substringAfter('.')
-                title?.let { "$it $verb" } ?: "Upcoming date $verb"
-            }
-            "connection.added" -> "Connected ${client ?: "a client"}"
-            "connection.changed" -> "${client ?: "A connection"} changed"
-            "connection.removed" -> "${client ?: "A connection"} disconnected"
-            "reads" -> "${client ?: "An agent"} read your notes"
-            "status.stopped" -> "Email stopped"
-            "status.restarted" -> "Email restarted"
-            "signin" -> "Signed in on the web"
-            "settings.changed" -> "Settings changed"
-            "pause.set" -> "Email paused"
-            "pause.ended" -> "Pause ended"
-            "place.set", "place.removed" -> "Place for the day changed"
+            "note.added" -> inVersion(Phrase.NoteAdded, Phrase.NoteAddedBare)
+            "note.edited" -> inVersion(Phrase.NoteEdited, Phrase.NoteEditedBare)
+            "note.deleted" -> inVersion(Phrase.NoteDeleted, Phrase.NoteDeletedBare)
+            "note.files" -> inVersion(Phrase.NoteFiles, Phrase.NoteFilesBare)
+            "mail" -> if (outcome == "filed") inVersion(Phrase.MailFiled, Phrase.MailFiledBare) else Words.say(Phrase.MailNotFiled)
+            "email.sent" -> inVersion(Phrase.EmailSent, Phrase.EmailSentBare)
+            "reminder" -> named(Phrase.ReminderTitled, Phrase.ReminderRow, title)
+            "badge.earned" -> named(Phrase.BadgeNamed, Phrase.BadgeEarned, name)
+            "transcript.added" -> Words.say(Phrase.TranscriptAdded)
+            "description.added" -> Words.say(Phrase.DescriptionAdded)
+            "import.notes" -> Words.say(Phrase.ImportNotes)
+            "upcoming.added" -> named(Phrase.UpcomingAddedTitled, Phrase.UpcomingAdded, title)
+            "upcoming.changed" -> named(Phrase.UpcomingChangedTitled, Phrase.UpcomingChanged, title)
+            "upcoming.removed" -> named(Phrase.UpcomingRemovedTitled, Phrase.UpcomingRemoved, title)
+            "connection.added" -> named(Phrase.ConnectionAdded, Phrase.ConnectionAddedBare, client)
+            "connection.changed" -> named(Phrase.ConnectionChanged, Phrase.ConnectionChangedBare, client)
+            "connection.removed" -> named(Phrase.ConnectionRemoved, Phrase.ConnectionRemovedBare, client)
+            "reads" -> named(Phrase.Reads, Phrase.ReadsBare, client)
+            "status.stopped" -> Words.say(Phrase.StatusStopped)
+            "status.restarted" -> Words.say(Phrase.StatusRestarted)
+            "signin" -> Words.say(Phrase.SignedIn)
+            "settings.changed" -> Words.say(Phrase.SettingsChanged)
+            "pause.set" -> Words.say(Phrase.PauseSet)
+            "pause.ended" -> Words.say(Phrase.PauseEnded)
+            "place.set", "place.removed" -> Words.say(Phrase.PlaceChanged)
             else -> kind.split('.').joinToString(" ") { w -> w.replaceFirstChar { it.uppercase() } }
         }
     }
@@ -63,12 +64,14 @@ fun ActivityItem.isMine(tokenName: String?): Boolean =
     kind == "note.added" && via == "token" && token != null && token == tokenName && note != null && day != null
 
 /** The Activity screen's filters, by the API's kind families. */
-enum class ActivityFilter(val label: String, val kinds: List<String>) {
-    All("All", emptyList()),
-    Notes("Notes", listOf("note", "transcript", "description", "import")),
-    Email("Email", listOf("mail", "email", "reminder")),
-    Badges("Badges", listOf("badge")),
-    Upcoming("Upcoming", listOf("upcoming", "reminder")),
-    Connections("Connections", listOf("connection", "reads")),
-    Problems("Problems", listOf("mail", "status", "connection")),
+enum class ActivityFilter(private val phrase: Phrase, val kinds: List<String>) {
+    All(Phrase.FilterAll, emptyList()),
+    Notes(Phrase.FilterNotes, listOf("note", "transcript", "description", "import")),
+    Email(Phrase.FilterEmail, listOf("mail", "email", "reminder")),
+    Badges(Phrase.FilterBadges, listOf("badge")),
+    Upcoming(Phrase.FilterUpcoming, listOf("upcoming", "reminder")),
+    Connections(Phrase.FilterConnections, listOf("connection", "reads")),
+    Problems(Phrase.FilterProblems, listOf("mail", "status", "connection"));
+
+    val label: String get() = Words.say(phrase)
 }

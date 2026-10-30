@@ -17,11 +17,13 @@ import java.util.UUID
 // an error.
 
 @Serializable
-enum class UpcomingKind(val label: String) {
-    @SerialName("birthday") Birthday("Birthday"),
-    @SerialName("anniversary") Anniversary("Anniversary"),
-    @SerialName("trip") Trip("Trip"),
-    @SerialName("event") Event("Event");
+enum class UpcomingKind(private val phrase: Phrase) {
+    @SerialName("birthday") Birthday(Phrase.KindBirthday),
+    @SerialName("anniversary") Anniversary(Phrase.KindAnniversary),
+    @SerialName("trip") Trip(Phrase.KindTrip),
+    @SerialName("event") Event(Phrase.KindEvent);
+
+    val label: String get() = Words.say(phrase)
 
     /** Comes back every year, written `MM-DD`, with its first year if known. */
     val annual: Boolean get() = this == Birthday || this == Anniversary
@@ -235,14 +237,16 @@ data class UpcomingDraft(
     val today: String,
 ) {
     /** What the owner can fix before anything is sent. The words never name the date's own title, day or place. */
-    enum class Problem(val message: String) {
-        Title("Give it a title, on one line."),
-        TitleTooLong("A title can be at most 120 characters."),
-        Year("A year goes with a birthday or anniversary, and can't be after this year."),
-        End("A trip's last day can't be before its first."),
-        Place("A trip needs a destination, like Zürich or Paris, Texas."),
-        Tag("A tag is one word of letters, numbers and hyphens, like family."),
-        Reminders("Choose from one to six reminders."),
+    enum class Problem(private val phrase: Phrase) {
+        Title(Phrase.ProblemTitle),
+        TitleTooLong(Phrase.ProblemTitleTooLong),
+        Year(Phrase.ProblemYear),
+        End(Phrase.ProblemEnd),
+        Place(Phrase.ProblemPlace),
+        Tag(Phrase.ProblemTag),
+        Reminders(Phrase.ProblemReminders);
+
+        val message: String get() = Words.say(phrase)
     }
 
     /** Switching kind: reminders left at one kind's default follow the new kind's. */

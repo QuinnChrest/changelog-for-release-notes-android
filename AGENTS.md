@@ -29,8 +29,14 @@ says how every client behaves.
   screens' ViewModel; `TokenStore` keeps the token sealed by an Android
   Keystore key; `ui/` has the screens (sign-in, Log, Settings). The app's
   words are in `res/values/strings.xml`, read with `say()` and `sayCount()`
-  (in `ChangelogApp.kt`); `kit`'s words (activity rows, the daily prompt,
-  `UpcomingDraft`'s checks) are still English in Kotlin.
+  (in `ChangelogApp.kt`). `kit` has no Android, so its sentences (activity
+  rows, notices, the daily prompt, errors, `UpcomingDraft`'s checks) are
+  named in `Words.kt` (`Phrase`, `CountPhrase`) and spoken through
+  `Words.say`; the app supplies the words (`AppPhrases`, from the `kit_*`
+  entries in `strings.xml`, with no `else` so a phrase without words won't
+  build). `kit`'s tests use `English`, in its test sources: call
+  `English.use()` before reading a sentence. A new sentence in `kit` is a
+  new `Phrase`, its `kit_` string, and a line in `AppPhrases` and `English`.
 - `SendWorker` sends the Outbox through WorkManager with a network
   constraint, oldest first, backing off while Release Notes can't be reached
   and waiting out `Retry-After`.

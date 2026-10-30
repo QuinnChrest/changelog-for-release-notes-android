@@ -95,8 +95,8 @@ object MediaType {
         val photos = files.count { it.isPhoto }
         val memos = files.count { it.isRecording }
         val others = files.size - photos - memos
-        fun say(n: Int, one: String, many: String) = when (n) { 0 -> null; 1 -> "1 $one"; else -> "$n $many" }
-        return listOfNotNull(say(photos, "photo", "photos"), say(memos, "voice memo", "voice memos"), say(others, "file", "files"))
+        fun say(n: Int, phrase: CountPhrase) = if (n == 0) null else Words.count(phrase, n)
+        return listOfNotNull(say(photos, CountPhrase.PhotoCount), say(memos, CountPhrase.MemoCount), say(others, CountPhrase.FileCount))
             .joinToString(", ")
     }
 }

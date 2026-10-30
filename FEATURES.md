@@ -4,15 +4,13 @@ What Changelog for Android does, what's left, and what's built but not yet
 checked. The iPhone app (`jthingelstad/changelog-ios`) is the reference;
 `AGENTS.md` says how each built piece works.
 
-**At a glance:** 40 built · 1 to do · 3 waiting on someone else · 5 to check
+**At a glance:** 41 built · 0 to do · 3 waiting on someone else · 5 to check
 
 Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 built, not yet checked
 
 ## To do
 
-| | Feature | Notes |
-|---|---|---|
-| 🔲 | `kit`'s words in resources | The app's words are in `strings.xml`; `kit`'s (activity rows, the daily prompt, `UpcomingDraft`'s checks) are still English in Kotlin, since `kit` has no Android. Needed only before a translation. |
+Nothing the project can do alone: what's left is waiting on someone else or needs a real phone.
 
 ## Waiting on someone else
 
@@ -100,7 +98,7 @@ These are written and built; something about them couldn't be seen on the emulat
 |---|---|
 | ✅ | Release Notes' look, light and dark: its colours, fonts and version style (every screen seen in both) |
 | ✅ | Runs on Android 12 through 17 (tested on 16 and 17) |
-| ✅ | Words in `strings.xml`, with plurals, ready for translation |
+| ✅ | Every word in `strings.xml`, with plurals, ready for translation: the app's own, and `kit`'s through its phrasebook (`Words.kt`) |
 | ✅ | Accessibility: switches labelled for TalkBack, 48dp targets, 4.5:1 text in both themes, every screen at 200% text |
 | ✅ | Release build: R8 keeps the JSON working (the UI test cycle passes shrunk), no plain HTTP, no local network permission |
 | ✅ | Release signing from a git-ignored `signing.properties` |

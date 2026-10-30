@@ -12,6 +12,10 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MediaTest {
+    init {
+        English.use()
+    }
+
     private fun bytes(vararg b: Int) = ByteArray(b.size) { b[it].toByte() }
     private fun ascii(s: String) = s.toByteArray(Charsets.ISO_8859_1)
 
@@ -158,7 +162,7 @@ class MediaTest {
         outbox.removeFiles(listOf(photo))
         val api = Api("http://127.0.0.1:1", "rn_" + "t".repeat(43), "Changelog/0.0.0")
         val report = outbox.flush(prepare = { api.prepare(it, outbox) }) { receipt }
-        assertEquals(Api.FILE_MISSING, report.refused.single().refusal)
+        assertEquals(Words.say(Phrase.FileMissing), report.refused.single().refusal)
         // Fixed, it goes as the words alone.
         outbox.retry(outbox.items.value.single().id, "Words too")
         assertTrue(outbox.items.value.single().files.isEmpty())

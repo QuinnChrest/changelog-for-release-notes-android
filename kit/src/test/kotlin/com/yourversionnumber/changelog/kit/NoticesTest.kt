@@ -8,6 +8,10 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class NoticesTest {
+    init {
+        English.use()
+    }
+
     private val chicago = ZoneId.of("America/Chicago")
 
     private fun me(wroteToday: Boolean = false) = Me(

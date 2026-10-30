@@ -117,7 +117,7 @@ data class FlushReport(
 )
 
 /** The queue could not be written to storage. The write was not taken, so the caller keeps the words. */
-class OutboxNotKept : Exception("This phone couldn't save the note. Free up some space and try again.")
+class OutboxNotKept : Exception(Words.say(Phrase.NoteNotKept))
 
 /**
  * Every write goes through here, online or not ("never lose a note"). Items
@@ -351,7 +351,7 @@ suspend fun Api.prepare(post: OutboxOperation.Post, outbox: Outbox): OutboxOpera
     val files = post.files.map { queued ->
         if (queued.upload != null) return@map queued
         val bytes = outbox.fileFor(queued)?.takeIf { it.exists() }
-            ?: throw ApiException(400, "file_missing", Api.FILE_MISSING)
+            ?: throw ApiException(400, "file_missing", Words.say(Phrase.FileMissing))
         val form = startUpload(UploadStart(queued.name, queued.type, bytes.length()))
         postFile(bytes, queued.name, form)
         queued.copy(upload = form.upload, type = form.type)

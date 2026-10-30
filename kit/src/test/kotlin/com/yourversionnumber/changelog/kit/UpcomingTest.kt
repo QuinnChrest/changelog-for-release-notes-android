@@ -9,6 +9,10 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class UpcomingTest {
+    init {
+        English.use()
+    }
+
     private val today = "2026-10-29"
     private fun problem(r: Result<*>) = (r.exceptionOrNull() as UpcomingDraft.Refused).problem
 

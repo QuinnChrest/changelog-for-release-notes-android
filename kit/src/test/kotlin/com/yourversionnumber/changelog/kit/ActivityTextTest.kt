@@ -7,6 +7,10 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ActivityTextTest {
+    init {
+        English.use()
+    }
+
     private fun row(kind: String, via: String? = null, token: String? = null, day: String? = "2026-10-29", note: String? = null, at: String = "2026-10-29T12:00:00Z") =
         ActivityItem(id = "a1", at = at, kind = kind, via = via, token = token, day = day, version = "4.5.137", note = note)
 

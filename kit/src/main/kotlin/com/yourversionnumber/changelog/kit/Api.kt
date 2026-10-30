@@ -85,14 +85,14 @@ class Api(
      * it carries no token and no cookie.
      */
     suspend fun postFile(file: File, name: String, form: UploadForm) = withContext(Dispatchers.IO) {
-        if (!file.exists()) throw ApiException(400, "file_missing", FILE_MISSING)
+        if (!file.exists()) throw ApiException(400, "file_missing", Words.say(Phrase.FileMissing))
         // S3's form is a full URL; the dev server's is a path on itself.
         val address = URI(baseUrl.trimEnd('/') + "/").resolve(form.url).toString()
         val boundary = "changelog-" + UUID.randomUUID()
         val connection = try {
             URI(address).toURL().openConnection() as HttpURLConnection
         } catch (e: Exception) {
-            throw ApiException(0, "unreadable", "That upload address doesn't work.")
+            throw ApiException(0, "unreadable", Words.say(Phrase.UploadAddressBad))
         }
         try {
             connection.requestMethod = "POST"
@@ -108,10 +108,10 @@ class Api(
             if (status !in 200..299) {
                 // A storage refusal (the form expired, the size was wrong) is worth one
                 // more try with a new form; its body is storage's, never shown.
-                throw ApiException(if (status >= 500) status else 0, "upload_failed", "A file didn't upload. It will be tried again.")
+                throw ApiException(if (status >= 500) status else 0, "upload_failed", Words.say(Phrase.UploadFailed))
             }
         } catch (e: IOException) {
-            throw ApiException(0, "network", "Release Notes can't be reached right now.")
+            throw ApiException(0, "network", Words.say(Phrase.NetworkDown))
         } finally {
             connection.disconnect()
         }
@@ -194,7 +194,7 @@ class Api(
         val connection = try {
             URI(address).toURL().openConnection() as HttpURLConnection
         } catch (e: Exception) {
-            throw ApiException(0, "unreadable", "That server address doesn't work.")
+            throw ApiException(0, "unreadable", Words.say(Phrase.ServerAddressBad))
         }
         try {
             connection.requestMethod = method
@@ -222,10 +222,10 @@ class Api(
             try {
                 json.decodeFromString(serializer, text)
             } catch (e: Exception) {
-                throw ApiException(status, "unreadable", "Release Notes answered in a way this version doesn't understand.")
+                throw ApiException(status, "unreadable", Words.say(Phrase.AnswerUnreadable))
             }
         } catch (e: IOException) {
-            throw ApiException(0, "network", "Release Notes can't be reached right now.")
+            throw ApiException(0, "network", Words.say(Phrase.NetworkDown))
         } finally {
             connection.disconnect()
         }
@@ -236,8 +236,6 @@ class Api(
 
         /** `tools/dev-server.ts` in the Release Notes repo, as the emulator reaches it. */
         const val DEV_SERVER = "http://10.0.2.2:8790"
-
-        const val FILE_MISSING = "A file for this note is no longer on this phone. Discard it, or fix it to send the words alone."
 
         val json = Json {
             namingStrategy = JsonNamingStrategy.SnakeCase
@@ -256,7 +254,7 @@ class Api(
                 return ApiException(status, e.code, e.message, e.field, e.revision, seconds)
             }
             val code = if (status >= 500) "unavailable" else "http_$status"
-            val message = if (status >= 500) "Release Notes isn't answering right now." else "Release Notes refused that ($status)."
+            val message = if (status >= 500) Words.say(Phrase.ServerUnavailable) else Words.say(Phrase.ServerRefused, status)
             return ApiException(status, code, message, retryAfterSeconds = seconds)
         }
     }

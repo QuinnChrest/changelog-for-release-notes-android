@@ -93,6 +93,36 @@ Release Notes' and the iPhone app's own. `app/build.gradle.kts` stamps it as
 `BuildConfig.COMMIT`, which the foot of Settings shows. Never set them by
 hand.
 
+### Release builds
+
+`./gradlew :app:bundleRelease` makes the Play bundle; `assembleRelease` an
+APK. R8 shrinks them. To check what R8 does without a real account, the
+`shrunk` build is shrunk as release is but signs in to the dev server as
+debug does; TestCycle runs on it:
+
+```sh
+./gradlew :app:connectedShrunkAndroidTest -Pchangelog.testBuildType=shrunk -Pandroid.testInstrumentationRunnerArguments.devToken=rn_...
+```
+
+(It keeps Kotlin, coroutines and AndroidX whole, which its tests borrow
+from the app; Changelog's code and kotlinx.serialization shrink as in
+release.)
+
+Signing is Quinn's: make an upload key once, kept out of git (`*.jks` and
+`signing.properties` are ignored), and name it in `signing.properties` at
+the repo's root. Without that file, release builds come out unsigned.
+
+```sh
+keytool -genkeypair -v -keystore changelog-upload.jks -alias upload -keyalg RSA -keysize 4096 -validity 10000
+```
+
+```properties
+storeFile=changelog-upload.jks
+storePassword=...
+keyAlias=upload
+keyPassword=...
+```
+
 ## The dev server
 
 In a clone of `jthingelstad/yvn-release-notes`, with Node 24:

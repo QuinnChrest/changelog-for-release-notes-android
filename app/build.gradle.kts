@@ -60,12 +60,48 @@ android {
         buildConfigField("String", "DEV_SERVER", "\"${providers.gradleProperty("changelog.devServer").getOrElse("http://10.0.2.2:8790")}\"")
     }
 
+    // The upload key stays off git: signing.properties (ignored) names it.
+    // Without the file, release builds come out unsigned. See AGENTS.md.
+    val signing = rootProject.file("signing.properties").takeIf { it.exists() }?.let { f ->
+        java.util.Properties().apply { f.inputStream().use { load(it) } }
+    }
+    signingConfigs {
+        if (signing != null) {
+            create("upload") {
+                storeFile = rootProject.file(signing.getProperty("storeFile"))
+                storePassword = signing.getProperty("storePassword")
+                keyAlias = signing.getProperty("keyAlias")
+                keyPassword = signing.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (signing != null) signingConfig = signingConfigs.getByName("upload")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
+        // Shrunk as release is, but signing in to the dev server as debug does,
+        // so what R8 does to the app can be tested without touching a real
+        // account: ./gradlew :app:connectedShrunkAndroidTest -Pchangelog.testBuildType=shrunk
+        create("shrunk") {
+            initWith(getByName("debug"))
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro", "proguard-shrunk-rules.pro")
+            testProguardFiles("proguard-test-rules.pro")
+            matchingFallbacks += "debug"
+        }
+    }
+    testBuildType = providers.gradleProperty("changelog.testBuildType").getOrElse("debug")
+
+    // The shrunk build takes debug's own files: the dev server's network rules
+    // and Android 17's local network permission.
+    sourceSets.getByName("shrunk") {
+        res.srcDir("src/debug/res")
+        manifest.srcFile("src/debug/AndroidManifest.xml")
     }
 
     compileOptions {

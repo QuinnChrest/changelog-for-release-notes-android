@@ -2,6 +2,7 @@ import java.time.LocalDate
 import java.time.Year
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -63,7 +64,7 @@ android {
     // The upload key stays off git: signing.properties (ignored) names it.
     // Without the file, release builds come out unsigned. See AGENTS.md.
     val signing = rootProject.file("signing.properties").takeIf { it.exists() }?.let { f ->
-        java.util.Properties().apply { f.inputStream().use { load(it) } }
+        Properties().apply { f.inputStream().use { load(it) } }
     }
     signingConfigs {
         if (signing != null) {

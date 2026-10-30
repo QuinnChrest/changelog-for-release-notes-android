@@ -47,15 +47,15 @@ class Api(
     suspend fun me(): Me = send("GET", "v1/me")
 
     suspend fun createNote(note: NoteRequest, idempotencyKey: String): NoteReceipt =
-        send("POST", "v1/notes", body = encode(note), idempotencyKey = idempotencyKey)
+        send("POST", "v1/notes", body = encode(note.copy(text = note.text?.wellFormed())), idempotencyKey = idempotencyKey)
 
     suspend fun note(date: String, id: String): NoteDetail = send("GET", "v1/notes/$date/$id")
 
     suspend fun editNote(date: String, id: String, text: String, revision: String, idempotencyKey: String): NoteRef =
-        send<Wrapped>("PUT", "v1/notes/$date/$id", body = encode(EditBody(text, revision)), idempotencyKey = idempotencyKey).note
+        send<Wrapped>("PUT", "v1/notes/$date/$id", body = encode(EditBody(text.wellFormed(), revision)), idempotencyKey = idempotencyKey).note
 
     suspend fun appendNote(date: String, id: String, text: String, idempotencyKey: String): NoteRef =
-        send<Wrapped>("POST", "v1/notes/$date/$id/append", body = encode(AppendBody(text)), idempotencyKey = idempotencyKey).note
+        send<Wrapped>("POST", "v1/notes/$date/$id/append", body = encode(AppendBody(text.wellFormed())), idempotencyKey = idempotencyKey).note
 
     suspend fun deleteNote(date: String, id: String, idempotencyKey: String) {
         send<Unit>("DELETE", "v1/notes/$date/$id", idempotencyKey = idempotencyKey)
@@ -258,4 +258,34 @@ class Api(
             return ApiException(status, code, message, retryAfterSeconds = seconds)
         }
     }
+}
+
+private val REPLACEMENT = Char(0xFFFD)
+
+/**
+ * A note's words with each lone half of a surrogate pair (half an emoji, cut
+ * by a paste) made U+FFFD. A JSON body holding one is refused (API 1.7.0), and
+ * a note that can never be sent would sit in the queue for good.
+ */
+internal fun String.wellFormed(): String {
+    val out = StringBuilder(length)
+    var i = 0
+    while (i < length) {
+        val c = this[i]
+        when {
+            Character.isHighSurrogate(c) && i + 1 < length && Character.isLowSurrogate(this[i + 1]) -> {
+                out.append(c).append(this[i + 1])
+                i += 2
+            }
+            Character.isSurrogate(c) -> {
+                out.append(REPLACEMENT)
+                i++
+            }
+            else -> {
+                out.append(c)
+                i++
+            }
+        }
+    }
+    return out.toString()
 }

@@ -13,12 +13,15 @@ data class Me(
     val today: String,
     val version: String,
     val tz: String,
-    val sendTime: String,
-    val wroteToday: Boolean,
-    val streak: Int,
+    /** The account's id, `acct_` and 32 hex characters, the same for every token of it (API 1.4.0). */
+    val account: String? = null,
+    // The spec leaves these four out when it has nothing to say; a missing one never stops a sign-in.
+    val sendTime: String = "",
+    val wroteToday: Boolean = false,
+    val streak: Int = 0,
     val pausedUntil: String? = null,
-    val status: String,
-    val showBadges: Boolean,
+    val status: String = "active",
+    val showBadges: Boolean = true,
     val days: List<DayVersion> = emptyList(),
     val token: TokenInfo,
     val apiVersion: String,
@@ -32,7 +35,13 @@ data class Me(
 data class DayVersion(val date: String, val version: String)
 
 @Serializable
-data class TokenInfo(val name: String, val scopes: List<String>, val expiresAt: String? = null)
+data class TokenInfo(
+    val name: String,
+    val scopes: List<String>,
+    val expiresAt: String? = null,
+    /** The token's own record id, 32 hex characters: it grants nothing, and names the rows this token writes (API 1.4.0). */
+    val id: String? = null,
+)
 
 /**
  * `POST /v1/notes`. `writtenAt` is the moment the words were typed, so a note
@@ -102,6 +111,8 @@ data class ActivityItem(
     val via: String? = null,
     val client: String? = null,
     val token: String? = null,
+    /** The writing token's id, on rows made since API 1.4.0: a name can be used again by a later token, an id never is. */
+    val tokenId: String? = null,
     val day: String? = null,
     val version: String? = null,
     val note: String? = null,
@@ -111,6 +122,10 @@ data class ActivityItem(
     val title: String? = null,
 ) {
     val family: String get() = kind.substringBefore('.')
+
+    /** Whether this row was written through that token: by id when both have one, else by its name. */
+    fun isFrom(by: TokenInfo): Boolean =
+        via == "token" && (if (tokenId != null && by.id != null) tokenId == by.id else token == by.name)
 }
 
 /** The one error shape: `{"error": {"code", "message"}}`. */

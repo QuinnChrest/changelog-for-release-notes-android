@@ -186,4 +186,15 @@ class ApiTest {
         assertEquals("network", e.code)
         assertTrue(e.retryable)
     }
+
+    @Test
+    fun aLoneHalfOfAnEmojiBecomesAReplacementCharacter() {
+        val high = Char(0xD83D)
+        val low = Char(0xDE00)
+        val gone = Char(0xFFFD)
+        val whole = "ok $high$low done"
+        assertEquals(whole, whole.wellFormed())
+        assertEquals("cut $gone and $gone", "cut $high and $low".wellFormed())
+        assertEquals("end $gone", "end $high".wellFormed())
+    }
 }

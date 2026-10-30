@@ -232,7 +232,7 @@ object PhoneNotices {
         // Turned off, or signed out, while the read was out.
         if (graph.noticeKinds != wanted || graph.activityCursor != cursor) return
         ActivityNotices.cursor(page.items, cursor)?.let { graph.activityCursor = it }
-        for (n in ActivityNotices.notices(page.items, me.token.name, wanted)) show(context, n.id, Channel.Activity, n.title, n.body)
+        for (n in ActivityNotices.notices(page.items, me.token, wanted)) show(context, n.id, Channel.Activity, n.title, n.body)
     }
 
     // Showing

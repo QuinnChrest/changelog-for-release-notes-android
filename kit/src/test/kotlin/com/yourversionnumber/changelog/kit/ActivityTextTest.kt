@@ -7,6 +7,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ActivityTextTest {
+    private val pixel = TokenInfo(name = "Pixel", scopes = listOf("notes:write"), id = "a".repeat(32))
+
     init {
         English.use()
     }
@@ -29,11 +31,11 @@ class ActivityTextTest {
     @Test
     fun onlyThisTokensNotesAreMine() {
         val mine = row("note.added", via = "token", token = "Pixel", note = "t-1")
-        assertTrue(mine.isMine("Pixel"))
-        assertFalse(mine.isMine("Another phone"))
-        assertFalse(mine.copy(via = "web").isMine("Pixel"))
-        assertFalse(mine.copy(kind = "note.edited").isMine("Pixel"))
-        assertFalse(mine.copy(note = null).isMine("Pixel"))
+        assertTrue(mine.isMine(pixel))
+        assertFalse(mine.isMine(TokenInfo(name = "Another phone", scopes = emptyList())))
+        assertFalse(mine.copy(via = "web").isMine(pixel))
+        assertFalse(mine.copy(kind = "note.edited").isMine(pixel))
+        assertFalse(mine.copy(note = null).isMine(pixel))
     }
 
     @Test

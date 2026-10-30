@@ -85,6 +85,22 @@ screens from these.
 - Dependencies are AndroidX and Kotlin's own libraries only. Ask before
   adding anything else.
 
+## Keeping up with the API
+
+Release Notes changes its API often and says so. `GET /v1/openapi.json` (no
+token needed) is the live contract; `info.x-changes` in it is the ledger of
+each version, and `docs/API.md` in yvn-release-notes the design. When it has
+moved past the version the app last read (`api_version` in `/v1/me`):
+
+1. read what each version since changed (`x-changes`), and compare the
+   schemas with `kit`'s models, which must read every field the spec marks
+   optional as optional;
+2. keep `Hashtags` in step with `packages/domain/tags.ts`;
+3. run `DevServerTest` against the current dev server (`git pull`, restart
+   it) before anything else.
+
+It last matched API 1.8.0 (2026-10-30).
+
 ## Building
 
 JDK 17 or later, Android SDK 37.

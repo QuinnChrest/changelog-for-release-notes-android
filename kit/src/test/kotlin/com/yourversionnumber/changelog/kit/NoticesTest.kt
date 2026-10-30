@@ -56,19 +56,32 @@ class NoticesTest {
 
     // Activity notices
 
-    private fun row(id: String, kind: String, via: String? = null, token: String? = null, outcome: String? = null, name: String? = null, client: String? = null) =
-        ActivityItem(id = id, at = "2026-10-29T12:00:00Z", kind = kind, via = via, token = token, outcome = outcome, name = name, client = client, version = "4.5.137")
+    private val pixel = TokenInfo(name = "Pixel", scopes = listOf("notes:write"), id = "a".repeat(32))
+
+    private fun row(id: String, kind: String, via: String? = null, token: String? = null, outcome: String? = null, name: String? = null, client: String? = null, tokenId: String? = null) =
+        ActivityItem(id = id, at = "2026-10-29T12:00:00Z", kind = kind, via = via, token = token, tokenId = tokenId, outcome = outcome, name = name, client = client, version = "4.5.137")
+
+    @Test
+    fun aRowIsKnownByTheTokensIdWhenItHasOne() {
+        // Another token that took the same name later is not this phone's.
+        val other = row("1", "note.added", via = "token", token = "Pixel", tokenId = "b".repeat(32))
+        assertEquals(ActivityNoticeKind.Others, ActivityNotices.kind(other, pixel))
+        // This token's own row, whatever name it carries.
+        assertNull(ActivityNotices.kind(row("2", "note.added", via = "token", token = "Renamed", tokenId = "a".repeat(32)), pixel))
+        // A row from before ids has only the name.
+        assertNull(ActivityNotices.kind(row("3", "note.added", via = "token", token = "Pixel"), pixel))
+    }
 
     @Test
     fun neverThisPhonesOwnNorTheDailyEmail() {
-        assertNull(ActivityNotices.kind(row("1", "note.added", via = "token", token = "Pixel"), "Pixel"))
-        assertNull(ActivityNotices.kind(row("2", "badge.earned", via = "token", token = "Pixel"), "Pixel"))
-        assertNull(ActivityNotices.kind(row("3", "email.sent"), "Pixel"))
-        assertNull(ActivityNotices.kind(row("4", "note.added", via = "web"), "Pixel"))
-        assertEquals(ActivityNoticeKind.Others, ActivityNotices.kind(row("5", "note.added", via = "token", token = "Laptop"), "Pixel"))
-        assertEquals(ActivityNoticeKind.Others, ActivityNotices.kind(row("6", "mail", outcome = "filed"), "Pixel"))
-        assertEquals(ActivityNoticeKind.Problems, ActivityNotices.kind(row("7", "mail", outcome = "failed"), "Pixel"))
-        assertEquals(ActivityNoticeKind.Problems, ActivityNotices.kind(row("8", "status.stopped"), "Pixel"))
+        assertNull(ActivityNotices.kind(row("1", "note.added", via = "token", token = "Pixel"), pixel))
+        assertNull(ActivityNotices.kind(row("2", "badge.earned", via = "token", token = "Pixel"), pixel))
+        assertNull(ActivityNotices.kind(row("3", "email.sent"), pixel))
+        assertNull(ActivityNotices.kind(row("4", "note.added", via = "web"), pixel))
+        assertEquals(ActivityNoticeKind.Others, ActivityNotices.kind(row("5", "note.added", via = "token", token = "Laptop"), pixel))
+        assertEquals(ActivityNoticeKind.Others, ActivityNotices.kind(row("6", "mail", outcome = "filed"), pixel))
+        assertEquals(ActivityNoticeKind.Problems, ActivityNotices.kind(row("7", "mail", outcome = "failed"), pixel))
+        assertEquals(ActivityNoticeKind.Problems, ActivityNotices.kind(row("8", "status.stopped"), pixel))
     }
 
     @Test
@@ -78,18 +91,18 @@ class NoticesTest {
             row("2", "note.added", via = "assistant", client = "Claude"),
             row("1", "note.added", via = "token", token = "Laptop"),
         )
-        val all = ActivityNotices.notices(newestFirst, "Pixel", ActivityNoticeKind.entries.toSet())
+        val all = ActivityNotices.notices(newestFirst, pixel, ActivityNoticeKind.entries.toSet())
         assertEquals(listOf("activity.1", "activity.2", "activity.3"), all.map { it.id })
         assertEquals("Laptop added a note.", all[0].body)
         assertEquals("Claude added a note.", all[1].body)
         assertEquals("Added to 4.5.137", all[0].title)
-        assertEquals(listOf("activity.3"), ActivityNotices.notices(newestFirst, "Pixel", setOf(ActivityNoticeKind.Badges)).map { it.id })
+        assertEquals(listOf("activity.3"), ActivityNotices.notices(newestFirst, pixel, setOf(ActivityNoticeKind.Badges)).map { it.id })
     }
 
     @Test
     fun manyOfOneKindComeAsOne() {
         val rows = (5 downTo 1).map { row("$it", "note.added", via = "import") }
-        val notices = ActivityNotices.notices(rows, "Pixel", setOf(ActivityNoticeKind.Others))
+        val notices = ActivityNotices.notices(rows, pixel, setOf(ActivityNoticeKind.Others))
         assertEquals(1, notices.size)
         assertEquals("5 notes from elsewhere", notices.single().title)
         assertEquals("activity.others.5", notices.single().id)

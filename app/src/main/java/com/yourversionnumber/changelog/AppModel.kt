@@ -394,7 +394,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         null
     }
 
-    fun isMine(item: ActivityItem) = item.isMine(me?.token?.name)
+    fun isMine(item: ActivityItem) = item.isMine(me?.token)
 
     /** Offline is quiet: notes wait in the queue. Anything else, Release Notes says what to do. */
     private fun handle(e: ApiException) = when {

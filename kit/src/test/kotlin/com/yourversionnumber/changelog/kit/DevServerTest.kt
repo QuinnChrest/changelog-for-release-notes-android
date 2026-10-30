@@ -100,10 +100,14 @@ class DevServerTest {
     @Test
     fun theActivityLogTellsOfThisTokensNoteWithoutItsWords() = runTest {
         val receipt = api.createNote(NoteRequest("DevServerTest activity words"), key())
-        val rows = api.activity(kinds = ActivityNotices.families, limit = 20).items
+        val rows = api.activity(kinds = ActivityNotices.families, limit = 50).items
         val row = rows.first { it.note == receipt.note.id }
         assertEquals("note.added", row.kind)
-        assertTrue(ActivityNotices.isOwn(row, api.me().token.name))
+        val me = api.me()
+        // API 1.4.0: the account and the token have ids, and the row names the token by its id.
+        assertTrue(me.account?.startsWith("acct_") == true)
+        assertTrue(me.token.id != null && row.tokenId == me.token.id)
+        assertTrue(ActivityNotices.isOwn(row, me.token))
         assertTrue("DevServerTest activity words" !in Api.json.encodeToString(ActivityItem.serializer(), row))
         api.deleteNote(receipt.note.date, receipt.note.id, key())
     }

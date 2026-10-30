@@ -4,19 +4,22 @@ What Changelog for Android does, what's left, and what's built but not yet
 checked. The iPhone app (`jthingelstad/changelog-ios`) is the reference;
 `AGENTS.md` says how each built piece works.
 
-**At a glance:** 42 built · 0 to do · 3 waiting on someone else · 5 to check
+**At a glance:** 43 built · 3 to do · 2 waiting on someone else · 5 to check
 
 Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 built, not yet checked
 
 ## To do
 
-Nothing the project can do alone: what's left is waiting on someone else or needs a real phone.
+| | Feature | Notes |
+|---|---|---|
+| 🔲 | Sign in with Release Notes (OAuth) instead of pasting a token | The server has it since API 1.3.0: authorization code with PKCE for the resource `/v1`, a private-use callback (`com.yourversionnumber.changelog:/oauth`), the owner names the token and ticks its scopes, no refresh token; sign out at `/oauth/revoke` or `DELETE /v1/token`. Needs the registration, a browser hop (Custom Tabs, which is AndroidX) and the token exchange. Pasting a token stays for the dev server. |
+| 🔲 | Notes for another day | The API takes a `date` back to the birthday and the queue already carries one; Log has no day picker, so every note files to today. |
+| 🔲 | "Where": search for a place by name | `GET /v1/places?q=` is the web's city search; Log only has Here. |
 
 ## Waiting on someone else
 
 | | What | Waiting on |
 |---|---|---|
-| ⏳ | Sign in with Release Notes (OAuth) instead of pasting a token | Release Notes adding OAuth to `/v1` (its phase 5) |
 | ⏳ | Espresso 3.8 stable for the UI tests | Google; the tests use 3.8 alpha because 3.7 doesn't run on Android 17 |
 | ⏳ | Play Console internal testing | Quinn: a Play developer account and the upload key. The release build is checked and signs from `signing.properties` (`AGENTS.md`, Release builds). |
 
@@ -106,4 +109,5 @@ These are written and built; something about them couldn't be seen on the emulat
 | ✅ | Release signing from a git-ignored `signing.properties` |
 | ✅ | MIT licensed, and the repo is public |
 | ✅ | Version numbers by Your Version Number's arithmetic from 2026-10-29 |
+| ✅ | Checked against the live API's OpenAPI file (1.8.0): the client reads every field it uses, tags work in any script, activity rows are told apart by token id, and a note's words are made well-formed before sending |
 | ✅ | Tests: unit tests, tests against the dev server, and a UI test cycle on the emulator; CI on every push |

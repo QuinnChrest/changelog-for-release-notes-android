@@ -99,17 +99,17 @@ object ActivityNotices {
     const val PER_KIND = 3
 
     /**
-     * Whether a row came through this phone's own token. The token's name is
-     * what every row a token writes carries; `client` is only what a
-     * User-Agent claimed, so it labels and never decides. Should another
-     * token have the same name, its notes stay quiet too: a missed notice,
-     * never a false one.
+     * Whether a row came through this phone's own token. Rows made since API
+     * 1.4.0 carry the token's id, which a later token never reuses. Older
+     * rows carry only its name, so for them another token of the same name
+     * stays quiet too: a missed notice, never a false one. `client` is only
+     * what a User-Agent claimed, so it labels and never decides.
      */
-    fun isOwn(item: ActivityItem, tokenName: String) = item.via == "token" && item.token == tokenName
+    fun isOwn(item: ActivityItem, token: TokenInfo) = item.isFrom(token)
 
     /** Which notice a row is, if any. */
-    fun kind(item: ActivityItem, tokenName: String): ActivityNoticeKind? {
-        if (isOwn(item, tokenName)) return null
+    fun kind(item: ActivityItem, token: TokenInfo): ActivityNoticeKind? {
+        if (isOwn(item, token)) return null
         return when (item.kind) {
             // The web is the owner at a keyboard; email replies are mail rows.
             "note.added" -> if (item.via in listOf("assistant", "token", "import")) ActivityNoticeKind.Others else null
@@ -131,8 +131,8 @@ object ActivityNotices {
      * order, only of the kinds wanted. A kind with more than PER_KIND rows
      * comes as one notice instead.
      */
-    fun notices(items: List<ActivityItem>, tokenName: String, wanted: Set<ActivityNoticeKind>): List<ActivityNotice> {
-        val rows = items.reversed().mapNotNull { item -> kind(item, tokenName)?.takeIf { it in wanted }?.let { item to it } }
+    fun notices(items: List<ActivityItem>, token: TokenInfo, wanted: Set<ActivityNoticeKind>): List<ActivityNotice> {
+        val rows = items.reversed().mapNotNull { item -> kind(item, token)?.takeIf { it in wanted }?.let { item to it } }
         return ActivityNoticeKind.entries.flatMap { kind ->
             val mine = rows.filter { it.second == kind }
             val newest = mine.lastOrNull()?.first ?: return@flatMap emptyList()

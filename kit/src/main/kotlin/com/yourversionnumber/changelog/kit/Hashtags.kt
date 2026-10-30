@@ -7,38 +7,78 @@ import java.util.Locale
  * Hashtags live in the note's text, as Release Notes reads them
  * (`packages/domain/tags.ts`, and Changelog for iPhone's `Hashtags.swift`):
  * a `#` not after a letter, digit or one of `_#&/=`, then letters and digits
- * joined by single hyphens, lowercased and folded to ASCII, at most 50
- * characters, with at least one letter. The server stays the authority; this
- * is for the tag row's on and off. Keep it in step with both.
+ * joined by single hyphens, at most 50 characters, with at least one letter.
+ * A hashtag with a-z letters is lowercased and folded to ASCII, as every tag
+ * was before API 1.7.1; one without is a tag of its own letters in any
+ * script, lowercased (#Москва is москва, #東京 stays 東京), its marks and
+ * joiners kept. The server stays the authority; this is for the tag row's on
+ * and off. Keep it in step with both.
  */
 object Hashtags {
     const val MAX_TAG = 50
 
+    /**
+     * The legacy tag: ASCII letters and digits only. What won't fold to ASCII
+     * (a ß, a CJK letter) is dropped, not made a separator, as the server's.
+     */
     fun slug(name: String): String {
-        val folded = Normalizer.normalize(name, Normalizer.Form.NFKD)
-            .replace(Regex("\\p{M}+"), "")
-            .lowercase(Locale.ROOT)
-        val out = StringBuilder()
-        var gap = false
-        for (c in folded) {
-            if (c in 'a'..'z' || c in '0'..'9') {
-                if (gap && out.isNotEmpty()) out.append('-')
-                out.append(c)
-                gap = false
-            } else {
-                gap = true
-            }
-        }
-        var tag = if (out.length > MAX_TAG) out.substring(0, MAX_TAG) else out.toString()
-        tag = tag.trimEnd('-')
-        return tag
+        val ascii = Normalizer.normalize(name, Normalizer.Form.NFKD).filter { it.code < 128 }.lowercase(Locale.ROOT)
+        val tag = ascii.replace(Regex("[^a-z0-9]+"), "-").trim('-')
+        return (if (tag.length > MAX_TAG) tag.substring(0, MAX_TAG) else tag).trimEnd('-')
     }
 
-    fun valid(tag: String): Boolean = tag.any { it in 'a'..'z' }
+    private fun latin(tag: String): Boolean = tag.any { it in 'a'..'z' }
+
+    /** A letter in any script. */
+    fun valid(tag: String): Boolean = tag.codePoints().anyMatch { Character.isLetter(it) }
+
+    private fun alnum(cp: Int) = Character.isLetterOrDigit(cp)
+
+    private fun mark(cp: Int) = Character.getType(cp).let {
+        it == Character.NON_SPACING_MARK.toInt() || it == Character.COMBINING_SPACING_MARK.toInt() || it == Character.ENCLOSING_MARK.toInt()
+    }
+
+    private fun joiner(cp: Int) = cp == 0x200C || cp == 0x200D
+
+    private fun inWord(cps: IntArray, at: Int) = at in cps.indices && (alnum(cps[at]) || mark(cps[at]))
+
+    /** Past one word from `at`, which is alphanumeric: letters, numbers and marks, a joiner only inside. */
+    private fun wordEnd(cps: IntArray, from: Int): Int {
+        var end = from + 1
+        while (inWord(cps, end) || (end in cps.indices && joiner(cps[end]) && inWord(cps, end + 1))) end++
+        return end
+    }
+
+    /** Past one hashtag's words from `at`, joined by single hyphens, as the legacy span joins them. */
+    private fun wordsEnd(cps: IntArray, at: Int): Int {
+        var end = wordEnd(cps, at)
+        while (end + 1 in cps.indices && cps[end] == '-'.code && alnum(cps[end + 1])) end = wordEnd(cps, end + 1)
+        return end
+    }
+
+    /** A name's tag in any script: its words lowercased (NFC), joined by hyphens, never cut inside a letter's marks. */
+    private fun wide(name: String): String {
+        val cps = Normalizer.normalize(name.lowercase(Locale.ROOT), Normalizer.Form.NFC).codePoints().toArray()
+        val words = mutableListOf<String>()
+        var at = 0
+        while (at < cps.size) {
+            if (!alnum(cps[at])) { at++; continue }
+            val end = wordEnd(cps, at)
+            words += String(cps, at, end - at)
+            at = end
+        }
+        val out = words.joinToString("-").codePoints().toArray()
+        var end = minOf(out.size, MAX_TAG)
+        while (end > 0 && end < out.size && (mark(out[end]) || joiner(out[end - 1]))) end--
+        return String(out, 0, end).replace(Regex("[-\u200c\u200d]+$"), "")
+    }
+
+    /** A name as a tag: the legacy tag when it has a-z letters, otherwise its letters in any script. */
+    fun tagName(name: String): String = slug(name).let { if (latin(it)) it else wide(name) }
 
     /** A tag as the owner typed it ("#Maine 2016"), or null if it has no letter. */
     fun normalize(raw: String): String? {
-        val tag = slug(raw.removePrefix("#"))
+        val tag = tagName(raw.removePrefix("#"))
         return if (valid(tag)) tag else null
     }
 
@@ -70,28 +110,43 @@ object Hashtags {
     fun toggling(tag: String, text: String): String =
         if (contains(tag, text)) removing(tag, text) else adding(tag, text)
 
+    /** A hashtag's place in the text, in UTF-16 offsets, and the tag it makes. */
     internal data class Span(val start: Int, val end: Int, val tag: String)
 
-    // A combining mark belongs to the letter before it, as in Swift's Characters.
-    private fun word(c: Char): Boolean = c.isLetterOrDigit() ||
-        Character.getType(c).let { it == Character.NON_SPACING_MARK.toInt() || it == Character.COMBINING_SPACING_MARK.toInt() }
-
     internal fun spans(text: String): List<Span> {
+        val cps = text.codePoints().toArray()
+        // Where each code point starts in the string, and one past the last.
+        val at = IntArray(cps.size + 1)
+        for (i in cps.indices) at[i + 1] = at[i] + Character.charCount(cps[i])
         val out = mutableListOf<Span>()
         var start = 0
-        while (start < text.length) {
-            if (text[start] != '#') { start++; continue }
-            if (start > 0 && (word(text[start - 1]) || text[start - 1] in "_#&/=")) { start++; continue }
+        while (start < cps.size) {
+            if (cps[start] != '#'.code) { start++; continue }
+            if (start > 0 && (alnum(cps[start - 1]) || cps[start - 1].toChar() in "_#&/=")) { start++; continue }
+            if (start + 1 >= cps.size || !alnum(cps[start + 1])) { start++; continue }
             var end = start + 1
-            if (end >= text.length || !word(text[end])) { start++; continue }
-            while (end < text.length && word(text[end])) end++
-            while (end + 1 < text.length && text[end] == '-' && word(text[end + 1])) {
+            while (end < cps.size && alnum(cps[end])) end++
+            while (end + 1 < cps.size && cps[end] == '-'.code && alnum(cps[end + 1])) {
                 end++
-                while (end < text.length && word(text[end])) end++
+                while (end < cps.size && alnum(cps[end])) end++
             }
-            val tag = slug(text.substring(start + 1, end))
-            if (valid(tag)) out += Span(start, end, tag)
-            start = end
+            val tag = slug(String(cps, start + 1, end - start - 1))
+            if (latin(tag)) {
+                out += Span(at[start], at[end], tag)
+                start = end
+                continue
+            }
+            // No a-z letter: read on through marks and joiners, and if the whole
+            // hashtag still has none, its own letters are the tag.
+            val far = wordsEnd(cps, start + 1)
+            val body = String(cps, start + 1, far - start - 1)
+            val own = wide(body)
+            if (!latin(slug(body)) && valid(own) && tagName(own) == own) {
+                out += Span(at[start], at[far], own)
+                start = far
+            } else {
+                start = end
+            }
         }
         return out
     }

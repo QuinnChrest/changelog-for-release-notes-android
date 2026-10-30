@@ -60,8 +60,8 @@ val ActivityItem.isProblem: Boolean
 fun ActivityItem.isOn(date: String): Boolean = day == date || (day == null && at.startsWith(date))
 
 /** A note this token wrote, the only kind it may read back, change or delete. */
-fun ActivityItem.isMine(tokenName: String?): Boolean =
-    kind == "note.added" && via == "token" && token != null && token == tokenName && note != null && day != null
+fun ActivityItem.isMine(by: TokenInfo?): Boolean =
+    kind == "note.added" && by != null && isFrom(by) && note != null && day != null
 
 /** The Activity screen's filters, by the API's kind families. */
 enum class ActivityFilter(private val phrase: Phrase, val kinds: List<String>) {

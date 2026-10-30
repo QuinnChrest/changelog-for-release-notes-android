@@ -1,31 +1,26 @@
 package com.yourversionnumber.changelog.ui
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,22 +35,21 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yourversionnumber.changelog.AppModel
+import com.yourversionnumber.changelog.NoteTarget
 import com.yourversionnumber.changelog.Sent
 import com.yourversionnumber.changelog.kit.Hashtags
+import com.yourversionnumber.changelog.kit.MediaType
+import com.yourversionnumber.changelog.kit.NoteDetail
 import com.yourversionnumber.changelog.kit.OutboxItem
 import com.yourversionnumber.changelog.kit.OutboxOperation
-import com.yourversionnumber.changelog.kit.NoteDetail
-import com.yourversionnumber.changelog.kit.MediaType
-import com.yourversionnumber.changelog.NoteTarget
+import com.yourversionnumber.changelog.kit.UpcomingDraft
 import com.yourversionnumber.changelog.target
-import androidx.compose.foundation.layout.Box
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.runtime.LaunchedEffect
+import java.time.format.DateTimeFormatter
 
 /** The home screen: today's version, the box, the tag row, Commit, and what happened today. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LogScreen(model: AppModel, onSettings: () -> Unit) {
     val waiting by model.waiting.collectAsStateWithLifecycle()
@@ -65,20 +59,12 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
     var deleting by remember { mutableStateOf<NoteTarget?>(null) }
     var editing by remember { mutableStateOf<NoteTarget?>(null) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Changelog") },
-                actions = {
-                    TextButton(onClick = onSettings) { Text("Settings") }
-                },
-            )
-        },
-    ) { padding ->
+    Column(Modifier.fillMaxSize()) {
+        Bar { QuietButton("Settings", onSettings) }
         LazyColumn(
-            Modifier.padding(padding).imePadding(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.imePadding(),
+            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item { VersionHeader(model) }
             item {
@@ -86,52 +72,50 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
                 // outside the box: the cursor goes to the end, after what was added.
                 var field by remember { mutableStateOf(TextFieldValue(model.draft, TextRange(model.draft.length))) }
                 if (field.text != model.draft) field = TextFieldValue(model.draft, TextRange(model.draft.length))
-                OutlinedTextField(
-                    value = field,
-                    onValueChange = {
+                PaperField(
+                    field,
+                    {
                         field = it
                         model.draft = it.text
                     },
-                    placeholder = { Text("What changed?") },
+                    Modifier.fillMaxWidth().semantics { contentDescription = "Note" },
+                    placeholder = "What changed?",
+                    singleLine = false,
                     minLines = 3,
-                    maxLines = 10,
-                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Note" },
                 )
             }
             if (model.draftFiles.isNotEmpty()) item { AttachmentStrip(model) }
             item { TagRowView(model) }
-            model.sticky?.let { item { Caption("#$it on every note") } }
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (model.canAddFiles) ComposerTools(model)
                     Spacer(Modifier.weight(1f))
-                    Button(onClick = model::commit, enabled = model.canCommit) { Text("Commit") }
+                    GoButton("Commit", model::commit, enabled = model.canCommit)
                 }
             }
             problem?.let { message ->
                 item {
-                    Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp)) {
-                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(message, Modifier.weight(1f), color = MaterialTheme.colorScheme.onErrorContainer)
-                            TextButton(onClick = model::clearProblem) { Text("OK") }
-                        }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(message, Modifier.weight(1f), color = paper.orangeInk, style = MaterialTheme.typography.bodyMedium)
+                        QuietButton("OK", model::clearProblem)
                     }
                 }
             }
             if (waiting.isNotEmpty()) {
-                item { SectionTitle("Waiting to send") }
+                item { Heading("Waiting to send", Modifier.padding(top = 16.dp)) }
                 items(waiting, key = { it.id }) { item ->
                     WaitingRow(item, onDiscard = { model.discard(item.id) }, onFix = { fixing = item })
                 }
             }
             // With the activity log, Today shows every channel; without it, what this phone sent.
-            item { SectionTitle(if (model.hasActivity) "Today" else "Sent from this phone") }
+            item { Heading(if (model.hasActivity) "Today" else "Sent from this phone", Modifier.padding(top = 16.dp)) }
             val empty = if (model.hasActivity) model.today.isEmpty() else sent.isEmpty()
             if (empty) {
                 item {
                     Text(
                         model.me?.let { "No changes yet in ${it.version}." } ?: "Nothing yet.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = paper.ink3,
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
@@ -142,8 +126,8 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
                         item,
                         actions = if (!mine) null else {
                             {
-                                TextButton(onClick = { editing = item.target }) { Text("Edit") }
-                                TextButton(onClick = { deleting = item.target }) { Text("Delete") }
+                                QuietButton("Edit", { editing = item.target })
+                                QuietButton("Delete", { deleting = item.target })
                             }
                         },
                     )
@@ -169,12 +153,12 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
             title = { Text("Fix and send again") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item.refusal?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                    OutlinedTextField(value = text, onValueChange = { text = it }, minLines = 3)
+                    item.refusal?.let { Text(it, color = paper.orangeInk) }
+                    PaperField(text, { text = it }, singleLine = false)
                 }
             },
-            confirmButton = { TextButton(onClick = { model.fix(item.id, text); fixing = null }) { Text("Send") } },
-            dismissButton = { TextButton(onClick = { fixing = null }) { Text("Cancel") } },
+            confirmButton = { QuietButton("Send", { model.fix(item.id, text); fixing = null }) },
+            dismissButton = { QuietButton("Cancel", { fixing = null }, color = paper.ink2) },
         )
     }
 
@@ -183,52 +167,59 @@ fun LogScreen(model: AppModel, onSettings: () -> Unit) {
             onDismissRequest = { deleting = null },
             title = { Text("Delete this note?") },
             text = { Text("It comes out of ${target.version ?: "its day"} in Release Notes, with anything attached.") },
-            confirmButton = { TextButton(onClick = { model.delete(target); deleting = null }) { Text("Delete") } },
-            dismissButton = { TextButton(onClick = { deleting = null }) { Text("Keep") } },
+            confirmButton = { QuietButton("Delete", { model.delete(target); deleting = null }, color = paper.orangeInk) },
+            dismissButton = { QuietButton("Keep", { deleting = null }) },
         )
     }
 }
 
+private val dateline = DateTimeFormatter.ofPattern("EEEE, MMMM d")
+
+/** The day, then its version, large, as the site's Today. */
 @Composable
 private fun VersionHeader(model: AppModel) {
     val me = model.me
-    Row(verticalAlignment = Alignment.Bottom) {
+    Column(Modifier.padding(top = 20.dp, bottom = 4.dp)) {
         Text(
-            me?.version ?: "…",
-            style = VersionStyle,
-            modifier = Modifier.semantics { contentDescription = me?.let { "Version ${it.version}" } ?: "Version loading" },
+            me?.today?.let { UpcomingDraft.parse(it)?.format(dateline) } ?: " ",
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp),
+            color = paper.ink2,
         )
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(8.dp))
+        VersionText(me?.version, size = 52.sp)
+        Spacer(Modifier.height(10.dp))
         when {
             me == null -> {}
-            me.status == "stopped" -> Caption("Email stopped")
-            me.streak > 1 -> Caption("${me.streak}-day streak")
+            me.status == "stopped" -> Caption("Your email is stopped.", color = paper.orangeInk)
+            me.streak > 1 -> Caption("${me.streak} days in a row")
+            me.wroteToday -> Caption("Written today")
         }
     }
 }
 
-/** Pinned tags, then the ones used most lately. Tap to add or take off; touch and hold to keep on every note. */
-@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
+/**
+ * Pinned tags, then the ones used most lately, as the site's tag picks: tap
+ * to add or take off; touch and hold to keep one on every note.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TagRowView(model: AppModel) {
     val haptics = LocalHapticFeedback.current
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        model.tagRow.forEach { tag ->
-            val on = Hashtags.contains(tag, model.draft) || model.sticky == tag
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = if (on) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.combinedClickable(
+    Column {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            model.tagRow.forEach { tag ->
+                Pick(
+                    "#$tag",
+                    selected = Hashtags.contains(tag, model.draft) || model.sticky == tag,
                     onClick = { model.toggle(tag) },
                     onLongClick = {
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         model.stick(if (model.sticky == tag) null else tag)
                     },
-                ),
-            ) {
-                Text("#$tag", Modifier.padding(horizontal = 12.dp, vertical = 6.dp), style = MaterialTheme.typography.labelLarge)
+                )
             }
         }
+        model.sticky?.let { Caption("#$it goes on every note. Touch and hold it to stop.") }
     }
 }
 
@@ -242,27 +233,34 @@ private fun WaitingRow(item: OutboxItem, onDiscard: () -> Unit, onFix: () -> Uni
         is OutboxOperation.Post -> op.text.ifBlank { MediaType.count(op.files) }
     }
     Column {
-        Text(summary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(summary, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
         if (item.files.isNotEmpty() && item.text?.isNotBlank() == true) Caption(MediaType.count(item.files))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Caption(item.refusal ?: if (item.attempts > 0) "Will try again" else "Waiting for a connection", Modifier.weight(1f))
-            if (item.refusal != null && item.isNote) TextButton(onClick = onFix) { Text("Fix") }
-            TextButton(onClick = onDiscard) { Text("Discard") }
+            Caption(
+                item.refusal ?: if (item.attempts > 0) "Will try again" else "Waiting for a connection",
+                Modifier.weight(1f),
+                color = if (item.refusal != null) paper.orangeInk else paper.ink3,
+            )
+            if (item.refusal != null && item.isNote) QuietButton("Fix", onFix)
+            QuietButton("Discard", onDiscard, color = paper.ink2)
         }
-        HorizontalDivider()
+        Rule()
     }
 }
 
 @Composable
 private fun SentRow(sent: Sent, onEdit: () -> Unit, onDelete: () -> Unit) {
     Column {
-        Text(sent.text, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        Text(sent.text, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Caption("Filed in ${sent.note.version}", Modifier.weight(1f))
-            TextButton(onClick = onEdit) { Text("Edit") }
-            TextButton(onClick = onDelete) { Text("Delete") }
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                Caption("Filed in ")
+                VersionText(sent.note.version, size = 13.sp)
+            }
+            QuietButton("Edit", onEdit)
+            QuietButton("Delete", onDelete)
         }
-        HorizontalDivider()
+        Rule()
     }
 }
 
@@ -280,27 +278,18 @@ private fun EditNoteDialog(model: AppModel, target: NoteTarget, onDone: () -> Un
         title = { Text(target.version?.let { "Edit in $it" } ?: "Edit") },
         text = {
             if (note == null) {
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = paper.orange) }
             } else {
-                OutlinedTextField(value = text, onValueChange = { text = it }, minLines = 3, maxLines = 12)
+                PaperField(text, { text = it }, singleLine = false)
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = { note?.let { model.save(it, text) }; onDone() },
+            QuietButton(
+                "Save",
+                { note?.let { model.save(it, text) }; onDone() },
                 enabled = note != null && text.isNotBlank() && text != note?.text,
-            ) { Text("Save") }
+            )
         },
-        dismissButton = { TextButton(onClick = onDone) { Text("Cancel") } },
+        dismissButton = { QuietButton("Cancel", onDone, color = paper.ink2) },
     )
-}
-
-@Composable
-private fun SectionTitle(text: String) {
-    Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp))
-}
-
-@Composable
-internal fun Caption(text: String, modifier: Modifier = Modifier) {
-    Text(text, modifier, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }

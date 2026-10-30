@@ -14,9 +14,24 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Scaffold
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.yourversionnumber.changelog.ui.Rule
+import com.yourversionnumber.changelog.ui.paper
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,13 +53,36 @@ private fun Tabs(model: AppModel) {
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            NavigationBar {
-                tabs.forEach { (id, label) ->
-                    NavigationBarItem(
-                        selected = model.screen == id,
-                        onClick = { model.screen = id },
-                        icon = { Text(label, style = MaterialTheme.typography.labelLarge) },
-                    )
+            // The site's nav: words on paper under a rule, the one you're on in
+            // ink with the tangerine dot of a version beneath it.
+            Column(Modifier.background(paper.paper).navigationBarsPadding()) {
+                Rule()
+                Row(Modifier.fillMaxWidth().selectableGroup()) {
+                    tabs.forEach { (id, label) ->
+                        val on = model.screen == id
+                        Column(
+                            Modifier
+                                .weight(1f)
+                                .selectable(selected = on, role = Role.Tab, onClick = { model.screen = id })
+                                .padding(top = 12.dp, bottom = 10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                label,
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontWeight = if (on) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                    fontSize = 16.sp,
+                                ),
+                                color = if (on) paper.ink else paper.ink3,
+                            )
+                            Box(
+                                Modifier
+                                    .padding(top = 6.dp)
+                                    .size(6.dp)
+                                    .background(if (on) paper.orange else Color.Transparent, CircleShape),
+                            )
+                        }
+                    }
                 }
             }
         },

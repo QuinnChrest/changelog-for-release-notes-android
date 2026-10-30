@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- In the dark, the paper is the ink: #14163a. -->
+    <color name="paper">#FF14163A</color>
+    <style name="Theme.Changelog" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/paper</item>
+    </style>
+</resources>

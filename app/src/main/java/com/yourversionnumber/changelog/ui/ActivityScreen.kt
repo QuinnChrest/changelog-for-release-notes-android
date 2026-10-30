@@ -84,7 +84,7 @@ fun ActivityScreen(model: AppModel) {
         topBar = {
             TopAppBar(
                 title = { Text("Activity") },
-                actions = { TextButton(onClick = { reloads++ }, enabled = !loading) { Text("Refresh") } },
+                actions = { QuietButton("Refresh", { reloads++ }, enabled = !loading) },
             )
         },
     ) { padding ->
@@ -94,10 +94,8 @@ fun ActivityScreen(model: AppModel) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ActivityFilter.entries.forEach {
-                        FilterChip(selected = filter == it, onClick = { filter = it }, label = { Text(it.label) })
-                    }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                    ActivityFilter.entries.forEach { Pick(it.label, selected = filter == it, onClick = { filter = it }) }
                 }
             }
             if (!model.hasActivity) {
@@ -118,7 +116,7 @@ fun ActivityScreen(model: AppModel) {
             }
             if (next != null) {
                 item {
-                    OutlinedButton(onClick = { scope.launch { load(more = true) } }, enabled = !loading) { Text("Older") }
+                    QuietButton("Older", { scope.launch { load(more = true) } }, enabled = !loading)
                 }
             }
         }
@@ -132,9 +130,10 @@ internal fun ActivityRow(item: ActivityItem, actions: (@Composable () -> Unit)? 
     Column(Modifier.semantics(mergeDescendants = true) {}) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                item.headline,
+                withVersion(item.headline, item.version),
                 Modifier.weight(1f),
-                color = if (item.isProblem) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                color = if (item.isProblem) paper.orangeInk else paper.ink,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
             )
             Caption(time(item.at))
         }
@@ -142,7 +141,7 @@ internal fun ActivityRow(item: ActivityItem, actions: (@Composable () -> Unit)? 
             Caption(detail.orEmpty(), Modifier.weight(1f))
             actions?.invoke()
         }
-        HorizontalDivider(Modifier.padding(top = 4.dp))
+        Rule(Modifier.padding(top = 4.dp))
     }
 }
 

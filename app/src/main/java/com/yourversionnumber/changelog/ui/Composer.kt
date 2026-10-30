@@ -72,21 +72,20 @@ fun ComposerTools(model: AppModel) {
         if (granted) recording = true else model.graph.report("Changelog can't record without the microphone. Allow it in Settings, Apps, Changelog.")
     }
 
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        TextButton(
-            onClick = { photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-            enabled = room > 0,
-        ) { Text("Photos") }
-        TextButton(
-            onClick = {
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        QuietButton("Photos", { photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = room > 0)
+        QuietButton(
+            "Camera",
+            {
                 val file = model.scratch("jpg")
                 cameraFile = file.path
                 camera.launch(FileProvider.getUriForFile(context, "${context.packageName}.files", file))
             },
             enabled = room > 0,
-        ) { Text("Camera") }
-        TextButton(
-            onClick = {
+        )
+        QuietButton(
+            "Record",
+            {
                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                     recording = true
                 } else {
@@ -95,7 +94,7 @@ fun ComposerTools(model: AppModel) {
             },
             enabled = room > 0,
             modifier = Modifier.semantics { contentDescription = "Record a voice memo" },
-        ) { Text("Record") }
+        )
     }
 
     if (recording) RecorderDialog(model, onDone = { recording = false })
@@ -137,14 +136,14 @@ private fun RecorderDialog(model: AppModel, onDone: () -> Unit) {
                 val s = elapsed / 1000
                 Text(
                     "%d:%02d".format(s / 60, s % 60),
-                    style = MaterialTheme.typography.displaySmall.copy(fontFamily = FontFamily.Monospace),
+                    style = MaterialTheme.typography.displaySmall.copy(fontFamily = Mono, color = paper.blue),
                     textAlign = TextAlign.Center,
                     modifier = Modifier.semantics { contentDescription = "Recorded ${s / 60} minutes ${s % 60} seconds" },
                 )
             }
         },
-        confirmButton = { if (!failed) TextButton(onClick = ::stop) { Text("Stop") } },
-        dismissButton = { TextButton(onClick = { recorder.cancel(); onDone() }) { Text(if (failed) "OK" else "Cancel") } },
+        confirmButton = { if (!failed) GoButton("Stop", ::stop) },
+        dismissButton = { QuietButton(if (failed) "OK" else "Cancel", { recorder.cancel(); onDone() }, color = paper.ink2) },
     )
 }
 

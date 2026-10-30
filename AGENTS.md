@@ -34,6 +34,19 @@ says how every client behaves.
 - `MainActivity` takes `ACTION_SEND` text and links from other apps into the
   draft.
 
+## The look
+
+Changelog looks like Release Notes (`web/src/styles/site.css` in
+yvn-release-notes): type on paper, the email's colours, light and dark as
+the phone is. `ui/Theme.kt` holds it: the site's colours (`paper`), its two
+fonts (Bricolage Grotesque for words, Martian Mono for versions; OFL, see
+`docs/fonts/`), `VersionText` (cobalt, the dots tangerine), `GoButton` (the
+one tangerine button on a screen), `QuietButton` (blue words), `Pick` (the
+site's tag picks: underlined blue, the chosen one in bold ink), `PaperField`
+and `Select` (no box, a 2dp rule that turns tangerine), `Rule` and `Bar`.
+No boxes, no shadows, no Material chips or outlined fields: build new
+screens from these.
+
 ## Rules
 
 - Never commit real notes, real versions, real account details, tokens, or

@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Changelog" parent="android:Theme.Material.Light.NoActionBar" />
-    <color name="ic_launcher_background">#FF1F2430</color>
+    <!-- Release Notes' paper, so nothing flashes before the app draws. -->
+    <color name="paper">#FFFFFBF2</color>
+    <color name="ic_launcher_background">#FFFFFBF2</color>
+    <style name="Theme.Changelog" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/paper</item>
+    </style>
 </resources>

@@ -29,7 +29,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -76,7 +75,7 @@ fun UpcomingScreen(model: AppModel) {
         topBar = {
             TopAppBar(
                 title = { Text("Upcoming") },
-                actions = { if (model.hasUpcoming) TextButton(onClick = { adding = true }) { Text("Add a date") } },
+                actions = { if (model.hasUpcoming) QuietButton("Add a date", { adding = true }) },
             )
         },
     ) { padding ->
@@ -103,10 +102,10 @@ fun UpcomingScreen(model: AppModel) {
                         .clickable(role = Role.Button, onClickLabel = "Edit") { editing = entry }
                         .padding(vertical = 10.dp),
                 ) {
-                    Text(entry.line)
+                    Text(entry.line, style = MaterialTheme.typography.bodyLarge)
                     Caption(listOfNotNull(whenSaid(entry), entry.kind.label, entry.tag?.let { "#$it" }).joinToString(" · "))
                 }
-                HorizontalDivider()
+                Rule()
             }
             list?.let {
                 val notes = listOfNotNull(
@@ -158,8 +157,8 @@ private fun UpcomingEditor(model: AppModel, editing: UpcomingEntry?, onDone: () 
             topBar = {
                 TopAppBar(
                     title = { Text(if (editing == null) "Add a date" else "Edit") },
-                    navigationIcon = { TextButton(onClick = onDone) { Text("Cancel") } },
-                    actions = { TextButton(onClick = ::save, enabled = !busy) { Text("Save") } },
+                    navigationIcon = { QuietButton("Cancel", onDone, color = paper.ink2) },
+                    actions = { QuietButton("Save", ::save, enabled = !busy) },
                 )
             },
         ) { padding ->
@@ -167,52 +166,56 @@ private fun UpcomingEditor(model: AppModel, editing: UpcomingEntry?, onDone: () 
                 Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                     UpcomingKind.entries.forEach { kind ->
-                        FilterChip(selected = draft.kind == kind, onClick = { draft = draft.withKind(kind); found = null }, label = { Text(kind.label) })
+                        Pick(kind.label, selected = draft.kind == kind, onClick = { draft = draft.withKind(kind); found = null })
                     }
                 }
-                OutlinedTextField(
-                    value = draft.title,
-                    onValueChange = { draft = draft.copy(title = it.replace("\n", " ")) },
-                    label = { Text(if (draft.kind.annual) "Whose" else "Title") },
-                    placeholder = { Text(placeholder(draft.kind)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                PaperField(
+                    draft.title,
+                    { draft = draft.copy(title = it.replace("\n", " ")) },
+                    Modifier.fillMaxWidth(),
+                    label = if (draft.kind.annual) "Whose" else "Title",
+                    placeholder = placeholder(draft.kind),
                 )
 
                 when (draft.kind) {
                     UpcomingKind.Birthday, UpcomingKind.Anniversary -> {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                             Picker(
+                                title = "Month",
                                 label = Month.of(draft.month).getDisplayName(TextStyle.FULL, locale),
                                 options = (1..12).map { it to Month.of(it).getDisplayName(TextStyle.FULL, locale) },
                                 onPick = { draft = draft.withMonth(it) },
+                                modifier = Modifier.weight(2f),
                             )
                             Picker(
+                                title = "Day",
                                 label = draft.day.toString(),
                                 options = (1..UpcomingDraft.daysIn(draft.month)).map { it to it.toString() },
                                 onPick = { draft = draft.copy(day = it) },
+                                modifier = Modifier.weight(1f),
                             )
                         }
-                        OutlinedTextField(
-                            value = draft.year,
-                            onValueChange = { draft = draft.copy(year = it.filter(Char::isDigit).take(4)) },
-                            label = { Text(if (draft.kind == UpcomingKind.Birthday) "Year born (optional)" else "Year it began (optional)") },
-                            supportingText = { Text("With a year, the line says which one it is.") },
-                            singleLine = true,
+                        PaperField(
+                            draft.year,
+                            { draft = draft.copy(year = it.filter(Char::isDigit).take(4)) },
+                            Modifier.fillMaxWidth(),
+                            label = if (draft.kind == UpcomingKind.Birthday) "Year born (optional)" else "Year it began (optional)",
+                            placeholder = "YYYY",
+                            supporting = "With a year, the line says which one it is.",
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                     UpcomingKind.Trip -> {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            DayButton("First day", draft.start) { draft = draft.withStart(it) }
-                            DayButton("Last day", draft.end) { draft = draft.copy(end = it) }
+                        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                            DayButton("First day", draft.start, Modifier.weight(1f)) { draft = draft.withStart(it) }
+                            DayButton("Last day", draft.end, Modifier.weight(1f)) { draft = draft.copy(end = it) }
                         }
                         Destination(draft.place, "Destination", found) { draft = draft.copy(place = it); found = null }
-                        OutlinedButton(
-                            onClick = {
+                        QuietButton(
+                            "Find the city",
+                            {
                                 busy = true
                                 scope.launch {
                                     model.checkPlace(draft, editing).fold(
@@ -223,32 +226,25 @@ private fun UpcomingEditor(model: AppModel, editing: UpcomingEntry?, onDone: () 
                                 }
                             },
                             enabled = !busy && draft.place.isNotBlank(),
-                        ) { Text("Find the city") }
+                        )
                     }
                     UpcomingKind.Event -> {
-                        DayButton("Day", draft.start) { draft = draft.withStart(it) }
+                        DayButton("Day", draft.start, Modifier.fillMaxWidth()) { draft = draft.withStart(it) }
                         Destination(draft.place, "Place (optional)", null) { draft = draft.copy(place = it) }
                     }
                 }
 
-                OutlinedTextField(
-                    value = draft.tag,
-                    onValueChange = { draft = draft.copy(tag = it) },
-                    label = { Text("Tag (optional)") },
-                    placeholder = { Text("family") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                PaperField(draft.tag, { draft = draft.copy(tag = it) }, Modifier.fillMaxWidth(), label = "Tag (optional)", placeholder = "family")
 
-                Text("Remind me", style = MaterialTheme.typography.titleSmall)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Heading("Remind me")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                     (reminderChoices.keys + draft.reminders).distinct().sortedDescending().forEach { days ->
-                        FilterChip(
+                        Pick(
+                            reminderChoices[days] ?: "$days days before",
                             selected = days in draft.reminders,
                             onClick = {
                                 draft = draft.copy(reminders = if (days in draft.reminders) draft.reminders - days else draft.reminders + days)
                             },
-                            label = { Text(reminderChoices[days] ?: "$days days before") },
                         )
                     }
                 }
@@ -257,17 +253,13 @@ private fun UpcomingEditor(model: AppModel, editing: UpcomingEntry?, onDone: () 
                         Text("In the morning email")
                         Caption("Off, this date reminds nowhere, this phone included.")
                     }
-                    Switch(checked = draft.email, onCheckedChange = { draft = draft.copy(email = it) })
+                    Switch(checked = draft.email, onCheckedChange = { draft = draft.copy(email = it) }, colors = switchColors())
                 }
 
-                problem?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                problem?.let { Text(it, color = paper.orangeInk) }
 
-                Button(onClick = ::save, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Save") }
-                if (editing != null) {
-                    TextButton(onClick = { removing = true }, enabled = !busy) {
-                        Text("Delete this date", color = MaterialTheme.colorScheme.error)
-                    }
-                }
+                GoButton("Save", ::save, enabled = !busy)
+                if (editing != null) QuietButton("Delete this date", { removing = true }, enabled = !busy, color = paper.orangeInk)
                 Spacer(Modifier.padding(8.dp))
             }
         }
@@ -287,9 +279,9 @@ private fun UpcomingEditor(model: AppModel, editing: UpcomingEntry?, onDone: () 
                         busy = false
                         if (problem == null) onDone()
                     }
-                }) { Text("Delete") }
+                }) { Text("Delete", color = paper.orangeInk) }
             },
-            dismissButton = { TextButton(onClick = { removing = false }) { Text("Keep") } },
+            dismissButton = { QuietButton("Keep", { removing = false }) },
         )
     }
 }
@@ -312,22 +304,21 @@ private fun placeholder(kind: UpcomingKind) = when (kind) {
 
 @Composable
 private fun Destination(value: String, label: String, found: String?, onChange: (String) -> Unit) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onChange,
-        label = { Text(label) },
-        placeholder = { Text("Zürich, or Paris, Texas") },
-        supportingText = found?.let { { Text("Found: $it") } },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
+    PaperField(
+        value,
+        onChange,
+        Modifier.fillMaxWidth(),
+        label = label,
+        placeholder = "Zürich, or Paris, Texas",
+        supporting = found?.let { "Found: $it" },
     )
 }
 
 @Composable
-private fun <T> Picker(label: String, options: List<Pair<T, String>>, onPick: (T) -> Unit) {
+private fun <T> Picker(title: String, label: String, options: List<Pair<T, String>>, onPick: (T) -> Unit, modifier: Modifier = Modifier) {
     var open by remember { mutableStateOf(false) }
-    Box {
-        OutlinedButton(onClick = { open = true }) { Text(label) }
+    Box(modifier) {
+        Select(title, label, { open = true }, Modifier.fillMaxWidth())
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             options.forEach { (value, text) ->
                 DropdownMenuItem(text = { Text(text) }, onClick = { onPick(value); open = false })
@@ -339,13 +330,10 @@ private fun <T> Picker(label: String, options: List<Pair<T, String>>, onPick: (T
 /** A day, `YYYY-MM-DD`, chosen on the calendar. The picker counts in UTC days, so no zone moves it. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DayButton(label: String, day: String, onPick: (String) -> Unit) {
+private fun DayButton(label: String, day: String, modifier: Modifier = Modifier, onPick: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val date = UpcomingDraft.parse(day)
-    Column {
-        Caption(label)
-        OutlinedButton(onClick = { open = true }) { Text(date?.format(DateTimeFormatter.ofPattern("EEE, MMM d, yyyy")) ?: day) }
-    }
+    Select(label, date?.format(DateTimeFormatter.ofPattern("EEE, MMM d")) ?: day, { open = true }, modifier)
     if (open) {
         val state = rememberDatePickerState(initialSelectedDateMillis = date?.atStartOfDay()?.toInstant(ZoneOffset.UTC)?.toEpochMilli())
         DatePickerDialog(
@@ -354,9 +342,9 @@ private fun DayButton(label: String, day: String, onPick: (String) -> Unit) {
                 TextButton(onClick = {
                     state.selectedDateMillis?.let { onPick(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate().toString()) }
                     open = false
-                }) { Text("OK") }
+                }) { Text("OK", color = paper.blue) }
             },
-            dismissButton = { TextButton(onClick = { open = false }) { Text("Cancel") } },
+            dismissButton = { QuietButton("Cancel", { open = false }, color = paper.ink2) },
         ) { DatePicker(state) }
     }
 }

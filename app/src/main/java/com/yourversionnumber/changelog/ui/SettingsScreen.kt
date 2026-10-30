@@ -48,7 +48,7 @@ private fun Toggle(title: String, about: String?, checked: Boolean, enabled: Boo
             Text(title)
             about?.let { Caption(it) }
         }
-        Switch(checked = checked, enabled = enabled, onCheckedChange = onChange)
+        Switch(checked = checked, enabled = enabled, onCheckedChange = onChange, colors = switchColors())
     }
 }
 
@@ -87,7 +87,7 @@ fun SettingsScreen(model: AppModel, onBack: () -> Unit) {
         topBar = {
             TopAppBar(
                 title = { Text("Settings") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Done") } },
+                navigationIcon = { QuietButton("Done", onBack) },
             )
         },
     ) { padding ->
@@ -95,7 +95,7 @@ fun SettingsScreen(model: AppModel, onBack: () -> Unit) {
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Token", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Heading("Token", Modifier.padding(top = 12.dp))
             me?.token?.let { token ->
                 Text(token.name)
                 Caption("Can: " + token.scopes.joinToString(", "))
@@ -103,16 +103,16 @@ fun SettingsScreen(model: AppModel, onBack: () -> Unit) {
             }
             if (model.server != Api.PRODUCTION) Caption("Server: ${model.server}")
 
-            Text("Tags", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Heading("Tags", Modifier.padding(top = 12.dp))
             val sticky = model.sticky
             if (sticky != null) {
-                OutlinedButton(onClick = { model.stick(null) }) { Text("Stop adding #$sticky to every note") }
+                QuietButton("Stop adding #$sticky to every note", { model.stick(null) })
             } else {
                 Caption("Touch and hold a tag on Log to add it to every note.")
             }
 
-            Text("Notifications", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-            problem?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            Heading("Notifications", Modifier.padding(top = 12.dp))
+            problem?.let { Text(it, color = paper.orangeInk) }
             Toggle(
                 "Remind me on this phone",
                 if (model.hasUpcoming) "Upcoming reminders, when each morning’s email is due, in its words."
@@ -127,7 +127,7 @@ fun SettingsScreen(model: AppModel, onBack: () -> Unit) {
                 checked = model.promptOn,
             ) { on -> if (on) turnOn { model.setPrompt(true) } else model.setPrompt(false) }
 
-            Text("Activity notifications", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            Heading("Activity notifications", Modifier.padding(top = 12.dp))
             if (model.hasActivity) {
                 ActivityNoticeKind.entries.forEach { kind ->
                     Toggle(kind.label, null, checked = kind in model.noticeKinds) { on ->
@@ -143,7 +143,7 @@ fun SettingsScreen(model: AppModel, onBack: () -> Unit) {
                 Caption("To get them here, make a token with “Read the activity log” ticked.")
             }
 
-            OutlinedButton(onClick = { signingOut = true }) { Text("Sign out") }
+            QuietButton("Sign out", { signingOut = true }, color = paper.orangeInk)
             Caption("Changelog ${BuildConfig.VERSION_NAME}, build ${BuildConfig.COMMIT}")
         }
     }

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -251,12 +252,15 @@ private fun UpcomingEditor(model: AppModel, editing: UpcomingEntry?, onDone: () 
                         )
                     }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.toggleable(value = draft.email, role = Role.Switch, onValueChange = { draft = draft.copy(email = it) }),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Column(Modifier.weight(1f)) {
                         Text(say(R.string.in_the_morning_email))
                         Caption(say(R.string.off_this_date_reminds_nowhere))
                     }
-                    Switch(checked = draft.email, onCheckedChange = { draft = draft.copy(email = it) }, colors = switchColors())
+                    Switch(checked = draft.email, onCheckedChange = null, colors = switchColors())
                 }
 
                 problem?.let { Text(it, color = paper.orangeInk) }

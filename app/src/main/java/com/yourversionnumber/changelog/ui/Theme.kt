@@ -56,8 +56,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
@@ -220,15 +221,20 @@ fun ChangelogTheme(content: @Composable () -> Unit) {
     }
 }
 
-/** A version as the site writes it: Martian Mono in cobalt, the dots tangerine. */
+/**
+ * A version as the site writes it: Martian Mono in cobalt, the dots tangerine.
+ * Below large text's 24sp the dots take the darker tangerine, which keeps 4.5:1
+ * on light paper; the site's own tangerine is 3:1 there.
+ */
 @Composable
 fun VersionText(version: String?, size: TextUnit = 48.sp, modifier: Modifier = Modifier) {
     val p = paper
+    val dot = if (size.value >= 24f) p.orange else p.orangeInk
     val text = buildAnnotatedString {
         if (version == null) {
             withStyle(SpanStyle(color = p.ink3)) { append("?.?.???") }
         } else {
-            version.forEach { c -> if (c == '.') withStyle(SpanStyle(color = p.orange)) { append(c) } else append(c) }
+            version.forEach { c -> if (c == '.') withStyle(SpanStyle(color = dot)) { append(c) } else append(c) }
         }
     }
     Text(
@@ -289,10 +295,11 @@ fun Pick(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifie
     Text(
         text,
         modifier
-            .semantics { this.selected = selected }
+            // TalkBack says "checked" or "not checked", as for any checkbox.
+            .semantics { toggleableState = ToggleableState(selected) }
             .then(tap)
-            .defaultMinSize(minHeight = 40.dp)
-            .padding(vertical = 8.dp),
+            .defaultMinSize(minHeight = 48.dp)
+            .padding(vertical = 12.dp),
         color = if (selected) p.ink else p.blue,
         style = TextStyle(
             fontFamily = Grotesque,
@@ -505,7 +512,7 @@ fun withVersion(text: String, version: String?): androidx.compose.ui.text.Annota
         append(text.substring(0, at))
         // Martian Mono runs wide: a size smaller than the words around it reads as the same.
         withStyle(SpanStyle(fontFamily = Mono, fontWeight = FontWeight.Bold, color = p.blue, fontSize = 0.82.em, letterSpacing = (-0.04).em)) {
-            version!!.forEach { c -> if (c == '.') withStyle(SpanStyle(color = p.orange)) { append(c) } else append(c) }
+            version!!.forEach { c -> if (c == '.') withStyle(SpanStyle(color = p.orangeInk)) { append(c) } else append(c) }
         }
         append(text.substring(at + version!!.length))
     }

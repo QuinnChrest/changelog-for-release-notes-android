@@ -1,6 +1,6 @@
-# Issue for jthingelstad/yvn-release-notes: read the notes a token wrote, by day
+# Issue for jthingelstad/yvn-release-notes: read the notes a token wrote, across a date range
 
-Title: **`GET /v1/notes?date=` — list the notes this token wrote on a day, with their words and files**
+Title: **`GET /v1/notes?from=&to=` — list the notes this token wrote across a date range, with their words and files**
 
 ## What a client wants
 
@@ -31,12 +31,21 @@ fetching notes one at a time, and can never show the files.
 
 ## What would fix it (smallest useful change)
 
-1. **`GET /v1/notes?date=YYYY-MM-DD`**, scope `notes:write` (same as
-   `getNote`): the notes **this token wrote** on that account-local day,
-   oldest first, each as the existing `Note` (id, date, version, text,
-   revision, written_at, token), so it carries no more than `getNote` does.
-   Also `limit` (max 100) and `before` cursor, like `/v1/activity`, for a
-   busy day. Empty day: `{"items": [], "next": null}`.
+1. **`GET /v1/notes?from=YYYY-MM-DD&to=YYYY-MM-DD`**, scope `notes:write`
+   (same as `getNote`): the notes **this token wrote** on account-local days
+   from `from` to `to`, both inclusive (`to` defaults to `from`, so one day is
+   one date). Each is the existing `Note` (id, date, version, text, revision,
+   written_at, token), so it carries no more than `getNote` does. Order is up
+   to the server (oldest first within a day reads best); also `limit`
+   (max 100) and a `before`/`next` cursor, like `/v1/activity`, so a long
+   range or a busy day pages. No notes in the range: `{"items": [], "next": null}`.
+   The client pulls whatever range it needs (a day for Log, a week or month
+   for scrolling back) and does the stepping itself.
+   **How wide a range to allow is the server's call**: cap the span in days
+   (say 31 or 92), the number of notes per page, or both, whatever protects
+   it. Refuse a wider one with a stable error `code` (e.g. `range_too_wide`)
+   and say the limit in the `message`, and document it in the OpenAPI, so the
+   app can ask in pieces. Also refuse `from` after `to` and malformed dates.
 2. **Files on a note**: let `Note` carry `files` as a list, not only a count:
    `[{"id", "type": "image/jpeg", "name", "size", "width", "height", "duration"}]`
    plus a way to fetch the bytes with the same token, e.g.
@@ -45,16 +54,16 @@ fetching notes one at a time, and can never show the files.
    enough, since it's only files this token wrote. (Keep `files` as the count
    too if changing its type would break clients; a new `file_list` field
    works.)
-3. Optional, helps Activity too: **`date` (or `since`/`until`) on
-   `GET /v1/activity`**, so a client can ask for one day's rows without paging
-   from now back to it.
+3. Optional, helps Activity too: **`from`/`to` on `GET /v1/activity`**, the
+   same range, so a client can ask for the rows of some days without paging
+   from now back to them. Same cap at the server's discretion.
 
 Everything stays inside the existing rule that a token reads back only what
 it wrote. This asks for no `notes:read` and exposes no other channel's words.
 
 ## Why this matters
 
-- One request per day instead of paging the log and N `getNote` calls: far
+- One request per range instead of paging the log and N `getNote` calls: far
   less data on a phone and on the server.
 - Works for a token with only `notes:write`, so a client doesn't have to ask
   for `activity` just to show its own day.
@@ -62,9 +71,12 @@ it wrote. This asks for no `notes:read` and exposes no other channel's words.
 
 ## Acceptance
 
-- `GET /v1/notes?date=2026-10-30` with a `notes:write` token returns only that
-  token's notes for that day, oldest first, 200 with `items`/`next`.
-- A date with none returns an empty list, not 404.
+- `GET /v1/notes?from=2026-10-28&to=2026-10-30` with a `notes:write` token
+  returns only that token's notes on those days, 200 with `items`/`next`;
+  `from` alone is that one day.
+- A range with none returns an empty list, not 404.
+- A range wider than the server's limit, `from` after `to`, or a bad date is
+  refused with a stable `code`, and the limit is in the OpenAPI.
 - A token that didn't write a note never sees it, whatever its scopes.
 - `/v1/openapi.json` and `info.x-changes` describe it (a new minor version).
 - Files: a note with a photo lists it and the thumb URL serves the image to the

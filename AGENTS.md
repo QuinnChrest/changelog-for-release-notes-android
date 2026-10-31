@@ -280,7 +280,10 @@ oldest first, paged by `next`), with a way a day back or on (`AppModel`'s
 a photo shows its small copy when it has one (`size=thumb`, kept in a small
 cache for the session), a recording plays and anything else opens, each by a
 signed address asked for as it's tapped and never kept (ten minutes, fetched
-with no token). A note says where it came from (`source`, `mine`).
+with no token). A photo opens in the app (`ui/PhotoViewer.kt`: full screen,
+pinch and double-tap to zoom, decoded down to 2560 px on its longest side);
+other files go to what the phone opens them with. A note says where it came
+from (`source`, `mine`).
 
 Pinned tags are set in Settings (`PUT /v1/tags/pinned`, through the
 Outbox) and come first in the tag row.

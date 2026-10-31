@@ -163,6 +163,8 @@ private fun NoteFiles(model: AppModel, note: NoteDetail, player: FilePlayer) {
     fun address(file: NoteMedia, then: (String) -> Unit) {
         scope.launch { model.fileAddress(note, file.n, thumb = false)?.let { then(model.absolute(it)) } }
     }
+    // A photo opens in the app, to zoom and look at; anything else goes to what the phone opens it with.
+    var viewing by remember { mutableStateOf<NoteMedia?>(null) }
     fun open(file: NoteMedia) = address(file) {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
@@ -174,7 +176,11 @@ private fun NoteFiles(model: AppModel, note: NoteDetail, player: FilePlayer) {
         note.media.forEach { file ->
             val key = "${note.id}/${file.n}"
             when {
-                file.kind == "image" && file.thumb != null -> Thumbnail(model, note, file) { open(file) }
+                file.kind == "image" && file.thumb != null -> Thumbnail(model, note, file) { viewing = file }
+                file.kind == "image" -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    QuietButton(say(R.string.open), { viewing = file })
+                    Caption(fileLabel(file))
+                }
                 file.kind == "audio" -> Row(verticalAlignment = Alignment.CenterVertically) {
                     val on = player.playing == key
                     QuietButton(if (on) say(R.string.stop) else say(R.string.play), { address(file) { player.toggle(key, it) } })
@@ -187,6 +193,7 @@ private fun NoteFiles(model: AppModel, note: NoteDetail, player: FilePlayer) {
             }
         }
     }
+    viewing?.let { file -> PhotoViewer(model, note, file, onClose = { viewing = null }, onOpenOutside = { open(file) }) }
 }
 
 private fun fileLabel(file: NoteMedia): String {

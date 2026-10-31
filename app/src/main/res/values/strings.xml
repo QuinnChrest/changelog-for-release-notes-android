@@ -102,6 +102,8 @@
     <string name="via_name">via %1$s</string>
     <string name="play">Play</string>
     <string name="open">Open</string>
+    <string name="close">Close</string>
+    <string name="cant_show_this_photo">Can’t show this photo here.</string>
     <string name="voice_memo">Voice memo</string>
     <string name="photo">Photo</string>
     <string name="file">File</string>

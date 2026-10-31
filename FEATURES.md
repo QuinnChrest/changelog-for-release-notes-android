@@ -4,7 +4,7 @@ What Changelog for Android does, what's left, and what's built but not yet
 checked. The iPhone app (`jthingelstad/changelog-ios`) is the reference;
 `AGENTS.md` says how each built piece works.
 
-**At a glance:** 47 built · 3 to do · 2 waiting on someone else · 6 to check
+**At a glance:** 48 built · 3 to do · 2 waiting on someone else · 6 to check
 
 Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 built, not yet checked
 
@@ -57,6 +57,7 @@ These are written and built; something about them couldn't be seen on the emulat
 | ✅ | Waiting to send, with Fix and Discard for a refused note |
 | ✅ | Edit and delete notes this phone sent |
 | ✅ | Log shows a day's notes with their words and files (photos by their small copy, voice memos to play, PDFs to open), oldest first, and steps a day back or on (`GET /v1/notes?from=&to=`, API 1.9.0); offline, today falls back to the activity log or what this phone sent |
+| ✅ | A photo on a note opens in the app, full screen, to pinch or double-tap to zoom and drag (`PhotoViewer`); a photo the phone can't read offers to open it outside |
 | ✅ | Every note, from any channel, with a token that has `notes:all` (API 1.10.0, 1.11.0): each says where it came from, and Edit and Delete work on any of them; without it, only this token's own, and other channels show as activity rows without words |
 | ✅ | Today: activity from every channel, or this phone's notes without the activity scope |
 

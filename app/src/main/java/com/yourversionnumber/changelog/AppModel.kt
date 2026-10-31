@@ -149,6 +149,14 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         null
     }
 
+    /** The bytes of a photo itself, for the viewer; null when it can't be had. */
+    suspend fun photo(note: NoteDetail, n: Int): ByteArray? = try {
+        val api = graph.api()
+        fileAddress(note, n, thumb = false)?.let { api?.fetch(it) }
+    } catch (e: ApiException) {
+        null
+    }
+
     /** Where a file is read from outside the app, or the server's base for a path. */
     fun absolute(address: String): String = if (address.startsWith("/")) graph.server.trimEnd('/') + address else address
 

@@ -66,7 +66,7 @@ class Api(
     suspend fun setPinned(pinned: List<String>, idempotencyKey: String): Tags =
         send("PUT", "v1/tags/pinned", body = encode(PinsBody(pinned)), idempotencyKey = idempotencyKey)
 
-    suspend fun activity(after: String? = null, before: String? = null, kinds: List<String> = emptyList(), limit: Int = 50): ActivityPage {
+    suspend fun activity(after: String? = null, before: String? = null, kinds: List<String> = emptyList(), limit: Int = 30): ActivityPage {
         val query = buildList {
             add("limit" to limit.toString())
             after?.let { add("after" to it) }

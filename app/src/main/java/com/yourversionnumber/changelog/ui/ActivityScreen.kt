@@ -117,7 +117,10 @@ fun ActivityScreen(model: AppModel) {
                 ActivityRow(item)
             }
             if (next != null) {
-                item {
+                item(key = "older") {
+                    // The next page comes as this row scrolls into view, so only what you read is fetched. Problems is
+                    // filtered here, not on the server, so it keeps the button rather than chain through the whole log.
+                    if (filter != ActivityFilter.Problems && !loading) LaunchedEffect(next) { load(more = true) }
                     QuietButton(say(R.string.older), { scope.launch { load(more = true) } }, enabled = !loading)
                 }
             }

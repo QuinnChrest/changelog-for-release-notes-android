@@ -61,6 +61,13 @@ fetching notes one at a time, and can never show the files.
 Everything stays inside the existing rule that a token reads back only what
 it wrote. This asks for no `notes:read` and exposes no other channel's words.
 
+## Related
+
+A separate issue (`ISSUE-notes-whole-account.md`) asks for a token permission
+that reaches every note in the account, not only the ones the token wrote. This
+issue doesn't depend on it: the range call works for the notes a token wrote,
+and should return more only if that permission exists and the token has it.
+
 ## Why this matters
 
 - One request per range instead of paging the log and N `getNote` calls: far

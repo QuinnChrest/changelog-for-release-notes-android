@@ -37,40 +37,40 @@ in the Release Notes repo.
 ## Install it on your phone
 
 Changelog isn't on Google Play yet, so you install it yourself ("sideload").
-It needs Android 12 or later and a Release Notes account.
+It needs Android 12 or later and a Release Notes account. There are two ways
+to get the app; either one ends with an APK on your phone.
 
-### 1. Get the app
+### Option 1: download a release
 
-**Download an APK.** If the [Releases page](https://github.com/QuinnChrest/changelog-for-release-notes-android/releases)
-has a release, download the `.apk` from it, on the phone or on a computer.
+1. On the phone, open the
+   [Releases page](https://github.com/QuinnChrest/changelog-for-release-notes-android/releases)
+   and download the newest `.apk`.
+2. Open it from your browser's downloads or from Files. Android asks whether
+   to let that app install unknown apps: allow it, then tap Install. You can
+   turn the permission off again afterwards in Settings → Apps → Special app
+   access → Install unknown apps.
+3. If Play Protect says it hasn't seen the app before, choose "Install
+   anyway". That is the usual message for any app that isn't from Play.
 
-**Or build it.** With JDK 17+ and the Android SDK 37, in a clone of this repo:
+No computer or USB cable is needed.
+
+### Option 2: build it yourself
+
+With JDK 17+ and the Android SDK 37, in a clone of this repo:
 
 ```sh
 ./gradlew :app:assembleDebug
 ```
 
-The APK is `app/build/outputs/apk/debug/app-debug.apk`. It works the same as a
-release build, but it also has a "Dev server" choice on the sign-in screen,
-which you can ignore. To make a release build signed with your own key
-instead, see [Release builds](AGENTS.md#release-builds); an unsigned release
-APK won't install.
+Copy `app/build/outputs/apk/debug/app-debug.apk` to the phone and install it
+as in steps 2 and 3 above, or with USB debugging on, run
+`adb install -r app/build/outputs/apk/debug/app-debug.apk`. The debug build
+works the same as a release, but its sign-in screen also has a "Dev server"
+choice, which you can ignore. To make a release build signed with your own
+key instead, see [Release builds](AGENTS.md#release-builds); an unsigned
+release APK won't install.
 
-### 2. Install it
-
-Open the APK from Files or Downloads on the phone. Android asks whether to
-let that app (your browser or Files) install unknown apps: allow it for this
-once, then tap Install. You can turn the permission off again afterwards in
-Settings → Apps → Special app access → Install unknown apps. No computer, USB
-cable or Developer options needed.
-
-(Optional, for developers: with USB debugging on, `adb install -r
-app-debug.apk` does the same from a computer.)
-
-If Play Protect says it hasn't seen the app before, choose "Install anyway".
-That is the usual message for any app that isn't from Play.
-
-### 3. Sign in
+### Sign in
 
 In Release Notes, open Settings → API tokens and make a token. Tick what you
 want the app to do: write notes, plus "Add files" for photos and recordings,
@@ -81,10 +81,10 @@ key that never leaves it.
 ### Updating
 
 Install the newer APK over the old one (the same key must sign both, so don't
-switch between a downloaded APK and one you built yourself without removing
-the app first). Your token and any notes still waiting to send are kept.
-Android doesn't update sideloaded apps by itself, so check the Releases page
-now and then.
+switch between a downloaded release and one you built yourself without
+removing the app first). Your token and any notes still waiting to send are
+kept. Android doesn't update sideloaded apps by itself, so check the Releases
+page now and then.
 
 ## Building
 

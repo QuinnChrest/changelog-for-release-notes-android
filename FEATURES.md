@@ -4,7 +4,7 @@ What Changelog for Android does, what's left, and what's built but not yet
 checked. The iPhone app (`jthingelstad/changelog-ios`) is the reference;
 `AGENTS.md` says how each built piece works.
 
-**At a glance:** 45 built · 3 to do · 2 waiting on someone else · 5 to check
+**At a glance:** 47 built · 3 to do · 2 waiting on someone else · 6 to check
 
 Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 built, not yet checked
 
@@ -34,6 +34,7 @@ These are written and built; something about them couldn't be seen on the emulat
 | 🔍 | Reminders survive a phone restart | Not rebooted with alarms waiting |
 | 🔍 | The whole pass on a real phone | `docs/PHONE-TEST.md`, by hand, on a real account |
 | 🔍 | UI test cycle in CI | Runs on emulators here; CI runs the unit tests and lint only |
+| 🔍 | A photo's small copy on Log, and `notes:all` on a real account | The dev server's fixture photo has no small copy, so the thumbnail path ran only in a unit test; the whole-account list was seen on the dev server with a `notes:all` token, not on production |
 
 ## Built
 
@@ -55,6 +56,8 @@ These are written and built; something about them couldn't be seen on the emulat
 | ✅ | "Filed in 4.5.137." or "Unlocked: …" after a send |
 | ✅ | Waiting to send, with Fix and Discard for a refused note |
 | ✅ | Edit and delete notes this phone sent |
+| ✅ | Log shows a day's notes with their words and files (photos by their small copy, voice memos to play, PDFs to open), oldest first, and steps a day back or on (`GET /v1/notes?from=&to=`, API 1.9.0); offline, today falls back to the activity log or what this phone sent |
+| ✅ | Every note, from any channel, with a token that has `notes:all` (API 1.10.0, 1.11.0): each says where it came from, and Edit and Delete work on any of them; without it, only this token's own, and other channels show as activity rows without words |
 | ✅ | Today: activity from every channel, or this phone's notes without the activity scope |
 
 ### Files and places

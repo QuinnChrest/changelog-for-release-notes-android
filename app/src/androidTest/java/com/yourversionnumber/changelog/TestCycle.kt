@@ -2,6 +2,7 @@ package com.yourversionnumber.changelog
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isSelectable
@@ -11,21 +12,22 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.yourversionnumber.changelog.kit.Api
+import java.util.UUID
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.RuleChain
 import org.junit.rules.TestRule
-import org.junit.runners.model.Statement
 import org.junit.runner.RunWith
-import java.util.UUID
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import org.junit.runners.model.Statement
 
 /**
  * The test cycle, as Changelog for iPhone's ui-test-cycle.sh: the real app on
@@ -96,13 +98,16 @@ class TestCycle {
         compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput(words)
         compose.tap("Commit")
         // The send waits for a connection, and a freshly started emulator or dev server is slow to give one.
-        compose.see("Filed in", timeout = 60_000)
-        val filed = runBlocking {
+        fun filedNotes() = runBlocking {
             api.activity(kinds = listOf("note"), limit = 20).items.mapNotNull { row ->
                 // Rows for notes deleted since are still in the log: skip those.
                 row.note?.let { id -> row.day?.let { runCatching { api.note(it, id) }.getOrNull() } }
             }.filter { it.text == words }
         }
+        compose.waitUntil(60_000) { filedNotes().isNotEmpty() }
+        // It reads back in Log's day, with its words, scrolled to.
+        compose.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText(words, substring = true))
+        val filed = filedNotes()
         assertEquals("the note filed exactly once", 1, filed.size)
 
         // Upcoming: a birthday added, then read back from the server.

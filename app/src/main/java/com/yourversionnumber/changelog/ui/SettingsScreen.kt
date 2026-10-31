@@ -79,6 +79,7 @@ private fun scopeName(scope: String) = when (scope) {
     "media:write" -> say(R.string.add_files)
     "upcoming" -> say(R.string.upcoming)
     "activity" -> say(R.string.read_activity)
+    "notes:all" -> say(R.string.read_every_note)
     else -> scope
 }
 

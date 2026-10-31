@@ -72,7 +72,29 @@ class DevServerTest {
         assertEquals(null, report.stopped?.code, report.stopped?.message)
         val receipt = (report.sent.single().result as OutboxResult.Filed).receipt
         assertEquals(1, receipt.note.files)
+        // API 1.9.0: the day lists it with its file, and the file has a small copy and an address.
+        val listed = api.notes(receipt.note.date).items.single { it.id == receipt.note.id }
+        assertTrue(listed.mine)
+        val media = listed.media.single()
+        assertEquals("image", media.kind)
+        // A one-pixel PNG may have no small copy (and the server then answers not_found); a file that has one serves it.
+        if (media.thumb != null) assertTrue(api.fetch(api.noteFile(listed.date, listed.id, media.n, thumb = true).url).isNotEmpty())
+        assertEquals(png.size, api.fetch(api.noteFile(listed.date, listed.id, media.n).url).size)
         api.deleteNote(receipt.note.date, receipt.note.id, key())
+    }
+
+    @Test
+    fun aDayListsThisTokensNotesOldestFirstAndAWideRangeIsRefused() = runTest {
+        val day = api.me().today
+        val first = api.createNote(NoteRequest("DevServerTest first #devtest", writtenAt = java.time.Instant.now().minusSeconds(120).toString()), key())
+        val second = api.createNote(NoteRequest("DevServerTest second #devtest", writtenAt = Timestamp.now()), key())
+        val ids = api.notes(day, mine = true).items.map { it.id }
+        assertTrue(ids.indexOf(first.note.id) in 0 until ids.indexOf(second.note.id))
+        assertTrue(api.notes(day, to = day).items.all { it.mine })
+        assertEquals("range_too_wide", assertFailsWith<ApiException> { api.notes("2026-01-01", "2026-12-31") }.code)
+        assertTrue(api.notes("2026-10-01", "2026-10-01").items.none { it.id == first.note.id })
+        api.deleteNote(first.note.date, first.note.id, key())
+        api.deleteNote(second.note.date, second.note.id, key())
     }
 
     @Test

@@ -51,6 +51,52 @@ class Api(
 
     suspend fun note(date: String, id: String): NoteDetail = send("GET", "v1/notes/$date/$id")
 
+    /**
+     * The notes on those days (account days, `to` defaults to `from`; at most
+     * 31 a request), oldest first. This token's own; every channel's with
+     * `notes:all`, unless `mine`.
+     */
+    suspend fun notes(from: String, to: String = from, after: String? = null, mine: Boolean = false, limit: Int = 50): NoteList {
+        val query = buildList {
+            add("from" to from)
+            if (to != from) add("to" to to)
+            add("limit" to limit.toString())
+            after?.let { add("after" to it) }
+            if (mine) add("mine" to "true")
+        }
+        return send("GET", "v1/notes", query = query)
+    }
+
+    /** A signed address for file `n` of a note, or its small copy. */
+    suspend fun noteFile(date: String, id: String, n: Int, thumb: Boolean = false): FileAddress =
+        send("GET", "v1/notes/$date/$id/media/$n", query = if (thumb) listOf("size" to "thumb") else emptyList())
+
+    /** The bytes at a signed address, with no token sent. A path is the server's own (the dev server's). */
+    suspend fun fetch(address: String, limit: Int = 16 * 1024 * 1024): ByteArray = withContext(Dispatchers.IO) {
+        val full = if (address.startsWith("/")) baseUrl.trimEnd('/') + address else address
+        val connection = try {
+            URI(full).toURL().openConnection() as HttpURLConnection
+        } catch (e: Exception) {
+            throw ApiException(0, "unreadable", Words.say(Phrase.ServerAddressBad))
+        }
+        try {
+            connection.connectTimeout = 30_000
+            connection.readTimeout = 60_000
+            connection.useCaches = false
+            connection.instanceFollowRedirects = false
+            connection.setRequestProperty("User-Agent", userAgent)
+            val status = connection.responseCode
+            if (status !in 200..299) throw ApiException(status, "http_$status", Words.say(Phrase.ServerRefused, status))
+            val bytes = connection.inputStream.use { it.readNBytes(limit + 1) }
+            if (bytes.size > limit) throw ApiException(status, "too_large", Words.say(Phrase.AnswerUnreadable))
+            bytes
+        } catch (e: IOException) {
+            throw ApiException(0, "network", Words.say(Phrase.NetworkDown))
+        } finally {
+            connection.disconnect()
+        }
+    }
+
     suspend fun editNote(date: String, id: String, text: String, revision: String, idempotencyKey: String): NoteRef =
         send<Wrapped>("PUT", "v1/notes/$date/$id", body = encode(EditBody(text.wellFormed(), revision)), idempotencyKey = idempotencyKey).note
 
@@ -66,8 +112,17 @@ class Api(
     suspend fun setPinned(pinned: List<String>, idempotencyKey: String): Tags =
         send("PUT", "v1/tags/pinned", body = encode(PinsBody(pinned)), idempotencyKey = idempotencyKey)
 
-    suspend fun activity(after: String? = null, before: String? = null, kinds: List<String> = emptyList(), limit: Int = 30): ActivityPage {
+    suspend fun activity(
+        after: String? = null,
+        before: String? = null,
+        kinds: List<String> = emptyList(),
+        limit: Int = 30,
+        from: String? = null,
+        to: String? = null,
+    ): ActivityPage {
         val query = buildList {
+            from?.let { add("from" to it) }
+            to?.let { add("to" to it) }
             add("limit" to limit.toString())
             after?.let { add("after" to it) }
             before?.let { add("before" to it) }

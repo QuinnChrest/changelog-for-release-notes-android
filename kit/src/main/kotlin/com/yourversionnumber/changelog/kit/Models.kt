@@ -41,7 +41,10 @@ data class TokenInfo(
     val expiresAt: String? = null,
     /** The token's own record id, 32 hex characters: it grants nothing, and names the rows this token writes (API 1.4.0). */
     val id: String? = null,
-)
+) {
+    /** `notes:all` (API 1.10.0): reads and changes every note in the account, whatever channel wrote it. */
+    val readsAll: Boolean get() = "notes:all" in scopes
+}
 
 /**
  * `POST /v1/notes`. `writtenAt` is the moment the words were typed, so a note
@@ -85,7 +88,41 @@ data class NoteDetail(
     val revision: String,
     val writtenAt: String? = null,
     val files: Int? = null,
+    val media: List<NoteMedia> = emptyList(),
+    val source: String? = null,
+    /** Whether this token wrote it; a note read before API 1.10.0 was always the token's own. */
+    val mine: Boolean = true,
+    val token: String? = null,
+    val version: String? = null,
 )
+
+/** One file on a note, from `media` (API 1.9.0): `kind` is image, audio or file. */
+@Serializable
+data class NoteMedia(
+    val n: Int,
+    val kind: String,
+    val type: String,
+    val name: String? = null,
+    val size: Long = 0,
+    /** The small JPEG, when it has one: ask for it with `size=thumb`. */
+    val thumb: Thumb? = null,
+)
+
+@Serializable
+data class Thumb(val width: Int? = null, val height: Int? = null)
+
+/** `GET /v1/notes?from=&to=`: oldest first, `next` is the `after` of the next page. */
+@Serializable
+data class NoteList(
+    val from: String,
+    val to: String,
+    val items: List<NoteDetail>,
+    val next: String? = null,
+)
+
+/** A signed address for one file, fetched with no token and good for ten minutes. */
+@Serializable
+data class FileAddress(val url: String, val type: String? = null, val expiresIn: Int? = null)
 
 /** `GET /v1/tags`: the pinned list, then the most used in the last 30 days. */
 @Serializable

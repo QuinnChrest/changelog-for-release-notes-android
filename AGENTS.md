@@ -82,8 +82,12 @@ bar, and Commit at the right of the composer's icons.
   `GET /v1/upcoming/reminders`), never worked out on the phone.
 - Act on an error's `code`, show its `message`. On a 401, stop sending,
   keep the queue and ask for a new token.
-- The app reads back only notes this token wrote, and the activity log. It
-  never asks for `notes:read`.
+- The app reads back the notes this token wrote and the activity log. With
+  `notes:all` on the token (the owner ticks it when making the token: "Read
+  and change every note", API 1.10.0) it reads, edits and deletes every note
+  of the account, whatever channel wrote it. The app never makes the choice
+  for the owner, and holds a note's words in memory only, never on disk (no
+  backups). Without `notes:all`, the server refuses the rest (`not_yours`).
 - Sign out sends `DELETE /v1/token` when the owner chooses to revoke.
 - A notification never carries a note's words.
 - Location is foreground only, one `getCurrentLocation` when the owner asks,
@@ -107,7 +111,7 @@ moved past the version the app last read (`api_version` in `/v1/me`):
 3. run `DevServerTest` against the current dev server (`git pull`, restart
    it) before anything else.
 
-It last matched API 1.8.0 (2026-10-30).
+It last matched API 1.11.0 (2026-10-30).
 
 ## Building
 
@@ -269,6 +273,14 @@ Each is off until turned on in Settings, each kind with its own channel.
 After a send, Log says "Filed in 4.5.137." or, when the receipt's
 `unlocked` names badges, "Unlocked: …", in an ink capsule that goes by
 itself.
+
+Log shows the notes on a day (`GET /v1/notes?from=&to=`, one day a request,
+oldest first, paged by `next`), with a way a day back or on (`AppModel`'s
+`stepDay`, `loadDay`; `ui/DayNotes.kt`). A note's files come from its `media`:
+a photo shows its small copy when it has one (`size=thumb`, kept in a small
+cache for the session), a recording plays and anything else opens, each by a
+signed address asked for as it's tapped and never kept (ten minutes, fetched
+with no token). A note says where it came from (`source`, `mine`).
 
 Pinned tags are set in Settings (`PUT /v1/tags/pinned`, through the
 Outbox) and come first in the tag row.

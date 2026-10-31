@@ -35,7 +35,9 @@ import com.yourversionnumber.changelog.kit.isOn
 import com.yourversionnumber.changelog.kit.upcomingSentence
 import com.yourversionnumber.changelog.ui.ThemeMode
 import java.io.File
+import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -45,6 +47,8 @@ data class NoteTarget(val date: String, val id: String, val version: String?)
 val Sent.target get() = NoteTarget(note.date, note.id, note.version)
 
 val ActivityItem.target get() = NoteTarget(day!!, note!!, version)
+
+val NoteDetail.target get() = NoteTarget(date, id, version)
 
 /** The screens' state, over AppGraph. */
 class AppModel(application: Application) : AndroidViewModel(application) {
@@ -72,6 +76,81 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         private set
 
     val hasActivity: Boolean get() = me?.token?.scopes?.contains("activity") == true
+
+    /** `notes:all`: every note of the account is read, edited and deleted here, not only this token's own. */
+    val readsAll: Boolean get() = me?.token?.readsAll == true
+
+    /** The day Log shows; null is today. */
+    var viewing by mutableStateOf<String?>(null)
+        private set
+
+    /** The day Log shows, as the account's own day. */
+    val day: String? get() = viewing ?: me?.today
+    val isToday: Boolean get() = viewing == null || viewing == me?.today
+
+    /** The notes on that day, oldest first; null until the first read, or when it couldn't be made (offline). */
+    var dayNotes by mutableStateOf<List<NoteDetail>?>(null)
+        private set
+    private var dayNext by mutableStateOf<String?>(null)
+    val moreOnDay: Boolean get() = dayNext != null
+    var dayLoading by mutableStateOf(false)
+        private set
+    private var dayJob: Job? = null
+
+    /** Whether a note on Log may be edited or deleted here. */
+    fun canChange(note: NoteDetail) = note.mine || readsAll
+
+    /** One day back (-1) or on (+1), never past today. */
+    fun stepDay(by: Int) {
+        val today = me?.today ?: return
+        val to = LocalDate.parse(day ?: return).plusDays(by.toLong())
+        viewing = if (to >= LocalDate.parse(today)) null else to.toString()
+        loadDay()
+    }
+
+    fun showToday() {
+        viewing = null
+        loadDay()
+    }
+
+    /** Reads the day Log shows: this token's notes, or every channel's with `notes:all`. `more` takes the next page. */
+    fun loadDay(more: Boolean = false) {
+        val api = graph.api() ?: return
+        val shown = day ?: return
+        if (more && dayNext == null) return
+        dayJob?.cancel()
+        dayJob = viewModelScope.launch {
+            dayLoading = true
+            try {
+                val page = api.notes(shown, after = if (more) dayNext else null)
+                dayNotes = if (more) dayNotes.orEmpty() + page.items else page.items
+                dayNext = page.next
+            } catch (e: ApiException) {
+                if (!more) dayNotes = null
+                handle(e)
+            } finally {
+                dayLoading = false
+            }
+        }
+    }
+
+    /** A signed address for a file on a note, or its small copy. Null when it can't be had. */
+    suspend fun fileAddress(note: NoteDetail, n: Int, thumb: Boolean): String? = try {
+        graph.api()?.noteFile(note.date, note.id, n, thumb)?.url
+    } catch (e: ApiException) {
+        null
+    }
+
+    /** The bytes of a small copy, kept for the session. */
+    suspend fun thumbnail(note: NoteDetail, n: Int): ByteArray? = try {
+        val api = graph.api()
+        fileAddress(note, n, thumb = true)?.let { api?.fetch(it, limit = 2 * 1024 * 1024) }
+    } catch (e: ApiException) {
+        null
+    }
+
+    /** Where a file is read from outside the app, or the server's base for a path. */
+    fun absolute(address: String): String = if (address.startsWith("/")) graph.server.trimEnd('/') + address else address
 
     val tagRow: List<String> get() = TagRow.tags(tags)
     val canCommit: Boolean get() = draft.isNotBlank() || draftFiles.isNotEmpty()
@@ -360,6 +439,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         queue(OutboxOperation.Delete(target.date, target.id))
         graph.forget(target.id)
         today = today.filterNot { it.note == target.id }
+        dayNotes = dayNotes?.filterNot { it.id == target.id }
     }
 
     private fun queue(operation: OutboxOperation) = viewModelScope.launch {
@@ -380,7 +460,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         if (!hasActivity) return
         viewModelScope.launch {
             try {
-                today = api.activity(limit = 100).items.filter { it.isOn(day) }
+                today = api.activity(limit = 100, from = day, to = day).items.filter { it.isOn(day) }
             } catch (e: ApiException) {
                 handle(e)
             }
@@ -413,6 +493,8 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         if (revoke) runCatching { graph.api()?.revokeToken() }
         graph.signOut()
         me = null
+        viewing = null
+        dayNotes = null
         tags = null
         sticky = null
         today = emptyList()

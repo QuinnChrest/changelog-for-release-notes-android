@@ -73,6 +73,7 @@ fun LogScreen(model: AppModel) {
     var deleting by remember { mutableStateOf<NoteTarget?>(null) }
     var editing by remember { mutableStateOf<NoteTarget?>(null) }
     val noteBox = remember { FocusRequester() }
+    val player = rememberFilePlayer()
     LaunchedEffect(model.writeNow) {
         if (model.writeNow) {
             runCatching { noteBox.requestFocus() }
@@ -125,34 +126,67 @@ fun LogScreen(model: AppModel) {
                     WaitingRow(item, onDiscard = { model.discard(item.id) }, onFix = { fixing = item })
                 }
             }
-            // With the activity log, Today shows every channel; without it, what this phone sent.
-            item { Heading(if (model.hasActivity) say(R.string.today) else say(R.string.sent_from_this_phone), Modifier.padding(top = 16.dp)) }
-            val empty = if (model.hasActivity) model.today.isEmpty() else sent.isEmpty()
-            if (empty) {
+            val notes = model.dayNotes
+            item { DayHeading(model) }
+            if (notes != null) {
+                // The notes on the day, with their words and files: this token's own, or every channel's with notes:all.
+                if (notes.isEmpty()) {
+                    item {
+                        Text(
+                            if (model.isToday) model.me?.let { say(R.string.no_changes_yet_in, it.version) } ?: say(R.string.nothing_yet)
+                            else say(R.string.nothing_filed_this_day),
+                            color = paper.ink3,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+                items(notes, key = { it.id }) { note ->
+                    DayNote(model, note, player, onEdit = { editing = note.target }, onDelete = { deleting = note.target })
+                }
+                if (model.moreOnDay) {
+                    item { QuietButton(say(R.string.older), { model.loadDay(more = true) }, enabled = !model.dayLoading) }
+                }
+                // Another channel's notes show here only by their rows, without words, unless this token reads every note.
+                if (model.isToday && model.hasActivity && !model.readsAll) {
+                    items(model.today.filter { !model.isMine(it) }, key = { it.id }) { ActivityRow(it) }
+                }
+            } else if (!model.isToday) {
                 item {
                     Text(
-                        model.me?.let { say(R.string.no_changes_yet_in, it.version) } ?: say(R.string.nothing_yet),
+                        if (model.dayLoading) say(R.string.nothing_yet) else say(R.string.cant_reach_release_notes),
                         color = paper.ink3,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
-            }
-            if (model.hasActivity) {
-                items(model.today, key = { it.id }) { item ->
-                    val mine = model.isMine(item)
-                    ActivityRow(
-                        item,
-                        actions = if (!mine) null else {
-                            {
-                                QuietButton(say(R.string.edit), { editing = item.target })
-                                QuietButton(say(R.string.delete), { deleting = item.target })
-                            }
-                        },
-                    )
-                }
             } else {
-                items(sent, key = { it.note.id }) { note ->
-                    SentRow(note, onEdit = { editing = note.target }, onDelete = { deleting = note.target })
+                // Not read yet, or offline: what the activity log or this phone has for today.
+                val empty = if (model.hasActivity) model.today.isEmpty() else sent.isEmpty()
+                if (empty) {
+                    item {
+                        Text(
+                            model.me?.let { say(R.string.no_changes_yet_in, it.version) } ?: say(R.string.nothing_yet),
+                            color = paper.ink3,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+                if (model.hasActivity) {
+                    items(model.today, key = { it.id }) { item ->
+                        val mine = model.isMine(item)
+                        ActivityRow(
+                            item,
+                            actions = if (!mine) null else {
+                                {
+                                    QuietButton(say(R.string.edit), { editing = item.target })
+                                    QuietButton(say(R.string.delete), { deleting = item.target })
+                                }
+                            },
+                        )
+                    }
+                } else {
+                    items(sent, key = { it.note.id }) { note ->
+                        SentRow(note, onEdit = { editing = note.target }, onDelete = { deleting = note.target })
+                    }
                 }
             }
         }
@@ -163,8 +197,9 @@ fun LogScreen(model: AppModel) {
 
     // A send that delivered something changes what the server has for today.
     val sends by model.graph.sends.collectAsStateWithLifecycle()
-    LaunchedEffect(sends) {
+    LaunchedEffect(sends, model.me?.today) {
         model.loadToday()
+        model.loadDay()
         model.syncTags()
     }
 

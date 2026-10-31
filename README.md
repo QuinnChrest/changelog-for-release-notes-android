@@ -58,12 +58,14 @@ APK won't install.
 
 ### 2. Install it
 
-- **On the phone:** open the APK from Files or Downloads. Android asks
-  whether to let that app (your browser or Files) install unknown apps: allow
-  it for this once, then tap Install. You can turn the permission off again
-  afterwards in Settings → Apps → Special app access → Install unknown apps.
-- **From a computer:** turn on Developer options and USB debugging on the
-  phone, plug it in, and run `adb install -r app-debug.apk`.
+Open the APK from Files or Downloads on the phone. Android asks whether to
+let that app (your browser or Files) install unknown apps: allow it for this
+once, then tap Install. You can turn the permission off again afterwards in
+Settings → Apps → Special app access → Install unknown apps. No computer, USB
+cable or Developer options needed.
+
+(Optional, for developers: with USB debugging on, `adb install -r
+app-debug.apk` does the same from a computer.)
 
 If Play Protect says it hasn't seen the app before, choose "Install anyway".
 That is the usual message for any app that isn't from Play.

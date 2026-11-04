@@ -124,6 +124,10 @@ JDK 17 or later, Android SDK 37.
 ./gradlew :app:installDebug    # onto a running emulator or phone
 ```
 
+A debug build starts on the dev server. One made to be used, not developed
+(`-Pchangelog.production`, as the README says for anyone building it themselves)
+starts on Release Notes; release builds only ever talk to Release Notes.
+
 Versions count from Changelog for Android's first day, 2026-10-29, by Your
 Version Number's arithmetic (decades.years.days, the day in Chicago), like
 Release Notes' and the iPhone app's own. `app/build.gradle.kts` stamps it as

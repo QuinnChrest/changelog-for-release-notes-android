@@ -59,15 +59,15 @@ No computer or USB cable is needed.
 With JDK 17+ and the Android SDK 37, in a clone of this repo:
 
 ```sh
-./gradlew :app:assembleDebug
+./gradlew :app:assembleDebug -Pchangelog.production
 ```
 
 Copy `app/build/outputs/apk/debug/app-debug.apk` to the phone and install it
 as in steps 2 and 3 above, or with USB debugging on, run
 `adb install -r app/build/outputs/apk/debug/app-debug.apk`. The debug build
-works the same as a release, but its sign-in screen also has a "Dev server"
-choice, which you can ignore. To make a release build signed with your own
-key instead, see [Release builds](AGENTS.md#release-builds); an unsigned
+works the same as a release and starts on Release Notes, but its sign-in screen
+also has a "Dev server" choice, which you can ignore. To make a release build
+signed with your own key instead, see [Release builds](AGENTS.md#release-builds); an unsigned
 release APK won't install.
 
 ### Sign in

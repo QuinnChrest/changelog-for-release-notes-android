@@ -112,8 +112,13 @@ class AppGraph(private val context: Context) {
     val problem: StateFlow<String?> = _problem.asStateFlow()
 
     var server: String
-        // Debug builds start on the dev server: development never touches real notes.
-        get() = if (BuildConfig.DEBUG) prefs.getString("server", BuildConfig.DEV_SERVER)!! else Api.PRODUCTION
+        // Debug builds start on the dev server: development never touches real notes. A debug build
+        // made with -Pchangelog.production, to be used, starts on Release Notes.
+        get() = if (BuildConfig.DEBUG) {
+            prefs.getString("server", if (BuildConfig.START_ON_PRODUCTION) Api.PRODUCTION else BuildConfig.DEV_SERVER)!!
+        } else {
+            Api.PRODUCTION
+        }
         set(value) = prefs.edit().putString("server", value).apply()
 
     /** Upcoming reminders as this phone's own notifications. Off until the owner turns them on. */

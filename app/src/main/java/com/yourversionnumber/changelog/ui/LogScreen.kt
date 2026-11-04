@@ -88,8 +88,8 @@ fun LogScreen(model: AppModel) {
             contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 32.dp + LocalBarSpace.current),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            item { VersionHeader(model) }
-            item {
+            item(key = "version") { VersionHeader(model) }
+            item(key = "field") {
                 // A tag tapped in the row, a share or a commit changes the draft from
                 // outside the box: the cursor goes to the end, after what was added.
                 var field by remember { mutableStateOf(TextFieldValue(model.draft, TextRange(model.draft.length))) }
@@ -107,12 +107,12 @@ fun LogScreen(model: AppModel) {
                     minLines = 3,
                 )
             }
-            if (model.draftFiles.isNotEmpty()) item { AttachmentStrip(model) }
-            item { TagRowView(model) }
-            item { ComposerTools(model) }
-            if (model.placeLabel != null) item { PlaceLine(model) }
+            if (model.draftFiles.isNotEmpty()) item(key = "attachments") { AttachmentStrip(model) }
+            item(key = "tags") { TagRowView(model) }
+            item(key = "tools") { ComposerTools(model) }
+            if (model.placeLabel != null) item(key = "place") { PlaceLine(model) }
             problem?.let { message ->
-                item {
+                item(key = "problem") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(message, Modifier.weight(1f), color = paper.orangeInk, style = MaterialTheme.typography.bodyMedium)
                         QuietButton(say(R.string.ok), model::clearProblem)
@@ -120,17 +120,17 @@ fun LogScreen(model: AppModel) {
                 }
             }
             if (waiting.isNotEmpty()) {
-                item { Heading(say(R.string.waiting_to_send), Modifier.padding(top = 16.dp)) }
+                item(key = "waiting") { Heading(say(R.string.waiting_to_send), Modifier.padding(top = 16.dp)) }
                 items(waiting, key = { it.id }) { item ->
                     WaitingRow(item, onDiscard = { model.discard(item.id) }, onFix = { fixing = item })
                 }
             }
             val notes = model.dayNotes
-            item { DayHeading(model) }
+            item(key = "day") { DayHeading(model) }
             if (notes != null) {
                 // The notes on the day, with their words and files: this token's own, or every channel's with notes:all.
                 if (notes.isEmpty()) {
-                    item {
+                    item(key = "empty") {
                         Text(
                             if (model.isToday) model.me?.let { say(R.string.no_changes_yet_in, it.version) } ?: say(R.string.nothing_yet)
                             else say(R.string.nothing_filed_this_day),
@@ -143,14 +143,14 @@ fun LogScreen(model: AppModel) {
                     DayNote(model, note, player, onOpen = { opened = note.target })
                 }
                 if (model.moreOnDay) {
-                    item { QuietButton(say(R.string.older), { model.loadDay(more = true) }, enabled = !model.dayLoading) }
+                    item(key = "more") { QuietButton(say(R.string.older), { model.loadDay(more = true) }, enabled = !model.dayLoading) }
                 }
                 // Another channel's notes show here only by their rows, without words, unless this token reads every note.
                 if (model.isToday && model.hasActivity && !model.readsAll) {
                     items(model.today.filter { !model.isMine(it) }, key = { it.id }) { ActivityRow(it) }
                 }
             } else if (!model.isToday) {
-                item {
+                item(key = "empty") {
                     Text(
                         if (model.dayLoading) say(R.string.nothing_yet) else say(R.string.cant_reach_release_notes),
                         color = paper.ink3,
@@ -161,7 +161,7 @@ fun LogScreen(model: AppModel) {
                 // Not read yet, or offline: what the activity log or this phone has for today.
                 val empty = if (model.hasActivity) model.today.isEmpty() else sent.isEmpty()
                 if (empty) {
-                    item {
+                    item(key = "empty") {
                         Text(
                             model.me?.let { say(R.string.no_changes_yet_in, it.version) } ?: say(R.string.nothing_yet),
                             color = paper.ink3,

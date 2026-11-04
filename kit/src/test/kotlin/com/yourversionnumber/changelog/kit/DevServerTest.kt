@@ -90,7 +90,8 @@ class DevServerTest {
         val second = api.createNote(NoteRequest("DevServerTest second #devtest", writtenAt = Timestamp.now()), key())
         val ids = api.notes(day, mine = true).items.map { it.id }
         assertTrue(ids.indexOf(first.note.id) in 0 until ids.indexOf(second.note.id))
-        assertTrue(api.notes(day, to = day).items.all { it.mine })
+        // Without notes:all a day lists only this token's notes; with it, every channel's.
+        if (!api.me().token.readsAll) assertTrue(api.notes(day, to = day).items.all { it.mine })
         assertEquals("range_too_wide", assertFailsWith<ApiException> { api.notes("2026-01-01", "2026-12-31") }.code)
         assertTrue(api.notes("2026-10-01", "2026-10-01").items.none { it.id == first.note.id })
         api.deleteNote(first.note.date, first.note.id, key())
@@ -140,5 +141,23 @@ class DevServerTest {
         val pinned = api.setPinned(before + "devtest", key()).pinned
         assertTrue("devtest" in pinned)
         assertEquals(before, api.setPinned(before, key()).pinned)
+    }
+
+    @Test
+    fun aFileIsAddedToANoteAlreadyFiled() = runTest {
+        val folder = Files.createTempDirectory("dev server attach").toFile()
+        val outbox = Outbox(File(folder, "outbox.json"))
+        val first = api.createNote(NoteRequest("DevServerTest note for a file #devtest", writtenAt = Timestamp.now()), key())
+        val png = java.util.Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+        )
+        val file = QueuedFile(type = "image/png", name = "Later.png", size = png.size.toLong())
+        outbox.keep(png.inputStream(), file)
+        outbox.enqueue(OutboxOperation.Attach(first.note.date, first.note.id, listOf(file)))
+        val report = outbox.flush(prepareAttach = { api.prepare(it, outbox) }) { api.perform(it) }
+        assertEquals(null, report.stopped?.code, report.stopped?.message)
+        assertTrue(report.sent.single().result is OutboxResult.Attached)
+        assertEquals("image", api.note(first.note.date, first.note.id).media.single().kind)
+        api.deleteNote(first.note.date, first.note.id, key())
     }
 }

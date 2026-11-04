@@ -12,8 +12,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -69,32 +67,16 @@ import java.io.File
 import kotlinx.coroutines.delay
 
 /** Photos, the camera and a voice memo (for a token that can add files), and Here, as icons, with Commit at the right. */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ComposerTools(model: AppModel) {
     val context = LocalContext.current
-    var recording by remember { mutableStateOf(false) }
-    var cameraFile by rememberSaveable { mutableStateOf<String?>(null) }
-    val room = model.roomForFiles
-
-    val photos = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickMultipleVisualMedia(maxItems = room.coerceIn(2, 20)),
-    ) { uris -> if (uris.isNotEmpty()) model.addPhotos(uris) }
-    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { taken ->
-        val file = cameraFile?.let(::File)
-        cameraFile = null
-        if (taken && file != null && file.length() > 0) model.addCameraPhoto(file) else file?.delete()
-    }
     val whereAbouts = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
         if (granted.values.any { it }) model.locate()
         else model.graph.report(say(R.string.changelog_cant_add_where_you))
     }
-    val microphone = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) recording = true else model.graph.report(say(R.string.changelog_cant_record_without_the))
-    }
 
     Row(verticalAlignment = Alignment.CenterVertically) {
-        if (model.canAddFiles) FileTools(model, room, context, photos, camera, { cameraFile = it }, microphone, { recording = true })
+        if (model.canAddFiles) FileTools(model)
         if (model.locating) {
             Box(Modifier.size(48.dp).semantics { contentDescription = say(R.string.finding) }, contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(Modifier.size(22.dp), color = paper.orange, strokeWidth = 2.dp)
@@ -112,22 +94,31 @@ fun ComposerTools(model: AppModel) {
         Spacer(Modifier.weight(1f))
         GoButton(say(R.string.commit), model::commit, enabled = model.canCommit)
     }
-
-    if (recording) RecorderDialog(model, onDone = { recording = false })
 }
 
-/** Photos, the camera and a voice memo, for a token that can add files. */
+/**
+ * Photos, the camera and a voice memo, as icons in the row they're placed in.
+ * With `edit`, what's picked goes to the note being edited, not the draft.
+ */
 @Composable
-private fun FileTools(
-    model: AppModel,
-    room: Int,
-    context: android.content.Context,
-    photos: androidx.activity.result.ActivityResultLauncher<PickVisualMediaRequest>,
-    camera: androidx.activity.result.ActivityResultLauncher<android.net.Uri>,
-    setCameraFile: (String) -> Unit,
-    microphone: androidx.activity.result.ActivityResultLauncher<String>,
-    record: () -> Unit,
-) {
+fun FileTools(model: AppModel, edit: Boolean = false) {
+    val context = LocalContext.current
+    var recording by remember { mutableStateOf(false) }
+    var cameraFile by rememberSaveable { mutableStateOf<String?>(null) }
+    val room = model.roomForFiles(edit)
+
+    val photos = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(maxItems = room.coerceIn(2, 20)),
+    ) { uris -> if (uris.isNotEmpty()) model.addPhotos(uris, edit) }
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { taken ->
+        val file = cameraFile?.let(::File)
+        cameraFile = null
+        if (taken && file != null && file.length() > 0) model.addCameraPhoto(file, edit) else file?.delete()
+    }
+    val microphone = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) recording = true else model.graph.report(say(R.string.changelog_cant_record_without_the))
+    }
+
     ToolIcon(
         R.drawable.ic_photos,
         say(R.string.photos),
@@ -139,7 +130,7 @@ private fun FileTools(
         say(R.string.camera),
         {
             val file = model.scratch("jpg")
-            setCameraFile(file.path)
+            cameraFile = file.path
             camera.launch(FileProvider.getUriForFile(context, "${context.packageName}.files", file))
         },
         enabled = room > 0,
@@ -149,13 +140,15 @@ private fun FileTools(
         say(R.string.record_a_voice_memo),
         {
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                record()
+                recording = true
             } else {
                 microphone.launch(Manifest.permission.RECORD_AUDIO)
             }
         },
         enabled = room > 0,
     )
+
+    if (recording) RecorderDialog(model, edit, onDone = { recording = false })
 }
 
 /** One tool of the composer: an outline icon in blue, a 48dp target, named for TalkBack. */
@@ -180,14 +173,14 @@ private fun ToolIcon(@DrawableRes icon: Int, description: String, onClick: () ->
 
 /** Records while open: Stop puts the memo on the note, Cancel throws it away. */
 @Composable
-private fun RecorderDialog(model: AppModel, onDone: () -> Unit) {
+private fun RecorderDialog(model: AppModel, edit: Boolean, onDone: () -> Unit) {
     val context = LocalContext.current
     val recorder = remember { Recorder(context, model.scratch("m4a")) }
     var failed by remember { mutableStateOf(false) }
     var elapsed by remember { mutableLongStateOf(0L) }
 
     fun stop() {
-        recorder.stop()?.let(model::addRecording) ?: model.graph.report(say(R.string.that_recording_didnt_work_try))
+        recorder.stop()?.let { model.addRecording(it, edit) } ?: model.graph.report(say(R.string.that_recording_didnt_work_try))
         onDone()
     }
 
@@ -225,16 +218,16 @@ private fun RecorderDialog(model: AppModel, onDone: () -> Unit) {
     )
 }
 
-/** The draft's files, each with a way to take it off. */
+/** The draft's files (or those picked for a note being edited), each with a way to take it off. */
 @Composable
-fun AttachmentStrip(model: AppModel) {
+fun AttachmentStrip(model: AppModel, edit: Boolean = false) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(model.draftFiles, key = { it.id }) { file -> Attachment(file, model) }
+        items(if (edit) model.editFiles else model.draftFiles, key = { it.id }) { file -> Attachment(file, model, edit) }
     }
 }
 
 @Composable
-private fun Attachment(file: QueuedFile, model: AppModel) {
+private fun Attachment(file: QueuedFile, model: AppModel, edit: Boolean) {
     val thumbnail = model.thumbnails[file.id]
     Box(Modifier.size(72.dp).semantics(mergeDescendants = true) { contentDescription = file.name }) {
         if (thumbnail != null) {
@@ -262,7 +255,7 @@ private fun Attachment(file: QueuedFile, model: AppModel) {
             contentAlignment = Alignment.Center,
         ) {
             TextButton(
-                onClick = { model.remove(file) },
+                onClick = { model.remove(file, edit) },
                 modifier = Modifier.size(28.dp).semantics { contentDescription = say(R.string.take_off, file.name) },
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
             ) { Text("✕", color = Color.White) }

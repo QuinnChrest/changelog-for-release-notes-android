@@ -4,7 +4,7 @@ What Changelog for Android does, what's left, and what's built but not yet
 checked. The iPhone app (`jthingelstad/changelog-ios`) is the reference;
 `AGENTS.md` says how each built piece works.
 
-**At a glance:** 48 built · 3 to do · 2 waiting on someone else · 6 to check
+**At a glance:** 50 built · 4 to do · 2 waiting on someone else · 6 to check
 
 Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 built, not yet checked
 
@@ -15,6 +15,7 @@ Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 b
 | 🔲 | Sign in with Release Notes (OAuth) instead of pasting a token | The server has it since API 1.3.0: authorization code with PKCE for the resource `/v1`, a private-use callback (`com.yourversionnumber.changelog:/oauth`), the owner names the token and ticks its scopes, no refresh token; sign out at `/oauth/revoke` or `DELETE /v1/token`. Needs the registration, a browser hop (Custom Tabs, which is AndroidX) and the token exchange. Pasting a token stays for the dev server. |
 | 🔲 | Notes for another day | The API takes a `date` back to the birthday and the queue already carries one; Log has no day picker, so every note files to today. |
 | 🔲 | "Where": search for a place by name | `GET /v1/places?q=` is the web's city search; Log only has Here. |
+| 🔲 | Take a file off a note | `/v1` can add files to a note but not remove one, so the editor shows a note's files and leaves them. Needs an API change first (an issue on yvn-release-notes). |
 
 ## Waiting on someone else
 
@@ -54,8 +55,9 @@ These are written and built; something about them couldn't be seen on the emulat
 | ✅ | A sticky tag on every note (touch and hold) |
 | ✅ | Commit saves to the phone first, then sends: works offline, never sends twice |
 | ✅ | "Filed in 4.5.137." or "Unlocked: …" after a send |
-| ✅ | Waiting to send, with Fix and Discard for a refused note |
-| ✅ | Edit and delete notes this phone sent |
+| ✅ | Waiting to send, with Fix and Discard for a refused note; a write that sends at once never shows there, one tried, refused or kept over four seconds does |
+| ✅ | Tap a note on Log to open it full screen (`NoteViewer`): all its words and files, where it came from, and Edit and Delete where this token may change it; Delete asks first. Rows on Log carry no buttons, and a source line too long for the row moves its version down whole |
+| ✅ | Edit as the box on Log is: words, the tag row, and Photos, Camera and Record (files added to the note after the edit, `OutboxOperation.Attach`, `POST /v1/notes/{date}/{id}/media`); no Here, a note keeps its place |
 | ✅ | Log shows a day's notes with their words and files (photos by their small copy, voice memos to play, PDFs to open), oldest first, and steps a day back or on (`GET /v1/notes?from=&to=`, API 1.9.0); offline, today falls back to the activity log or what this phone sent |
 | ✅ | A photo on a note opens in the app, full screen, to pinch or double-tap to zoom and drag (`PhotoViewer`); a photo the phone can't read offers to open it outside |
 | ✅ | Every note, from any channel, with a token that has `notes:all` (API 1.10.0, 1.11.0): each says where it came from, and Edit and Delete work on any of them; without it, only this token's own, and other channels show as activity rows without words |
@@ -82,7 +84,7 @@ These are written and built; something about them couldn't be seen on the emulat
 ### Activity and notifications
 | | Feature |
 |---|---|
-| ✅ | Activity screen: filters, "Older" paging, "Since you last looked" |
+| ✅ | Activity screen: filters, "Older" paging, pull down to refresh, "Since you last looked" |
 | ✅ | Daily prompt: "You're 4.5.137 today. What changed?" |
 | ✅ | Notices for notes from elsewhere, problems and badges; never this phone's own notes |
 

@@ -4,6 +4,7 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -362,34 +363,45 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     private val media = MediaReader(application)
 
     val canAddFiles: Boolean get() = me?.token?.scopes?.contains("media:write") == true
-    val roomForFiles: Int get() = (MediaType.MAX_FILES - draftFiles.size).coerceAtLeast(0)
 
-    fun addPhotos(uris: List<Uri>) = viewModelScope.launch {
-        for (uri in uris) add { media.photo(uri) }
+    /** Files picked for a note being edited, kept apart from the draft's. */
+    val editFiles = mutableStateListOf<QueuedFile>()
+
+    /** Files the note being edited holds already, so it stays within its twenty. */
+    var editHeld by mutableIntStateOf(0)
+
+    private fun slot(edit: Boolean) = if (edit) editFiles else draftFiles
+
+    fun roomForFiles(edit: Boolean = false): Int =
+        (MediaType.MAX_FILES - slot(edit).size - if (edit) editHeld else 0).coerceAtLeast(0)
+
+    fun addPhotos(uris: List<Uri>, edit: Boolean = false) = viewModelScope.launch {
+        for (uri in uris) add(edit) { media.photo(uri) }
     }
 
     /** The camera's photo, written into our own scratch file, which goes once it's read. */
-    fun addCameraPhoto(file: File) = viewModelScope.launch {
+    fun addCameraPhoto(file: File, edit: Boolean = false) = viewModelScope.launch {
         try {
-            add { media.photo(Uri.fromFile(file)) }
+            add(edit) { media.photo(Uri.fromFile(file)) }
         } finally {
             file.delete()
         }
     }
 
-    fun addRecording(file: File) = viewModelScope.launch { add { Picked(file, "audio/mp4", null) } }
+    fun addRecording(file: File, edit: Boolean = false) = viewModelScope.launch { add(edit) { Picked(file, "audio/mp4", null) } }
 
     /** Files shared from another app, each by what its bytes are. */
     fun addShared(uris: List<Uri>, declared: String?) = viewModelScope.launch {
-        for (uri in uris) add { media.shared(uri, getApplication<Application>().contentResolver.getType(uri) ?: declared) }
+        for (uri in uris) add(false) { media.shared(uri, getApplication<Application>().contentResolver.getType(uri) ?: declared) }
     }
 
     /** A file for the camera or the recorder to write. */
     fun scratch(extension: String): File = media.newScratch(extension)
 
-    private suspend fun add(read: () -> Picked) {
+    private suspend fun add(edit: Boolean, read: () -> Picked) {
+        val into = slot(edit)
         if (me != null && !canAddFiles) return graph.report(say(R.string.this_token_cant_add_files))
-        if (roomForFiles == 0) return graph.report(say(R.string.a_note_holds_up_to, MediaType.MAX_FILES))
+        if (roomForFiles(edit) == 0) return graph.report(say(R.string.a_note_holds_up_to, MediaType.MAX_FILES))
         val picked = try {
             withContext(Dispatchers.IO) { read() }
         } catch (e: NotKept) {
@@ -397,8 +409,8 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         }
         try {
             val name = picked.name ?: when {
-                picked.type.startsWith("image/") -> "Photo ${draftFiles.count { it.isPhoto } + 1}.${MediaType.fileExtension(picked.type)}"
-                picked.type.startsWith("audio/") -> draftFiles.count { it.isRecording }.let { if (it == 0) "Voice memo.m4a" else "Voice memo ${it + 1}.m4a" }
+                picked.type.startsWith("image/") -> "Photo ${into.count { it.isPhoto } + 1}.${MediaType.fileExtension(picked.type)}"
+                picked.type.startsWith("audio/") -> into.count { it.isRecording }.let { if (it == 0) "Voice memo.m4a" else "Voice memo ${it + 1}.m4a" }
                 else -> "File.${MediaType.fileExtension(picked.type)}"
             }
             val queued = QueuedFile(type = picked.type, name = name, size = picked.file.length())
@@ -406,8 +418,8 @@ class AppModel(application: Application) : AndroidViewModel(application) {
                 graph.outbox.keep(picked.file.inputStream(), queued)
                 if (queued.isPhoto) graph.outbox.fileFor(queued)?.let(media::thumbnail)?.let { thumbnails[queued.id] = it }
             }
-            draftFiles += queued
-            draftStarted()
+            into += queued
+            if (!edit) draftStarted()
         } catch (e: OutboxNotKept) {
             graph.report(e.message)
         } catch (e: java.io.IOException) {
@@ -417,8 +429,8 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun remove(file: QueuedFile) {
-        draftFiles.remove(file)
+    fun remove(file: QueuedFile, edit: Boolean = false) {
+        slot(edit).remove(file)
         thumbnails.remove(file.id)
         graph.outbox.removeFiles(listOf(file))
     }
@@ -440,8 +452,25 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         null
     }
 
-    /** Queues an edit from the revision read. A refusal (changed since) shows under Waiting to send. */
-    fun save(note: NoteDetail, text: String) = queue(OutboxOperation.Edit(note.date, note.id, text, note.revision))
+    /**
+     * Queues an edit from the revision read, then the files that came with it.
+     * The day shows the new words at once; a refusal (changed since) shows
+     * under Waiting to send.
+     */
+    fun saveEdit(note: NoteDetail, text: String, files: List<QueuedFile>) {
+        val changed = text != note.text
+        if (changed) dayNotes = dayNotes?.map { if (it.id == note.id) it.copy(text = text) else it }
+        editFiles.clear()
+        viewModelScope.launch {
+            try {
+                if (changed) graph.outbox.enqueue(OutboxOperation.Edit(note.date, note.id, text, note.revision))
+                if (files.isNotEmpty()) graph.outbox.enqueue(OutboxOperation.Attach(note.date, note.id, files))
+                graph.send()
+            } catch (e: OutboxNotKept) {
+                graph.report(e.message)
+            }
+        }
+    }
 
     fun delete(target: NoteTarget) {
         queue(OutboxOperation.Delete(target.date, target.id))

@@ -15,7 +15,10 @@ class SendWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     override suspend fun doWork(): Result {
         val graph = applicationContext.graph
         val api = graph.api() ?: return Result.success()
-        val report = graph.outbox.flush(prepare = { api.prepare(it, graph.outbox) }) { api.perform(it) }
+        val report = graph.outbox.flush(
+            prepare = { api.prepare(it, graph.outbox) },
+            prepareAttach = { api.prepare(it, graph.outbox) },
+        ) { api.perform(it) }
         graph.record(report)
         val stopped = report.stopped ?: return Result.success()
         return when {

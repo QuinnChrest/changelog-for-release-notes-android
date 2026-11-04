@@ -111,7 +111,8 @@ moved past the version the app last read (`api_version` in `/v1/me`):
 3. run `DevServerTest` against the current dev server (`git pull`, restart
    it) before anything else.
 
-It last matched API 1.11.0 (2026-10-30).
+It last matched API 1.13.0 (2026-11-01). 1.12.0 and 1.13.0 only add fields to
+`GET /v1/me` (`supporting_member`, `lived`), which the app doesn't read.
 
 ## Building
 
@@ -122,6 +123,10 @@ JDK 17 or later, Android SDK 37.
 ./gradlew :app:assembleDebug   # a debug APK
 ./gradlew :app:installDebug    # onto a running emulator or phone
 ```
+
+A debug build starts on the dev server. One made to be used, not developed
+(`-Pchangelog.production`, as the README says for anyone building it themselves)
+starts on Release Notes; release builds only ever talk to Release Notes.
 
 Versions count from Changelog for Android's first day, 2026-10-29, by Your
 Version Number's arithmetic (decades.years.days, the day in Chicago), like
@@ -227,8 +232,11 @@ dev server is a path: put the server's address in front of it.
 ## What's next
 
 Done: sign-in by token, Log (version, tag row with a sticky tag, Commit),
-the Outbox and its sender, Waiting to send (fix, discard), editing and
-deleting a note this token wrote, Today on Log from every channel (with
+the Outbox and its sender, Waiting to send (fix, discard), opening a note
+full screen to edit or delete it (`ui/NoteViewer.kt`: Edit is the composer's
+words, tag row, Photos, Camera and Record, with files added after the edit
+as an `OutboxOperation.Attach`; a note's own files can't come off, the API has
+no way; Delete asks first), Today on Log from every channel (with
 the `activity` scope; otherwise what this phone sent), the Activity screen
 (filters, "Older" paging, "Since you last looked"), Settings and
 sign-out. Activity rows read as in the iPhone app (`kit`'s

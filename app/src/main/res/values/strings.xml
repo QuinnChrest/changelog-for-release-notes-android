@@ -102,6 +102,9 @@
     <string name="via_name">via %1$s</string>
     <string name="play">Play</string>
     <string name="open">Open</string>
+    <string name="back">Back</string>
+    <string name="files_cant_come_off">Files already on this note can’t be taken off here.</string>
+    <string name="adding_files_to_a_note">Adding to a note: %1$s</string>
     <string name="close">Close</string>
     <string name="cant_show_this_photo">Can’t show this photo here.</string>
     <string name="voice_memo">Voice memo</string>
@@ -127,7 +130,6 @@
     <string name="record_a_voice_memo">Record a voice memo</string>
     <string name="recorded_minutes_seconds">Recorded %1$s minutes %2$s seconds</string>
     <string name="recording">Recording</string>
-    <string name="refresh">Refresh</string>
     <string name="release_notes">Release Notes</string>
     <string name="release_notes_doesnt_keep_video">Release Notes doesn\'t keep video. Photos, voice memos and PDFs go on a note.</string>
     <string name="release_notes_keeps_photos_voice">Release Notes keeps photos, voice memos and PDFs. That file isn\'t one.</string>

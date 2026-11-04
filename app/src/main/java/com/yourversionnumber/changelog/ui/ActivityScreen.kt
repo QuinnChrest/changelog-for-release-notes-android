@@ -1,11 +1,13 @@
 package com.yourversionnumber.changelog.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,6 +16,9 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -22,7 +27,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -31,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.yourversionnumber.changelog.AppModel
@@ -60,7 +65,8 @@ fun ActivityScreen(model: AppModel) {
     var items by remember { mutableStateOf<List<ActivityItem>>(emptyList()) }
     var next by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
-    var reloads by remember { mutableIntStateOf(0) }
+    // Pulled down by the owner; the spinner is theirs, apart from the loading of an older page.
+    var refreshing by remember { mutableStateOf(false) }
     // Where "Since you last looked" goes: the newest row when Activity was last left.
     val seenAtOpen = remember { model.graph.seenActivity }
     val scope = rememberCoroutineScope()
@@ -75,7 +81,7 @@ fun ActivityScreen(model: AppModel) {
         loading = false
     }
 
-    LaunchedEffect(filter, reloads) { load(more = false) }
+    LaunchedEffect(filter) { load(more = false) }
     DisposableEffect(Unit) {
         onDispose { items.firstOrNull()?.let { model.graph.seenActivity = it.id } }
     }
@@ -84,55 +90,77 @@ fun ActivityScreen(model: AppModel) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(say(R.string.activity)) },
-                actions = { QuietButton(say(R.string.refresh), { reloads++ }, enabled = !loading) },
-            )
+            TopAppBar(title = { Text(say(R.string.activity)) })
         },
     ) { padding ->
-        LazyColumn(
-            Modifier.padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + LocalBarSpace.current),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        val pull = rememberPullToRefreshState()
+        PullToRefreshBox(
+            isRefreshing = refreshing,
+            onRefresh = {
+                scope.launch {
+                    refreshing = true
+                    load(more = false)
+                    refreshing = false
+                }
+            },
+            modifier = Modifier.padding(padding),
+            state = pull,
+            // The other palette's paper behind the spinner, so it stands off the screen in light and in dark.
+            indicator = {
+                PullToRefreshDefaults.Indicator(
+                    state = pull,
+                    isRefreshing = refreshing,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    containerColor = paper.inverse.paper,
+                    color = paper.orange,
+                )
+            },
         ) {
-            item {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                    ActivityFilter.entries.forEach { Pick(it.label, selected = filter == it, onClick = { filter = it }) }
-                }
-            }
-            if (!model.hasActivity) {
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 16.dp + LocalBarSpace.current),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 item {
-                    Text(
-                        say(R.string.this_token_cant_read_the),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                        ActivityFilter.entries.forEach { Pick(it.label, selected = filter == it, onClick = { filter = it }) }
+                    }
                 }
-            } else if (shown.isEmpty() && !loading) {
-                item { Text(say(R.string.nothing_here_yet), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            }
-            items(shown, key = { it.id }) { item ->
-                if (item.id == seenAtOpen && item.id != items.firstOrNull()?.id) {
-                    Caption(say(R.string.since_you_last_looked))
+                if (!model.hasActivity) {
+                    item {
+                        Text(
+                            say(R.string.this_token_cant_read_the),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                } else if (shown.isEmpty() && !loading) {
+                    item { Text(say(R.string.nothing_here_yet), color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
-                ActivityRow(item)
-            }
-            if (next != null) {
-                item(key = "older") {
-                    // The next page comes as this row scrolls into view, so only what you read is fetched. Problems is
-                    // filtered here, not on the server, so it keeps the button rather than chain through the whole log.
-                    if (filter != ActivityFilter.Problems && !loading) LaunchedEffect(next) { load(more = true) }
-                    QuietButton(say(R.string.older), { scope.launch { load(more = true) } }, enabled = !loading)
+                items(shown, key = { it.id }) { item ->
+                    if (item.id == seenAtOpen && item.id != items.firstOrNull()?.id) {
+                        Caption(say(R.string.since_you_last_looked))
+                    }
+                    ActivityRow(item)
+                }
+                if (next != null) {
+                    item(key = "older") {
+                        // The next page comes as this row scrolls into view, so only what you read is fetched. Problems is
+                        // filtered here, not on the server, so it keeps the button rather than chain through the whole log.
+                        if (filter != ActivityFilter.Problems && !loading) LaunchedEffect(next) { load(more = true) }
+                        QuietButton(say(R.string.older), { scope.launch { load(more = true) } }, enabled = !loading)
+                    }
                 }
             }
         }
     }
 }
 
-/** One row of the log: what happened, through what, and when. `actions` for a note this token wrote. */
+/** One row of the log: what happened, through what, and when. `onOpen` for a note this token wrote. */
 @Composable
-internal fun ActivityRow(item: ActivityItem, actions: (@Composable () -> Unit)? = null) {
+internal fun ActivityRow(item: ActivityItem, onOpen: (() -> Unit)? = null) {
     val detail = item.detail
-    Column(Modifier.semantics(mergeDescendants = true) {}) {
+    val tap = if (onOpen == null) Modifier else Modifier.clickable(onClickLabel = say(R.string.open), role = Role.Button, onClick = onOpen)
+    Column(Modifier.semantics(mergeDescendants = true) {}.then(tap)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 withVersion(item.headline, item.version),
@@ -144,7 +172,6 @@ internal fun ActivityRow(item: ActivityItem, actions: (@Composable () -> Unit)? 
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Caption(detail.orEmpty(), Modifier.weight(1f))
-            actions?.invoke()
         }
         Rule(Modifier.padding(top = 4.dp))
     }

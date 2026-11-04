@@ -18,7 +18,8 @@ Upcoming and the activity log.
 
 1. **Sign in.** "Paste token", then "Sign in". Log opens on today's version.
 2. **A note.** A line with a #tag, then Commit. It shows under Today and
-   on the web. Edit it (change a word, Save), then Delete it.
+   on the web. Tap it to open it. Edit it (change a word, add a photo,
+   Save), then Delete it (it asks first).
 3. **Tags.** Tap a tag in the row to add it, tap again to take it off.
    Touch and hold one: it goes on every note until Settings (the tab at the right), "Stop adding
    #… to every note".

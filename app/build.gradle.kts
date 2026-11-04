@@ -59,6 +59,9 @@ android {
         // `adb reverse tcp:8790 tcp:8790` and http://localhost:8790.
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "DEV_SERVER", "\"${providers.gradleProperty("changelog.devServer").getOrElse("http://10.0.2.2:8790")}\"")
+        // A debug build starts on the dev server, so development never touches real notes; with
+        // -Pchangelog.production a debug build made to be used starts on Release Notes instead.
+        buildConfigField("boolean", "START_ON_PRODUCTION", providers.gradleProperty("changelog.production").isPresent.toString())
     }
 
     // The upload key stays off git: signing.properties (ignored) names it.

@@ -100,6 +100,10 @@ class Api(
     suspend fun editNote(date: String, id: String, text: String, revision: String, idempotencyKey: String): NoteRef =
         send<Wrapped>("PUT", "v1/notes/$date/$id", body = encode(EditBody(text.wellFormed(), revision)), idempotencyKey = idempotencyKey).note
 
+    /** Adds posted files to a note this token wrote, or with `notes:all` any note (with `media:write`). */
+    suspend fun attachFiles(date: String, id: String, uploads: List<UploadRef>, idempotencyKey: String): NoteRef =
+        send<Wrapped>("POST", "v1/notes/$date/$id/media", body = encode(AttachBody(uploads)), idempotencyKey = idempotencyKey).note
+
     suspend fun appendNote(date: String, id: String, text: String, idempotencyKey: String): NoteRef =
         send<Wrapped>("POST", "v1/notes/$date/$id/append", body = encode(AppendBody(text.wellFormed())), idempotencyKey = idempotencyKey).note
 
@@ -217,6 +221,9 @@ class Api(
 
     @Serializable
     private data class AppendBody(val text: String)
+
+    @Serializable
+    private data class AttachBody(val uploads: List<UploadRef>)
 
     @Serializable
     private data class PinsBody(val pinned: List<String>)

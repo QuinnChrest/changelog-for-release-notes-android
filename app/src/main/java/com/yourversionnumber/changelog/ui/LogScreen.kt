@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +22,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +38,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -53,7 +54,6 @@ import com.yourversionnumber.changelog.R
 import com.yourversionnumber.changelog.Sent
 import com.yourversionnumber.changelog.kit.Hashtags
 import com.yourversionnumber.changelog.kit.MediaType
-import com.yourversionnumber.changelog.kit.NoteDetail
 import com.yourversionnumber.changelog.kit.OutboxItem
 import com.yourversionnumber.changelog.kit.OutboxOperation
 import com.yourversionnumber.changelog.kit.UpcomingDraft
@@ -70,8 +70,7 @@ fun LogScreen(model: AppModel) {
     val sent by model.sent.collectAsStateWithLifecycle()
     val problem by model.problem.collectAsStateWithLifecycle()
     var fixing by remember { mutableStateOf<OutboxItem?>(null) }
-    var deleting by remember { mutableStateOf<NoteTarget?>(null) }
-    var editing by remember { mutableStateOf<NoteTarget?>(null) }
+    var opened by remember { mutableStateOf<NoteTarget?>(null) }
     val noteBox = remember { FocusRequester() }
     val player = rememberFilePlayer()
     LaunchedEffect(model.writeNow) {
@@ -141,7 +140,7 @@ fun LogScreen(model: AppModel) {
                     }
                 }
                 items(notes, key = { it.id }) { note ->
-                    DayNote(model, note, player, onEdit = { editing = note.target }, onDelete = { deleting = note.target })
+                    DayNote(model, note, player, onOpen = { opened = note.target })
                 }
                 if (model.moreOnDay) {
                     item { QuietButton(say(R.string.older), { model.loadDay(more = true) }, enabled = !model.dayLoading) }
@@ -172,20 +171,11 @@ fun LogScreen(model: AppModel) {
                 }
                 if (model.hasActivity) {
                     items(model.today, key = { it.id }) { item ->
-                        val mine = model.isMine(item)
-                        ActivityRow(
-                            item,
-                            actions = if (!mine) null else {
-                                {
-                                    QuietButton(say(R.string.edit), { editing = item.target })
-                                    QuietButton(say(R.string.delete), { deleting = item.target })
-                                }
-                            },
-                        )
+                        ActivityRow(item, onOpen = if (model.isMine(item)) ({ opened = item.target }) else null)
                     }
                 } else {
                     items(sent, key = { it.note.id }) { note ->
-                        SentRow(note, onEdit = { editing = note.target }, onDelete = { deleting = note.target })
+                        SentRow(note, onOpen = { opened = note.target })
                     }
                 }
             }
@@ -203,7 +193,7 @@ fun LogScreen(model: AppModel) {
         model.syncTags()
     }
 
-    editing?.let { target -> EditNoteDialog(model, target, onDone = { editing = null }) }
+    opened?.let { target -> NoteViewer(model, target, player, onClose = { opened = null }) }
 
     fixing?.let { item ->
         var text by remember(item.id) { mutableStateOf(item.text.orEmpty()) }
@@ -218,21 +208,6 @@ fun LogScreen(model: AppModel) {
             },
             confirmButton = { QuietButton(say(R.string.send), { model.fix(item.id, text); fixing = null }) },
             dismissButton = { QuietButton(say(R.string.cancel), { fixing = null }, color = paper.ink2) },
-        )
-    }
-
-    deleting?.let { target ->
-        AlertDialog(
-            onDismissRequest = { deleting = null },
-            title = { Text(say(R.string.delete_this_note)) },
-            text = {
-                Text(
-                    target.version?.let { say(R.string.it_comes_out_of_in, it) }
-                        ?: say(R.string.it_comes_out_of_its),
-                )
-            },
-            confirmButton = { QuietButton(say(R.string.delete), { model.delete(target); deleting = null }, color = paper.orangeInk) },
-            dismissButton = { QuietButton(say(R.string.keep), { deleting = null }) },
         )
     }
 }
@@ -297,6 +272,7 @@ private fun WaitingRow(item: OutboxItem, onDiscard: () -> Unit, onFix: () -> Uni
         is OutboxOperation.Note -> op.text
         is OutboxOperation.Edit -> say(R.string.edit_2, op.text)
         is OutboxOperation.Delete -> say(R.string.delete_a_note)
+        is OutboxOperation.Attach -> say(R.string.adding_files_to_a_note, MediaType.count(op.files))
         is OutboxOperation.Pins -> say(R.string.pinned_tags)
         is OutboxOperation.Post -> op.text.ifBlank { MediaType.count(op.files) }
     }
@@ -317,49 +293,17 @@ private fun WaitingRow(item: OutboxItem, onDiscard: () -> Unit, onFix: () -> Uni
 }
 
 @Composable
-private fun SentRow(sent: Sent, onEdit: () -> Unit, onDelete: () -> Unit) {
-    Column {
+private fun SentRow(sent: Sent, onOpen: () -> Unit) {
+    Column(Modifier.clickable(onClickLabel = say(R.string.open), role = Role.Button, onClick = onOpen)) {
         Text(sent.text, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                 Caption(say(R.string.filed_in_2))
                 VersionText(sent.note.version, size = 13.sp)
             }
-            QuietButton(say(R.string.edit), onEdit)
-            QuietButton(say(R.string.delete), onDelete)
         }
         Rule()
     }
-}
-
-/** Edits a note this token wrote, from the revision it reads as the dialog opens. */
-@Composable
-private fun EditNoteDialog(model: AppModel, target: NoteTarget, onDone: () -> Unit) {
-    var note by remember(target) { mutableStateOf<NoteDetail?>(null) }
-    var text by remember(target) { mutableStateOf("") }
-    LaunchedEffect(target) {
-        note = model.load(target)
-        note?.let { text = it.text } ?: onDone()
-    }
-    AlertDialog(
-        onDismissRequest = onDone,
-        title = { Text(target.version?.let { say(R.string.edit_in, it) } ?: say(R.string.edit)) },
-        text = {
-            if (note == null) {
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = paper.orange) }
-            } else {
-                PaperField(text, { text = it }, singleLine = false)
-            }
-        },
-        confirmButton = {
-            QuietButton(
-                say(R.string.save),
-                { note?.let { model.save(it, text) }; onDone() },
-                enabled = note != null && text.isNotBlank() && text != note?.text,
-            )
-        },
-        dismissButton = { QuietButton(say(R.string.cancel), onDone, color = paper.ink2) },
-    )
 }
 
 /** A word after a note is filed, in an ink capsule that goes by itself. */

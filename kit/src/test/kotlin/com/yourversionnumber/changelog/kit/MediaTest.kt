@@ -167,4 +167,47 @@ class MediaTest {
         outbox.retry(outbox.items.value.single().id, "Words too")
         assertTrue(outbox.items.value.single().files.isEmpty())
     }
+
+    @Test
+    fun filesAddedToAFiledNoteArePostedBeforeTheyGoUnderOneKey() = runTest {
+        val outbox = outbox()
+        val photo = outbox.photo()
+        val queued = outbox.enqueue(OutboxOperation.Attach("2026-10-29", "t-1", listOf(photo)))
+        assertEquals(listOf(photo), queued.files)
+        var forms = 0
+        val prepareAttach: suspend (OutboxOperation.Attach) -> OutboxOperation.Attach = { attach ->
+            forms++
+            attach.copy(files = attach.files.map { it.copy(upload = "u-$forms") })
+        }
+        val first = outbox.flush(prepareAttach = prepareAttach) { throw ApiException(0, "network", "offline") }
+        assertEquals("network", first.stopped?.code)
+        val ready = outbox.items.value.single().operation as OutboxOperation.Attach
+        assertEquals("u-1", ready.files.single().upload)
+
+        var key: String? = null
+        var sentWith: OutboxOperation.Attach? = null
+        val report = outbox.flush(prepareAttach = prepareAttach) {
+            key = it.idempotencyKey
+            sentWith = it.operation as OutboxOperation.Attach
+            OutboxResult.Attached(NoteRef("t-1", "2026-10-29", "0.0.0", "r2", files = 1))
+        }
+        assertEquals(1, report.sent.size)
+        assertEquals(1, forms)
+        assertEquals(queued.id, key)
+        assertEquals("u-1", sentWith!!.files.single().upload)
+        assertFalse(outbox.fileFor(photo)!!.exists())
+    }
+
+    @Test
+    fun editedWordsGoBeforeTheFilesThatCameWithThem() = runTest {
+        val outbox = outbox()
+        outbox.enqueue(OutboxOperation.Edit("2026-10-29", "t-1", "New words", "r1"))
+        outbox.enqueue(OutboxOperation.Attach("2026-10-29", "t-1", listOf(outbox.photo())))
+        val order = mutableListOf<String>()
+        outbox.flush(prepareAttach = { it.copy(files = it.files.map { f -> f.copy(upload = "u-1") }) }) {
+            order += it.operation::class.simpleName.orEmpty()
+            OutboxResult.Deleted
+        }
+        assertEquals(listOf("Edit", "Attach"), order)
+    }
 }

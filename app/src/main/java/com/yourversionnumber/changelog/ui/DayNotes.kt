@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +34,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -54,7 +54,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val dayline = DateTimeFormatter.ofPattern("EEEE, MMMM d")
+internal val dayline = DateTimeFormatter.ofPattern("EEEE, MMMM d")
 private val clock = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
 
 /** One file plays at a time; a second tap, another file or leaving the screen stops it. */
@@ -114,49 +114,51 @@ internal fun DayHeading(model: AppModel) {
     }
 }
 
-/** One note of the day: its words, its files, where it came from, and Edit and Delete where this token may. */
+/** One note of the day: its words, its files and where it came from. Tap it to open it, to edit or delete. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun DayNote(model: AppModel, note: NoteDetail, player: FilePlayer, onEdit: () -> Unit, onDelete: () -> Unit) {
-    Column {
+internal fun DayNote(model: AppModel, note: NoteDetail, player: FilePlayer, onOpen: () -> Unit) {
+    Column(Modifier.clickable(onClickLabel = say(R.string.open), role = Role.Button, onClick = onOpen)) {
         if (note.text.isNotBlank()) {
             Text(note.text, maxLines = 12, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
         }
         if (note.media.isNotEmpty()) NoteFiles(model, note, player)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                Caption(sourceLine(note))
-                if (note.version != null && !model.isToday) {
-                    Caption(" · ")
-                    VersionText(note.version, size = 13.sp)
-                }
-            }
-            if (model.canChange(note)) {
-                QuietButton(say(R.string.edit), onEdit)
-                QuietButton(say(R.string.delete), onDelete)
-            }
+        // A line that's too long moves the version down whole, never breaks it.
+        val showVersion = note.version != null && !model.isToday
+        FlowRow(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.Center) {
+            Caption(if (showVersion) sourceLine(note) + " ·" else sourceLine(note))
+            if (showVersion) VersionText(note.version, size = 13.sp)
         }
-        Rule()
+        Rule(Modifier.padding(top = 6.dp))
     }
 }
 
 /** The time it was written, and where it came from. */
 private fun sourceLine(note: NoteDetail): String {
-    val time = note.writtenAt?.let {
-        runCatching { OffsetDateTime.parse(it).atZoneSameInstant(ZoneId.systemDefault()).format(clock) }.getOrNull()
-    }
-    val from = when {
+    val time = noteTime(note)
+    val from = noteSource(note)
+    return if (time == null) from else "$time · $from"
+}
+
+/** The time it was written, in the phone's zone. */
+internal fun noteTime(note: NoteDetail): String? = note.writtenAt?.let {
+    runCatching { OffsetDateTime.parse(it).atZoneSameInstant(ZoneId.systemDefault()).format(clock) }.getOrNull()
+}
+
+/** Where it came from. */
+internal fun noteSource(note: NoteDetail): String {
+    return when {
         note.mine -> say(R.string.from_this_phone)
         note.source == "email" -> say(R.string.from_email)
         note.source == "web" -> say(R.string.from_the_web)
         note.token != null -> say(R.string.via_name, note.token!!)
         else -> note.source.orEmpty()
     }
-    return if (time == null) from else "$time · $from"
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun NoteFiles(model: AppModel, note: NoteDetail, player: FilePlayer) {
+internal fun NoteFiles(model: AppModel, note: NoteDetail, player: FilePlayer) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     // A signed address lasts ten minutes and is never kept: it's asked for as a file is opened or played.

@@ -37,6 +37,23 @@ sealed interface OutboxOperation {
     @SerialName("delete")
     data class Delete(val date: String, val id: String) : OutboxOperation
 
+    /**
+     * Files added to a note already filed, queued after an edit made with
+     * them. As for a new note, the bytes wait in the Outbox's folder and each
+     * `upload` is saved before this goes, so every resend is the same request.
+     */
+    @Serializable
+    @SerialName("attach")
+    data class Attach(
+        val date: String,
+        val id: String,
+        val files: List<QueuedFile>,
+        /** Times the uploads were made again after the note found them gone. */
+        val reuploads: Int = 0,
+    ) : OutboxOperation {
+        val ready: Boolean get() = files.all { it.upload != null }
+    }
+
     @Serializable
     @SerialName("pins")
     data class Pins(val pinned: List<String>) : OutboxOperation
@@ -96,13 +113,19 @@ data class OutboxItem(
 
     val isNote: Boolean get() = operation is OutboxOperation.Note || operation is OutboxOperation.Post
 
-    val files: List<QueuedFile> get() = (operation as? OutboxOperation.Post)?.files.orEmpty()
+    val files: List<QueuedFile>
+        get() = when (operation) {
+            is OutboxOperation.Post -> operation.files
+            is OutboxOperation.Attach -> operation.files
+            else -> emptyList()
+        }
 }
 
 /** What Release Notes answered for each kind of write. */
 sealed interface OutboxResult {
     data class Filed(val receipt: NoteReceipt) : OutboxResult
     data class Edited(val note: NoteRef) : OutboxResult
+    data class Attached(val note: NoteRef) : OutboxResult
     data object Deleted : OutboxResult
     data class Pinned(val tags: Tags) : OutboxResult
 }
@@ -225,6 +248,7 @@ class Outbox(private val file: File?, files: File? = null) {
      */
     suspend fun flush(
         prepare: (suspend (OutboxOperation.Post) -> OutboxOperation.Post)? = null,
+        prepareAttach: (suspend (OutboxOperation.Attach) -> OutboxOperation.Attach)? = null,
         send: suspend (OutboxItem) -> OutboxResult,
     ): FlushReport {
         if (!flushing.compareAndSet(false, true)) return FlushReport()
@@ -237,25 +261,21 @@ class Outbox(private val file: File?, files: File? = null) {
                 tried += item.id
                 try {
                     val post = item.operation as? OutboxOperation.Post
-                    if (prepare != null && post != null && !post.ready) {
-                        val ready = prepare(post)
+                    val attach = item.operation as? OutboxOperation.Attach
+                    val ready: OutboxOperation? = when {
+                        prepare != null && post != null && !post.ready -> prepare(post)
+                        prepareAttach != null && attach != null && !attach.ready -> prepareAttach(attach)
+                        else -> null
+                    }
+                    if (ready != null) {
                         // Saved before sending: from here on, every resend is this request.
                         // Unsaved, it doesn't go, or a relaunch would post other uploads
                         // under the same key.
-                        var discarded = false
-                        val kept = mutex.withLock {
-                            val list = _items.value
-                            val i = list.indexOfFirst { it.id == item.id }
-                            if (i < 0) {
-                                discarded = true
-                                return@withLock true
-                            }
-                            val next = list.toMutableList().also { it[i] = it[i].copy(operation = ready) }
-                            runCatching { commit(next) }.isSuccess
+                        when (keepReady(item.id, ready)) {
+                            null -> continue
+                            false -> return FlushReport(sent, refused, ApiException(507, "not_kept", OutboxNotKept().message!!))
+                            true -> item = item.copy(operation = ready)
                         }
-                        if (discarded) continue
-                        if (!kept) return FlushReport(sent, refused, ApiException(507, "not_kept", OutboxNotKept().message!!))
-                        item = item.copy(operation = ready)
                     }
                     val result = send(item)
                     sent += SentItem(item, result)
@@ -267,8 +287,14 @@ class Outbox(private val file: File?, files: File? = null) {
                     // Uploads a note found gone (unused for a day, say) are made again
                     // once, under a new key: the old key's request was refused.
                     val post = item.operation as? OutboxOperation.Post
-                    if (e.field == "uploads" && post != null && post.reuploads == 0) {
-                        val again = post.copy(files = post.files.map { it.copy(upload = null) }, reuploads = 1)
+                    val attach = item.operation as? OutboxOperation.Attach
+                    val again: OutboxOperation? = when {
+                        e.field != "uploads" -> null
+                        post != null && post.reuploads == 0 -> post.copy(files = post.files.map { it.copy(upload = null) }, reuploads = 1)
+                        attach != null && attach.reuploads == 0 -> attach.copy(files = attach.files.map { it.copy(upload = null) }, reuploads = 1)
+                        else -> null
+                    }
+                    if (again != null) {
                         val fresh = UUID.randomUUID().toString()
                         update { list -> list.map { if (it.id == item.id) it.copy(id = fresh, operation = again) else it } }
                         continue
@@ -288,6 +314,15 @@ class Outbox(private val file: File?, files: File? = null) {
         } finally {
             flushing.set(false)
         }
+    }
+
+    /** Keeps an item's prepared form: true once it is on disk, false if it couldn't be written, null if it was discarded meanwhile. */
+    private suspend fun keepReady(id: String, ready: OutboxOperation): Boolean? = mutex.withLock {
+        val list = _items.value
+        val i = list.indexOfFirst { it.id == id }
+        if (i < 0) return@withLock null
+        val next = list.toMutableList().also { it[i] = it[i].copy(operation = ready) }
+        runCatching { commit(next) }.isSuccess
     }
 
     private suspend fun update(change: (List<OutboxItem>) -> List<OutboxItem>) = mutex.withLock {
@@ -333,6 +368,8 @@ suspend fun Api.perform(item: OutboxItem): OutboxResult {
         is OutboxOperation.Note -> OutboxResult.Filed(createNote(NoteRequest(op.text, op.date, op.writtenAt), key))
         is OutboxOperation.Post -> OutboxResult.Filed(createNote(op.request, key))
         is OutboxOperation.Edit -> OutboxResult.Edited(editNote(op.date, op.id, op.text, op.revision, key))
+        is OutboxOperation.Attach ->
+            OutboxResult.Attached(attachFiles(op.date, op.id, op.files.map { UploadRef(it.upload.orEmpty(), it.type, it.name) }, key))
         is OutboxOperation.Delete -> {
             deleteNote(op.date, op.id, key)
             OutboxResult.Deleted
@@ -348,14 +385,7 @@ suspend fun Api.perform(item: OutboxItem): OutboxResult {
  * never held back for its place.
  */
 suspend fun Api.prepare(post: OutboxOperation.Post, outbox: Outbox): OutboxOperation.Post {
-    val files = post.files.map { queued ->
-        if (queued.upload != null) return@map queued
-        val bytes = outbox.fileFor(queued)?.takeIf { it.exists() }
-            ?: throw ApiException(400, "file_missing", Words.say(Phrase.FileMissing))
-        val form = startUpload(UploadStart(queued.name, queued.type, bytes.length()))
-        postFile(bytes, queued.name, form)
-        queued.copy(upload = form.upload, type = form.type)
-    }
+    val files = upload(post.files, outbox)
     val spot = post.spot
     if (spot != null && post.place == null) {
         val place = try {
@@ -367,6 +397,19 @@ suspend fun Api.prepare(post: OutboxOperation.Post, outbox: Outbox): OutboxOpera
         return post.copy(files = files, spot = place?.let { spot }, place = place)
     }
     return post.copy(files = files)
+}
+
+/** Posts the files of a note already filed, each asked for its form only as it goes. */
+suspend fun Api.prepare(attach: OutboxOperation.Attach, outbox: Outbox): OutboxOperation.Attach =
+    attach.copy(files = upload(attach.files, outbox))
+
+private suspend fun Api.upload(files: List<QueuedFile>, outbox: Outbox): List<QueuedFile> = files.map { queued ->
+    if (queued.upload != null) return@map queued
+    val bytes = outbox.fileFor(queued)?.takeIf { it.exists() }
+        ?: throw ApiException(400, "file_missing", Words.say(Phrase.FileMissing))
+    val form = startUpload(UploadStart(queued.name, queued.type, bytes.length()))
+    postFile(bytes, queued.name, form)
+    queued.copy(upload = form.upload, type = form.type)
 }
 
 object Timestamp {

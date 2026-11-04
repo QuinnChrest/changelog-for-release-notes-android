@@ -17,6 +17,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -91,6 +93,7 @@ fun ActivityScreen(model: AppModel) {
             TopAppBar(title = { Text(say(R.string.activity)) })
         },
     ) { padding ->
+        val pull = rememberPullToRefreshState()
         PullToRefreshBox(
             isRefreshing = refreshing,
             onRefresh = {
@@ -101,6 +104,17 @@ fun ActivityScreen(model: AppModel) {
                 }
             },
             modifier = Modifier.padding(padding),
+            state = pull,
+            // The other palette's paper behind the spinner, so it stands off the screen in light and in dark.
+            indicator = {
+                PullToRefreshDefaults.Indicator(
+                    state = pull,
+                    isRefreshing = refreshing,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    containerColor = paper.inverse.paper,
+                    color = paper.orange,
+                )
+            },
         ) {
             LazyColumn(
                 Modifier.fillMaxSize(),

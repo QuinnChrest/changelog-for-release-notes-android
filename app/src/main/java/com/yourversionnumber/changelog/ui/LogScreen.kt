@@ -60,6 +60,7 @@ import com.yourversionnumber.changelog.kit.UpcomingDraft
 import com.yourversionnumber.changelog.say
 import com.yourversionnumber.changelog.sayCount
 import com.yourversionnumber.changelog.target
+import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
 
@@ -72,6 +73,16 @@ fun LogScreen(model: AppModel) {
     var fixing by remember { mutableStateOf<OutboxItem?>(null) }
     var opened by remember { mutableStateOf<NoteTarget?>(null) }
     val noteBox = remember { FocusRequester() }
+    // A write that sends at once never shows under Waiting to send; one that's been tried, refused or kept
+    // a few seconds does, so a note is never out of sight for long.
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(waiting.isNotEmpty()) {
+        while (waiting.isNotEmpty()) {
+            delay(1_000)
+            now = System.currentTimeMillis()
+        }
+    }
+    val held = waiting.filter { it.refusal != null || it.attempts > 0 || now - queuedAt(it) > HELD_AFTER_MILLIS }
     val player = rememberFilePlayer()
     LaunchedEffect(model.writeNow) {
         if (model.writeNow) {
@@ -119,9 +130,9 @@ fun LogScreen(model: AppModel) {
                     }
                 }
             }
-            if (waiting.isNotEmpty()) {
+            if (held.isNotEmpty()) {
                 item(key = "waiting") { Heading(say(R.string.waiting_to_send), Modifier.padding(top = 16.dp)) }
-                items(waiting, key = { it.id }) { item ->
+                items(held, key = { it.id }) { item ->
                     WaitingRow(item, onDiscard = { model.discard(item.id) }, onFix = { fixing = item })
                 }
             }
@@ -213,6 +224,13 @@ fun LogScreen(model: AppModel) {
 }
 
 private val dateline = DateTimeFormatter.ofPattern("EEEE, MMMM d")
+
+/** How long a write may wait before Log says so. */
+private const val HELD_AFTER_MILLIS = 4_000L
+
+/** When a write was queued, in milliseconds; 0 (long ago) if it can't be read. */
+private fun queuedAt(item: OutboxItem): Long =
+    runCatching { OffsetDateTime.parse(item.queuedAt).toInstant().toEpochMilli() }.getOrDefault(0L)
 
 /** The day, then its version, large, as the site's Today. */
 @Composable

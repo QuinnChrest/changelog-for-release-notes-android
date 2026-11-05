@@ -236,9 +236,10 @@ the Outbox and its sender, Waiting to send (fix, discard), opening a note
 full screen to edit or delete it (`ui/NoteViewer.kt`: Edit is the composer's
 words, tag row, Photos, Camera and Record, with files added after the edit
 as an `OutboxOperation.Attach`; a note's own files can't come off, the API has
-no way; Delete asks first), Today on Log from every channel (with
-the `activity` scope; otherwise what this phone sent), the Activity screen
-(filters, "Older" paging, "Since you last looked"), Settings and
+no way; Delete asks first), Log showing notes only (activity is its own
+tab; offline, today falls back to what this phone sent), the Activity screen
+(filters, "Older" paging, "Since you last looked"; each filter's last rows
+kept in memory in `AppModel.activityShown` so the tab opens on them), Settings and
 sign-out. Activity rows read as in the iPhone app (`kit`'s
 `ActivityText.kt`).
 
@@ -286,7 +287,7 @@ Log shows the notes on a day (`GET /v1/notes?from=&to=`, one day a request,
 oldest first, paged by `next`), with a way a day back or on (`AppModel`'s
 `stepDay`, `loadDay`; `ui/DayNotes.kt`). A note's files come from its `media`:
 a photo shows its small copy when it has one (`size=thumb`, kept in a small
-cache for the session), a recording plays and anything else opens, each by a
+cache for the session), a recording plays with play, pause and a line to scrub along (`VoiceMemo`), and anything else opens, each by a
 signed address asked for as it's tapped and never kept (ten minutes, fetched
 with no token). A photo opens in the app (`ui/PhotoViewer.kt`: full screen,
 pinch and double-tap to zoom, decoded down to 2560 px on its longest side);

@@ -101,6 +101,8 @@
     <string name="from_the_web">From the web</string>
     <string name="via_name">via %1$s</string>
     <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="place_in_the_recording">Place in the recording</string>
     <string name="open">Open</string>
     <string name="back">Back</string>
     <string name="files_cant_come_off">Files already on this note can’t be taken off here.</string>

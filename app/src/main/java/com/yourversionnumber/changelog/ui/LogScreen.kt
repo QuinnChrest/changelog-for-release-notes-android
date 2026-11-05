@@ -156,10 +156,6 @@ fun LogScreen(model: AppModel) {
                 if (model.moreOnDay) {
                     item(key = "more") { QuietButton(say(R.string.older), { model.loadDay(more = true) }, enabled = !model.dayLoading) }
                 }
-                // Another channel's notes show here only by their rows, without words, unless this token reads every note.
-                if (model.isToday && model.hasActivity && !model.readsAll) {
-                    items(model.today.filter { !model.isMine(it) }, key = { it.id }) { ActivityRow(it) }
-                }
             } else if (!model.isToday) {
                 item(key = "empty") {
                     Text(
@@ -168,10 +164,11 @@ fun LogScreen(model: AppModel) {
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
+            } else if (model.dayRead != model.day) {
+                // The day's first read is still out: nothing yet, rather than something swapped out a moment later.
             } else {
-                // Not read yet, or offline: what the activity log or this phone has for today.
-                val empty = if (model.hasActivity) model.today.isEmpty() else sent.isEmpty()
-                if (empty) {
+                // Offline: the notes this phone filed today. Log shows notes only; activity is on its own tab.
+                if (sent.isEmpty()) {
                     item(key = "empty") {
                         Text(
                             model.me?.let { say(R.string.no_changes_yet_in, it.version) } ?: say(R.string.nothing_yet),
@@ -180,14 +177,8 @@ fun LogScreen(model: AppModel) {
                         )
                     }
                 }
-                if (model.hasActivity) {
-                    items(model.today, key = { it.id }) { item ->
-                        ActivityRow(item, onOpen = if (model.isMine(item)) ({ opened = item.target }) else null)
-                    }
-                } else {
-                    items(sent, key = { it.note.id }) { note ->
-                        SentRow(note, onOpen = { opened = note.target })
-                    }
+                items(sent, key = { it.note.id }) { note ->
+                    SentRow(note, onOpen = { opened = note.target })
                 }
             }
         }
@@ -199,7 +190,6 @@ fun LogScreen(model: AppModel) {
     // A send that delivered something changes what the server has for today.
     val sends by model.graph.sends.collectAsStateWithLifecycle()
     LaunchedEffect(sends, model.me?.today) {
-        model.loadToday()
         model.loadDay()
         model.syncTags()
     }

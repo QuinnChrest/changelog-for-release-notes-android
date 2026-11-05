@@ -27,7 +27,9 @@ Upcoming and the activity log.
    Commit. The web note has every photo. A HEIC from the library arrives
    as a JPEG.
 5. **A voice memo.** "Record", allow the microphone, ten seconds, Stop,
-   Commit. It plays on the web.
+   Commit. It plays on the web. On Log it plays, pauses, and a tap or a
+   drag anywhere along its line moves it; played to the end, it pauses
+   back at 0:00 and plays again.
 6. **Share.** From Chrome, a link; from Photos, three or four big photos at
    once; from Files, a PDF; from a recorder app, a recording. Each makes
    exactly one note. A video too, to see what it says: Release Notes

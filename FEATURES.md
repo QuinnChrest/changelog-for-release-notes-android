@@ -4,7 +4,7 @@ What Changelog for Android does, what's left, and what's built but not yet
 checked. The iPhone app (`jthingelstad/changelog-ios`) is the reference;
 `AGENTS.md` says how each built piece works.
 
-**At a glance:** 50 built · 4 to do · 2 waiting on someone else · 6 to check
+**At a glance:** 51 built · 4 to do · 3 waiting on someone else · 6 to check
 
 Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 built, not yet checked
 
@@ -22,6 +22,7 @@ Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 b
 | | What | Waiting on |
 |---|---|---|
 | ⏳ | Espresso 3.8 stable for the UI tests | Google; the tests use 3.8 alpha because 3.7 doesn't run on Android 17 |
+| ⏳ | A voice memo's transcript under it | Release Notes keeps the owner's opted-in transcript on each recording, but `/v1` doesn't give it (`fileView` reads out n, kind, type, name, size, thumb). Needs `transcript` on a note's `media` in the API first: jthingelstad/yvn-release-notes#301. |
 | ⏳ | Play Console internal testing | Quinn: a Play developer account and the upload key. The release build is checked and signs from `signing.properties` (`AGENTS.md`, Release builds). |
 
 ## Built, not yet checked
@@ -58,16 +59,17 @@ These are written and built; something about them couldn't be seen on the emulat
 | ✅ | Waiting to send, with Fix and Discard for a refused note; a write that sends at once never shows there, one tried, refused or kept over four seconds does |
 | ✅ | Tap a note on Log to open it full screen (`NoteViewer`): all its words and files, where it came from, and Edit and Delete where this token may change it; Delete asks first. Rows on Log carry no buttons, and a source line too long for the row moves its version down whole |
 | ✅ | Edit as the box on Log is: words, the tag row, and Photos, Camera and Record (files added to the note after the edit, `OutboxOperation.Attach`, `POST /v1/notes/{date}/{id}/media`); no Here, a note keeps its place |
-| ✅ | Log shows a day's notes with their words and files (photos by their small copy, voice memos to play, PDFs to open), oldest first, and steps a day back or on (`GET /v1/notes?from=&to=`, API 1.9.0); offline, today falls back to the activity log or what this phone sent |
+| ✅ | Log shows a day's notes with their words and files (photos by their small copy, voice memos to play, PDFs to open), oldest first, and steps a day back or on (`GET /v1/notes?from=&to=`, API 1.9.0); offline, today falls back to what this phone sent |
 | ✅ | A photo on a note opens in the app, full screen, to pinch or double-tap to zoom and drag (`PhotoViewer`); a photo the phone can't read offers to open it outside |
-| ✅ | Every note, from any channel, with a token that has `notes:all` (API 1.10.0, 1.11.0): each says where it came from, and Edit and Delete work on any of them; without it, only this token's own, and other channels show as activity rows without words |
-| ✅ | Today: activity from every channel, or this phone's notes without the activity scope |
+| ✅ | Every note, from any channel, with a token that has `notes:all` (API 1.10.0, 1.11.0): each says where it came from, and Edit and Delete work on any of them; without it, only this token's own |
+| ✅ | Log shows notes only, never activity rows: activity is on its own tab. Today shows nothing until its first read is back, so nothing stands in and is swapped out |
 
 ### Files and places
 | | Feature |
 |---|---|
 | ✅ | Photos from the photo picker, and from the camera |
 | ✅ | Voice memos (AAC .m4a) |
+| ✅ | A voice memo on Log or a note plays with play and pause and a line to tap or drag anywhere along (before it's loaded, a tap starts it from there), with where it is and its length once loaded; at the end it pauses back at the start |
 | ✅ | Files wait on the phone with the note; uploads go as it sends, and are made again if they expire |
 | ✅ | Here: where a note was written, the neighbourhood or a business nearby to pick |
 | ✅ | "Add where I am": each new draft finds its place, reused for ten minutes |
@@ -84,7 +86,7 @@ These are written and built; something about them couldn't be seen on the emulat
 ### Activity and notifications
 | | Feature |
 |---|---|
-| ✅ | Activity screen: filters, "Older" paging, pull down to refresh, "Since you last looked" |
+| ✅ | Activity screen: filters, "Older" paging, pull down to refresh, "Since you last looked"; coming back shows each filter's last rows at once (memory only) while it reads again, and "Nothing here yet" only once a read comes back empty |
 | ✅ | Daily prompt: "You're 4.5.137 today. What changed?" |
 | ✅ | Notices for notes from elsewhere, problems and badges; never this phone's own notes |
 

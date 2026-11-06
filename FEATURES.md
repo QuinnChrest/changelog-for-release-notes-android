@@ -4,7 +4,7 @@ What Changelog for Android does, what's left, and what's built but not yet
 checked. The iPhone app (`jthingelstad/changelog-ios`) is the reference;
 `AGENTS.md` says how each built piece works.
 
-**At a glance:** 51 built · 4 to do · 3 waiting on someone else · 6 to check
+**At a glance:** 51 built · 4 to do · 2 waiting on someone else · 7 to check
 
 Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 built, not yet checked
 
@@ -22,7 +22,6 @@ Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 b
 | | What | Waiting on |
 |---|---|---|
 | ⏳ | Espresso 3.8 stable for the UI tests | Google; the tests use 3.8 alpha because 3.7 doesn't run on Android 17 |
-| ⏳ | A voice memo's transcript under it | Release Notes keeps the owner's opted-in transcript on each recording, but `/v1` doesn't give it (`fileView` reads out n, kind, type, name, size, thumb). Needs `transcript` on a note's `media` in the API first: jthingelstad/yvn-release-notes#301. |
 | ⏳ | Play Console internal testing | Quinn: a Play developer account and the upload key. The release build is checked and signs from `signing.properties` (`AGENTS.md`, Release builds). |
 
 ## Built, not yet checked
@@ -36,6 +35,7 @@ These are written and built; something about them couldn't be seen on the emulat
 | 🔍 | Reminders survive a phone restart | Not rebooted with alarms waiting |
 | 🔍 | The whole pass on a real phone | `docs/PHONE-TEST.md`, by hand, on a real account |
 | 🔍 | UI test cycle in CI | Runs on emulators here; CI runs the unit tests and lint only |
+| 🔍 | A voice memo's transcript under it | API 1.14.0 (jthingelstad/yvn-release-notes#301). Seen on the emulator against the dev server's made-up transcript: "Its words are still being written." on Log, then the words, read again without a refresh, and whole in the open note. Not yet a real transcript on a real account |
 | 🔍 | A photo's small copy on Log, and `notes:all` on a real account | The dev server's fixture photo has no small copy, so the thumbnail path ran only in a unit test; the whole-account list was seen on the dev server with a `notes:all` token, not on production |
 
 ## Built

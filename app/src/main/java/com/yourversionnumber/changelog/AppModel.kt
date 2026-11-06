@@ -30,6 +30,7 @@ import com.yourversionnumber.changelog.kit.UpcomingDraft
 import com.yourversionnumber.changelog.kit.UpcomingEntry
 import com.yourversionnumber.changelog.kit.UpcomingList
 import com.yourversionnumber.changelog.kit.UpcomingRemoval
+import com.yourversionnumber.changelog.kit.awaitingWords
 import com.yourversionnumber.changelog.kit.upcomingSentence
 import com.yourversionnumber.changelog.ui.ThemeMode
 import java.io.File
@@ -131,6 +132,26 @@ class AppModel(application: Application) : AndroidViewModel(application) {
                 if (dayJob == coroutineContext[Job]) dayLoading = false
             }
         }
+    }
+
+    /**
+     * The day's notes with a recording still being written out, each read again, for its words. A transcript
+     * arriving doesn't change a note's `revision`, so only a fresh read finds it. Quiet: a read that fails waits
+     * for the next.
+     */
+    suspend fun rereadWriting() {
+        val shown = day ?: return
+        for (note in dayNotes.orEmpty().filter { it.awaitingWords }) {
+            val fresh = reread(note) ?: continue
+            if (day == shown) dayNotes = dayNotes?.map { if (it.id == fresh.id) fresh else it }
+        }
+    }
+
+    /** A note read again, quietly; null when it can't be had. */
+    suspend fun reread(note: NoteDetail): NoteDetail? = try {
+        graph.api()?.note(note.date, note.id)
+    } catch (e: ApiException) {
+        null
     }
 
     /** A signed address for a file on a note, or its small copy. Null when it can't be had. */

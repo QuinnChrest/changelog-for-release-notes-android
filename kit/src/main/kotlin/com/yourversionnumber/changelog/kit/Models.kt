@@ -106,7 +106,19 @@ data class NoteMedia(
     val size: Long = 0,
     /** The small JPEG, when it has one: ask for it with `size=thumb`. */
     val thumb: Thumb? = null,
+    /**
+     * A recording's words, once the owner's opt-in transcript is kept (API 1.14.0); null until then, and
+     * when nothing could be made out. One arriving doesn't change the note's `revision`.
+     */
+    val transcript: String? = null,
+    /** A photo's description, once the owner's opt-in one is kept (API 1.14.0). */
+    val description: String? = null,
+    /** A transcript of this recording is still to come (API 1.14.0). */
+    val writing: Boolean = false,
 )
+
+/** A recording on it is still being written out, so reading it again later may find the words. */
+val NoteDetail.awaitingWords: Boolean get() = media.any { it.writing }
 
 @Serializable
 data class Thumb(val width: Int? = null, val height: Int? = null)

@@ -111,8 +111,14 @@ moved past the version the app last read (`api_version` in `/v1/me`):
 3. run `DevServerTest` against the current dev server (`git pull`, restart
    it) before anything else.
 
-It last matched API 1.13.0 (2026-11-01). 1.12.0 and 1.13.0 only add fields to
-`GET /v1/me` (`supporting_member`, `lived`), which the app doesn't read.
+It was last read against API 1.17.2 (2026-11-05). Every new field is
+optional and `kit` ignores what it doesn't know, so nothing broke. Of what
+1.14.0 to 1.17.2 added, the app reads a recording's `transcript` and
+`writing` (1.14.0); not yet the rest of a note (`parts`, `place`, `markup`
+and the like), `include=urls`, `notes:read` and the archive reads (1.15.0),
+rich notes and place writes (1.16.0), or taking one file off a note
+(1.17.0). Since 1.17.0 a `note.files` activity row can say `removed`, which
+Activity still words as "Files added".
 
 ## Building
 
@@ -235,8 +241,8 @@ Done: sign-in by token, Log (version, tag row with a sticky tag, Commit),
 the Outbox and its sender, Waiting to send (fix, discard), opening a note
 full screen to edit or delete it (`ui/NoteViewer.kt`: Edit is the composer's
 words, tag row, Photos, Camera and Record, with files added after the edit
-as an `OutboxOperation.Attach`; a note's own files can't come off, the API has
-no way; Delete asks first), Log showing notes only (activity is its own
+as an `OutboxOperation.Attach`; a note's own files can't come off here yet,
+though API 1.17.0 has a way; Delete asks first), Log showing notes only (activity is its own
 tab; offline, today falls back to what this phone sent), the Activity screen
 (filters, "Older" paging, "Since you last looked"; each filter's last rows
 kept in memory in `AppModel.activityShown` so the tab opens on them), Settings and
@@ -287,7 +293,10 @@ Log shows the notes on a day (`GET /v1/notes?from=&to=`, one day a request,
 oldest first, paged by `next`), with a way a day back or on (`AppModel`'s
 `stepDay`, `loadDay`; `ui/DayNotes.kt`). A note's files come from its `media`:
 a photo shows its small copy when it has one (`size=thumb`, kept in a small
-cache for the session), a recording plays with play, pause and a line to scrub along (`VoiceMemo`), and anything else opens, each by a
+cache for the session), a recording plays with play, pause and a line to scrub along (`VoiceMemo`), with its transcript under it
+once Release Notes has kept one (the owner's opt-in; cut to six lines on Log, whole and selectable when
+the note is open; "Its words are still being written." while `writing`, and the note read again every ten
+seconds for up to five minutes, since a transcript arriving doesn't change `revision`), and anything else opens, each by a
 signed address asked for as it's tapped and never kept (ten minutes, fetched
 with no token). A photo opens in the app (`ui/PhotoViewer.kt`: full screen,
 pinch and double-tap to zoom, decoded down to 2560 px on its longest side);

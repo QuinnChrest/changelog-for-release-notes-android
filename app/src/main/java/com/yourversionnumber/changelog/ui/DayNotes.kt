@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.withFrameMillis
@@ -242,7 +243,7 @@ internal fun noteSource(note: NoteDetail): String {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun NoteFiles(model: AppModel, note: NoteDetail, player: FilePlayer) {
+internal fun NoteFiles(model: AppModel, note: NoteDetail, player: FilePlayer, whole: Boolean = false) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     // A signed address lasts ten minutes and is never kept: it's asked for as a file is opened or played.
@@ -261,6 +262,7 @@ internal fun NoteFiles(model: AppModel, note: NoteDetail, player: FilePlayer) {
         VoiceMemo(player, key, fileLabel(file), Modifier.padding(top = 8.dp)) { from ->
             address(file) { player.play(key, it, from) }
         }
+        Transcript(file, whole)
     }
     if (others.isNotEmpty()) FlowRow(
         Modifier.padding(top = 8.dp),
@@ -282,6 +284,28 @@ internal fun NoteFiles(model: AppModel, note: NoteDetail, player: FilePlayer) {
         }
     }
     viewing?.let { file -> PhotoViewer(model, note, file, onClose = { viewing = null }, onOpenOutside = { open(file) }) }
+}
+
+/**
+ * A recording's words under it, once Release Notes has kept them (the owner's opt-in transcript), or word that
+ * they're on their way. `whole` on the note's own page, where they can be selected; on Log, the first lines.
+ */
+@Composable
+private fun Transcript(file: NoteMedia, whole: Boolean) {
+    val words = file.transcript
+    when {
+        words != null && whole -> SelectionContainer {
+            Text(words, Modifier.padding(top = 4.dp, start = 50.dp), style = MaterialTheme.typography.bodyLarge)
+        }
+        words != null -> Text(
+            words,
+            Modifier.padding(top = 4.dp, start = 50.dp),
+            maxLines = 6,
+            overflow = TextOverflow.Ellipsis,
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        file.writing -> Caption(say(R.string.its_words_are_still_being), Modifier.padding(top = 2.dp, start = 50.dp))
+    }
 }
 
 /**

@@ -57,6 +57,7 @@ import com.yourversionnumber.changelog.kit.MediaType
 import com.yourversionnumber.changelog.kit.OutboxItem
 import com.yourversionnumber.changelog.kit.OutboxOperation
 import com.yourversionnumber.changelog.kit.UpcomingDraft
+import com.yourversionnumber.changelog.kit.awaitingWords
 import com.yourversionnumber.changelog.say
 import com.yourversionnumber.changelog.sayCount
 import com.yourversionnumber.changelog.target
@@ -192,6 +193,16 @@ fun LogScreen(model: AppModel) {
     LaunchedEffect(sends, model.me?.today) {
         model.loadDay()
         model.syncTags()
+    }
+    // A recording still being written out: its note is read again every ten seconds while Log is open, for five
+    // minutes at most, so its words appear when they're kept.
+    val awaiting = model.dayNotes.orEmpty().any { it.awaitingWords }
+    LaunchedEffect(awaiting, model.day) {
+        if (!awaiting) return@LaunchedEffect
+        repeat(30) {
+            delay(10_000)
+            model.rereadWriting()
+        }
     }
 
     opened?.let { target -> NoteViewer(model, target, player, onClose = { opened = null }) }

@@ -27,7 +27,12 @@ Upcoming and the activity log.
    Commit. The web note has every photo. A HEIC from the library arrives
    as a JPEG.
 5. **A voice memo.** "Record", allow the microphone, ten seconds, Stop,
-   Commit. It plays on the web.
+   Commit. It plays on the web. On Log it plays, pauses, and a tap or a
+   drag anywhere along its line moves it; played to the end, it pauses
+   back at 0:00 and plays again. With transcripts on (Release Notes'
+   Settings), Log says "Its words are still being written." under it, then
+   shows its words without being refreshed; opened, the note shows them
+   whole.
 6. **Share.** From Chrome, a link; from Photos, three or four big photos at
    once; from Files, a PDF; from a recorder app, a recording. Each makes
    exactly one note. A video too, to see what it says: Release Notes
@@ -37,6 +42,9 @@ Upcoming and the activity log.
 8. **The build.** The foot of Settings names the version and the commit
    (`Changelog 0.0.0, build 1a2b3c4`).
 9. **Activity.** Rows from every channel; a filter; "Older" loads more.
+   **Notes.** Today's notes, then Earlier: scroll far back (more days come),
+   open a day (version, place, weather, its notes), open a note, edit it,
+   Back: the day shows the edit, and the list is where it was left.
 10. **Upcoming.** "Add a date" (a birthday), Save, then edit it and delete
     it. A trip: "Find the city" names it. The web's Upcoming agrees at each
     step.

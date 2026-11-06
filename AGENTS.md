@@ -27,7 +27,7 @@ says how every client behaves.
 - `app/` is the Compose app: `AppGraph` (in `ChangelogApp.kt`) holds the
   shared state for the screens and for `SendWorker`; `AppModel` is the
   screens' ViewModel; `TokenStore` keeps the token sealed by an Android
-  Keystore key; `ui/` has the screens (sign-in, Log, Settings). The app's
+  Keystore key; `ui/` has the screens (sign-in, Log, Notes, Settings). The app's
   words are in `res/values/strings.xml`, read with `say()` and `sayCount()`
   (in `ChangelogApp.kt`). `kit` has no Android, so its sentences (activity
   rows, notices, the daily prompt, errors, `UpcomingDraft`'s checks) are
@@ -111,8 +111,15 @@ moved past the version the app last read (`api_version` in `/v1/me`):
 3. run `DevServerTest` against the current dev server (`git pull`, restart
    it) before anything else.
 
-It last matched API 1.13.0 (2026-11-01). 1.12.0 and 1.13.0 only add fields to
-`GET /v1/me` (`supporting_member`, `lived`), which the app doesn't read.
+It was last read against API 1.17.2 (2026-11-05). Every new field is
+optional and `kit` ignores what it doesn't know, so nothing broke. Of what
+1.14.0 to 1.17.2 added, the app reads a recording's `transcript` and
+`writing` (1.14.0); not yet the rest of a note (`parts`, `place`, `markup`
+and the like), `include=urls`, the archive reads beyond `GET /v1/days` and
+`GET /v1/days/{date}` (search, on this day, releases and the rest, 1.15.0),
+rich notes and place writes (1.16.0), or taking one file off a note
+(1.17.0). Since 1.17.0 a `note.files` activity row can say `removed`, which
+Activity still words as "Files added".
 
 ## Building
 
@@ -231,14 +238,16 @@ dev server is a path: put the server's address in front of it.
 
 ## What's next
 
-Done: sign-in by token, Log (version, tag row with a sticky tag, Commit),
+Done: sign-in by token, Log (version, tag row with a sticky tag, Commit,
+today's notes), Notes (the days and their notes),
 the Outbox and its sender, Waiting to send (fix, discard), opening a note
 full screen to edit or delete it (`ui/NoteViewer.kt`: Edit is the composer's
 words, tag row, Photos, Camera and Record, with files added after the edit
-as an `OutboxOperation.Attach`; a note's own files can't come off, the API has
-no way; Delete asks first), Today on Log from every channel (with
-the `activity` scope; otherwise what this phone sent), the Activity screen
-(filters, "Older" paging, "Since you last looked"), Settings and
+as an `OutboxOperation.Attach`; a note's own files can't come off here yet,
+though API 1.17.0 has a way; Delete asks first), Log showing notes only (activity is its own
+tab; offline, today falls back to what this phone sent), the Activity screen
+(filters, "Older" paging, "Since you last looked"; each filter's last rows
+kept in memory in `AppModel.activityShown` so the tab opens on them), Settings and
 sign-out. Activity rows read as in the iPhone app (`kit`'s
 `ActivityText.kt`).
 
@@ -282,11 +291,14 @@ After a send, Log says "Filed in 4.5.137." or, when the receipt's
 `unlocked` names badges, "Unlocked: …", in an ink capsule that goes by
 itself.
 
-Log shows the notes on a day (`GET /v1/notes?from=&to=`, one day a request,
-oldest first, paged by `next`), with a way a day back or on (`AppModel`'s
-`stepDay`, `loadDay`; `ui/DayNotes.kt`). A note's files come from its `media`:
+Log shows today's notes only (`GET /v1/notes?from=&to=`, oldest first, paged
+by `next`; `AppModel`'s `loadDay`, `ui/DayNotes.kt`); the days before are in
+Notes. A note's files come from its `media`:
 a photo shows its small copy when it has one (`size=thumb`, kept in a small
-cache for the session), a recording plays and anything else opens, each by a
+cache for the session), a recording plays with play, pause and a line to scrub along (`VoiceMemo`), with its transcript under it
+once Release Notes has kept one (the owner's opt-in; cut to six lines on Log, whole and selectable when
+the note is open; "Its words are still being written." while `writing`, and the note read again every ten
+seconds for up to five minutes, since a transcript arriving doesn't change `revision`), and anything else opens, each by a
 signed address asked for as it's tapped and never kept (ten minutes, fetched
 with no token). A photo opens in the app (`ui/PhotoViewer.kt`: full screen,
 pinch and double-tap to zoom, decoded down to 2560 px on its longest side);
@@ -296,7 +308,21 @@ from (`source`, `mine`).
 Pinned tags are set in Settings (`PUT /v1/tags/pinned`, through the
 Outbox) and come first in the tag row.
 
-Log, Upcoming, Activity and Settings are the four tabs along the bottom.
+Notes (`ui/NotesScreen.kt`) is reading, as the iPhone app's tab of the same
+name (Jamie asked for the name): today's notes, then "Earlier", the days
+before newest first (`GET /v1/days`, API 1.15.0, a page of 30 read as the last
+row shows), each with its version and "3 notes · 1 file · place · Paused". A
+day opens in the tab, Back returning to the list where it was left: its
+version, place, weather (with the credit the API asks for) and every note
+(`GET /v1/days/{date}`, then `/v1/notes` after its `next`). A note opens in
+`NoteViewer`, as from Log, with Edit and Delete where the token may; the open
+day's notes live in `AppModel` (`shownDayNotes`) beside Log's, so an edit or
+delete shows on both at once. It needs `notes:all` or `notes:read`
+(`readsNotes`); without, the tab says how to make such a token, and there is
+no in-app upgrade yet (the iPhone app has one, by OAuth). Everything it reads
+is in memory only. No lock on reading yet (the iPhone app's Face ID lock).
+
+Log, Notes, Upcoming, Activity and Settings are the five tabs along the bottom.
 Settings' Appearance (`ThemeMode`: same as the phone, light or dark) is about
 the phone, so it's kept in `AppGraph` and signing out leaves it. The widget
 and the tile follow the phone's own theme.

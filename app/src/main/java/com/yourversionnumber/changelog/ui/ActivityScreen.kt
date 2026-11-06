@@ -42,6 +42,7 @@ import com.yourversionnumber.changelog.AppModel
 import com.yourversionnumber.changelog.R
 import com.yourversionnumber.changelog.kit.ActivityFilter
 import com.yourversionnumber.changelog.kit.ActivityItem
+import com.yourversionnumber.changelog.kit.ActivityPage
 import com.yourversionnumber.changelog.kit.detail
 import com.yourversionnumber.changelog.kit.headline
 import com.yourversionnumber.changelog.kit.isProblem
@@ -62,9 +63,13 @@ import kotlinx.coroutines.launch
 @Composable
 fun ActivityScreen(model: AppModel) {
     var filter by rememberSaveable { mutableStateOf(ActivityFilter.All) }
-    var items by remember { mutableStateOf<List<ActivityItem>>(emptyList()) }
-    var next by remember { mutableStateOf<String?>(null) }
+    // What this filter showed last time, at once; read again as the tab opens.
+    val kept = model.activityShown[filter.name]
+    var items by remember { mutableStateOf(kept?.items.orEmpty()) }
+    var next by remember { mutableStateOf(kept?.next) }
     var loading by remember { mutableStateOf(false) }
+    // Whether this filter has been read, now or before: until then the list is blank, never "Nothing here yet".
+    var read by remember { mutableStateOf(kept != null) }
     // Pulled down by the owner; the spinner is theirs, apart from the loading of an older page.
     var refreshing by remember { mutableStateOf(false) }
     // Where "Since you last looked" goes: the newest row when Activity was last left.
@@ -74,14 +79,25 @@ fun ActivityScreen(model: AppModel) {
     suspend fun load(more: Boolean) {
         if (!model.hasActivity) return
         loading = true
-        model.activity(before = if (more) next else null, kinds = filter.kinds)?.let { page ->
+        val reading = filter
+        model.activity(before = if (more) next else null, kinds = reading.kinds)?.let { page ->
+            if (reading != filter) return@let
             items = if (more) items + page.items else page.items
             next = page.next
+            model.activityShown[reading.name] = ActivityPage(items, next)
         }
+        if (reading == filter) read = true
         loading = false
     }
 
-    LaunchedEffect(filter) { load(more = false) }
+    LaunchedEffect(filter) {
+        // Another filter: what it showed last time, if anything, then a fresh read.
+        val shownBefore = model.activityShown[filter.name]
+        items = shownBefore?.items.orEmpty()
+        next = shownBefore?.next
+        read = shownBefore != null
+        load(more = false)
+    }
     DisposableEffect(Unit) {
         onDispose { items.firstOrNull()?.let { model.graph.seenActivity = it.id } }
     }
@@ -133,7 +149,7 @@ fun ActivityScreen(model: AppModel) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                } else if (shown.isEmpty() && !loading) {
+                } else if (shown.isEmpty() && read && !loading) {
                     item { Text(say(R.string.nothing_here_yet), color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
                 items(shown, key = { it.id }) { item ->

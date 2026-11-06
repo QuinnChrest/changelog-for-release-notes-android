@@ -54,6 +54,7 @@ import com.yourversionnumber.changelog.ui.ActivityScreen
 import com.yourversionnumber.changelog.ui.ChangelogTheme
 import com.yourversionnumber.changelog.ui.LocalBarSpace
 import com.yourversionnumber.changelog.ui.LogScreen
+import com.yourversionnumber.changelog.ui.NotesScreen
 import com.yourversionnumber.changelog.ui.Rule
 import com.yourversionnumber.changelog.ui.SettingsScreen
 import com.yourversionnumber.changelog.ui.SignInScreen
@@ -65,6 +66,7 @@ private class Tab(val id: String, @StringRes val label: Int, @DrawableRes val ic
 
 private val tabs = listOf(
     Tab("log", R.string.log, R.drawable.ic_tab_log),
+    Tab("notes", R.string.notes, R.drawable.ic_tab_notes),
     Tab("upcoming", R.string.upcoming, R.drawable.ic_tab_upcoming),
     Tab("activity", R.string.activity, R.drawable.ic_tab_activity),
     Tab("settings", R.string.settings, R.drawable.ic_tab_settings),
@@ -73,7 +75,7 @@ private val tabs = listOf(
 /** How tall the floating bar is, without its margin. */
 private val BarHeight = 76.dp
 
-/** Log, Upcoming, Activity and Settings, in a bar that floats above the screen. Back from any but Log goes to Log. */
+/** Log, Notes, Upcoming, Activity and Settings, in a bar that floats above the screen. Back from any but Log goes to Log. */
 @Composable
 private fun Tabs(model: AppModel) {
     BackHandler(enabled = model.screen != "log") { model.screen = "log" }
@@ -83,6 +85,7 @@ private fun Tabs(model: AppModel) {
         Box(Modifier.fillMaxSize().consumeWindowInsets(WindowInsets.navigationBars)) {
             CompositionLocalProvider(LocalBarSpace provides BarHeight + inset + 16.dp) {
                 when (model.screen) {
+                    "notes" -> NotesScreen(model)
                     "upcoming" -> UpcomingScreen(model)
                     "activity" -> ActivityScreen(model)
                     "settings" -> SettingsScreen(model)
@@ -109,7 +112,7 @@ private fun Tabs(model: AppModel) {
  */
 @Composable
 private fun FloatingTabs(current: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
-    // Four words share the width, so the labels stop growing past 130% text size; the screens beside them go on to 200%.
+    // Five words share the width, so the labels stop growing past 130% text size; the screens beside them go on to 200%.
     val density = LocalDensity.current
     val labelSize = with(density) { (12f * minOf(fontScale, 1.3f)).dp.toSp() }
     val shape = RoundedCornerShape(36.dp)

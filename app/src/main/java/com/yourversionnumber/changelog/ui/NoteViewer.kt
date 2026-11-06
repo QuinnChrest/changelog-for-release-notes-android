@@ -52,6 +52,8 @@ import com.yourversionnumber.changelog.R
 import com.yourversionnumber.changelog.kit.Hashtags
 import com.yourversionnumber.changelog.kit.NoteDetail
 import com.yourversionnumber.changelog.kit.UpcomingDraft
+import com.yourversionnumber.changelog.kit.awaitingWords
+import kotlinx.coroutines.delay
 import com.yourversionnumber.changelog.say
 import com.yourversionnumber.changelog.target
 
@@ -61,14 +63,28 @@ import com.yourversionnumber.changelog.target
  */
 @Composable
 internal fun NoteViewer(model: AppModel, target: NoteTarget, player: FilePlayer, onClose: () -> Unit) {
-    var note by remember(target) { mutableStateOf(model.dayNotes?.firstOrNull { it.id == target.id }) }
+    // The copy on Log, or on the day open in Notes, while it's there: a transcript or an edit read in shows here too.
+    var loaded by remember(target) { mutableStateOf<NoteDetail?>(null) }
+    val onDay = model.noteShown(target.id)
+    // As it was when opened, should it leave the page while it's open (deleted, or the day read again).
+    val opened = remember(target) { onDay }
+    val note = onDay ?: loaded ?: opened
     var editing by remember(target) { mutableStateOf(false) }
     var deleting by remember(target) { mutableStateOf(false) }
     // A note not on the day's page (a row from the activity log, say) is read as this opens.
     LaunchedEffect(target) {
         if (note == null) {
-            note = model.load(target)
-            if (note == null) onClose()
+            loaded = model.load(target)
+            if (loaded == null) onClose()
+        }
+    }
+    // Read here, it's read again for a recording's words while they're being written, as Log does.
+    val awaiting = onDay == null && loaded?.awaitingWords == true
+    LaunchedEffect(target, awaiting) {
+        if (!awaiting) return@LaunchedEffect
+        repeat(30) {
+            delay(10_000)
+            loaded?.let { model.reread(it) }?.let { loaded = it }
         }
     }
     Dialog(
@@ -137,7 +153,7 @@ private fun NoteReader(model: AppModel, note: NoteDetail, player: FilePlayer, on
                     Text(note.text, Modifier.padding(top = 10.dp), style = MaterialTheme.typography.bodyLarge.copy(fontSize = 19.sp, lineHeight = 28.sp))
                 }
             }
-            if (note.media.isNotEmpty()) NoteFiles(model, note, player)
+            if (note.media.isNotEmpty()) NoteFiles(model, note, player, whole = true)
             Rule(Modifier.padding(top = 16.dp, bottom = 8.dp))
             Caption(noteSource(note))
             if (note.version != null) {

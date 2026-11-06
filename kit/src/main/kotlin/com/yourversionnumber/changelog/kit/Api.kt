@@ -67,6 +67,18 @@ class Api(
         return send("GET", "v1/notes", query = query)
     }
 
+    /** The timeline, newest first (API 1.15.0, `notes:read` or `notes:all`). `before` is the last page's `next`. */
+    suspend fun days(before: String? = null, limit: Int = 30): DayList {
+        val query = buildList {
+            add("limit" to limit.toString())
+            before?.let { add("before" to it) }
+        }
+        return send("GET", "v1/days", query = query)
+    }
+
+    /** One day with its first notes (API 1.15.0, `notes:read` or `notes:all`); the rest come from [notes] after `next`. */
+    suspend fun day(date: String): DayDetail = send("GET", "v1/days/$date")
+
     /** A signed address for file `n` of a note, or its small copy. */
     suspend fun noteFile(date: String, id: String, n: Int, thumb: Boolean = false): FileAddress =
         send("GET", "v1/notes/$date/$id/media/$n", query = if (thumb) listOf("size" to "thumb") else emptyList())

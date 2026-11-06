@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notes tab: an open book. Drawn as outlines in one colour, which the screen tints. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M12,7c-1.6,-1.6 -4,-2.4 -8,-2.5v13c4,0.1 6.4,0.9 8,2.5c1.6,-1.6 4,-2.4 8,-2.5v-13c-4,0.1 -6.4,0.9 -8,2.5z"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M12,7v13"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

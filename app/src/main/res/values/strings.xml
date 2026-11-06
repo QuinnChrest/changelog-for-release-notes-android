@@ -93,7 +93,6 @@
     <string name="off_this_date_reminds_nowhere">Off, this date reminds nowhere, this phone included.</string>
     <string name="older">Older</string>
     <string name="earlier">Earlier</string>
-    <string name="later">Later</string>
     <string name="nothing_filed_this_day">Nothing filed this day.</string>
     <string name="cant_reach_release_notes">Can’t reach Release Notes right now.</string>
     <string name="from_this_phone">From this phone</string>
@@ -178,6 +177,14 @@
     <string name="title">Title</string>
     <string name="to_get_them_here_make">To get them here, make a token with “Read the activity log” ticked.</string>
     <string name="today">Today</string>
+    <string name="today_in">Today in</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="notes">Notes</string>
+    <string name="paused">Paused</string>
+    <string name="no_notes">No notes</string>
+    <string name="notes_opens_once_release_notes">Notes opens once Release Notes can be reached.</string>
+    <string name="read_your_notes_here">Read your notes here, wherever you wrote them, and change any of them.</string>
+    <string name="notes_needs_a_token">This phone’s token reads only the notes it sent. Make a new token in Release Notes under Settings, API tokens, with “Read and change every note” ticked, then sign out here and sign in with it. Anything waiting to send stays.</string>
     <string name="token">Token</string>
     <string name="touch_and_hold_a_tag">Touch and hold a tag on Log to add it to every note from this phone.</string>
     <string name="two_weeks_before">Two weeks before</string>
@@ -205,6 +212,14 @@
     <string name="year_it_began_optional">Year it began (optional)</string>
     <string name="your_email_is_stopped">Your email is stopped.</string>
     <string name="z_rich_or_paris_texas">Zürich, or Paris, Texas</string>
+    <plurals name="notes_count">
+        <item quantity="one">%d note</item>
+        <item quantity="other">%d notes</item>
+    </plurals>
+    <plurals name="files_count">
+        <item quantity="one">%d file</item>
+        <item quantity="other">%d files</item>
+    </plurals>
     <plurals name="streak">
         <item quantity="one">%1$d day in a row</item>
         <item quantity="other">%1$d days in a row</item>

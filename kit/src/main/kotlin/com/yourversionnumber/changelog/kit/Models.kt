@@ -44,6 +44,9 @@ data class TokenInfo(
 ) {
     /** `notes:all` (API 1.10.0): reads and changes every note in the account, whatever channel wrote it. */
     val readsAll: Boolean get() = "notes:all" in scopes
+
+    /** `notes:all`, or `notes:read` (API 1.15.0) on its own: every note, and the days, can be read. */
+    val readsNotes: Boolean get() = readsAll || "notes:read" in scopes
 }
 
 /**
@@ -131,6 +134,60 @@ data class NoteList(
     val items: List<NoteDetail>,
     val next: String? = null,
 )
+
+/** A place as a day reads it out: its name. */
+@Serializable
+data class PlaceName(val label: String? = null)
+
+/** A day's weather, in the web's own words. */
+@Serializable
+data class DayWeather(val line: String)
+
+/** One day of the timeline, `GET /v1/days` (API 1.15.0): what it says of itself, without its notes. */
+@Serializable
+data class DaySummary(
+    val date: String,
+    val version: String,
+    /** The place set on the day itself. */
+    val place: PlaceName? = null,
+    /** What a note with no place of its own shows: the day's, or else home. */
+    val around: PlaceName? = null,
+    val weather: DayWeather? = null,
+    val notesTotal: Int = 0,
+    val files: Int = 0,
+    val emailed: Boolean = false,
+    val paused: Boolean = false,
+) {
+    /** Where it was, if it says. */
+    val placeLabel: String? get() = place?.label ?: around?.label
+}
+
+/** `GET /v1/days`: newest first, today on the first page; `next` is the `before` of the next page. */
+@Serializable
+data class DayList(
+    val today: String? = null,
+    val days: List<DaySummary> = emptyList(),
+    val next: String? = null,
+    /** Shown wherever the weather shows. */
+    val weatherCredit: String? = null,
+)
+
+/** `GET /v1/days/{date}` (API 1.15.0): one day and its first notes, oldest first; `next` goes on through `/v1/notes`. */
+@Serializable
+data class DayDetail(
+    val date: String,
+    val version: String,
+    val place: PlaceName? = null,
+    val around: PlaceName? = null,
+    val weather: DayWeather? = null,
+    val paused: Boolean = false,
+    val notesTotal: Int = 0,
+    val notes: List<NoteDetail> = emptyList(),
+    val next: String? = null,
+    val weatherCredit: String? = null,
+) {
+    val placeLabel: String? get() = place?.label ?: around?.label
+}
 
 /** A signed address for one file, fetched with no token and good for ten minutes. */
 @Serializable

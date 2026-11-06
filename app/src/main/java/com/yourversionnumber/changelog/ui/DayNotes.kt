@@ -182,37 +182,20 @@ internal fun rememberFilePlayer(): FilePlayer {
     return player
 }
 
-/** The day Log shows, with a way a day back, or on, and today again. */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-internal fun DayHeading(model: AppModel) {
-    val label = if (model.isToday) say(R.string.today) else model.day?.let { UpcomingDraft.parse(it)?.format(dayline) } ?: " "
-    Column(Modifier.padding(top = 16.dp)) {
-        Heading(label)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            QuietButton(say(R.string.earlier), { model.stepDay(-1) })
-            if (!model.isToday) {
-                QuietButton(say(R.string.later), { model.stepDay(1) })
-                QuietButton(say(R.string.today), model::showToday)
-            }
-        }
-    }
-}
-
 /** One note of the day: its words, its files and where it came from. Tap it to open it, to edit or delete. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun DayNote(model: AppModel, note: NoteDetail, player: FilePlayer, onOpen: () -> Unit) {
+internal fun DayNote(model: AppModel, note: NoteDetail, player: FilePlayer, showVersion: Boolean = false, onOpen: () -> Unit) {
     Column(Modifier.clickable(onClickLabel = say(R.string.open), role = Role.Button, onClick = onOpen)) {
         if (note.text.isNotBlank()) {
             Text(note.text, maxLines = 12, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
         }
         if (note.media.isNotEmpty()) NoteFiles(model, note, player)
         // A line that's too long moves the version down whole, never breaks it.
-        val showVersion = note.version != null && !model.isToday
+        val version = note.version.takeIf { showVersion }
         FlowRow(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.Center) {
-            Caption(if (showVersion) sourceLine(note) + " ·" else sourceLine(note))
-            if (showVersion) VersionText(note.version, size = 13.sp)
+            Caption(if (version != null) sourceLine(note) + " ·" else sourceLine(note))
+            if (version != null) VersionText(version, size = 13.sp)
         }
         Rule(Modifier.padding(top = 6.dp))
     }

@@ -4,7 +4,7 @@ What Changelog for Android does, what's left, and what's built but not yet
 checked. The iPhone app (`jthingelstad/changelog-ios`) is the reference;
 `AGENTS.md` says how each built piece works.
 
-**At a glance:** 51 built · 4 to do · 2 waiting on someone else · 7 to check
+**At a glance:** 52 built · 5 to do · 2 waiting on someone else · 7 to check
 
 Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 built, not yet checked
 
@@ -59,7 +59,9 @@ These are written and built; something about them couldn't be seen on the emulat
 | ✅ | Waiting to send, with Fix and Discard for a refused note; a write that sends at once never shows there, one tried, refused or kept over four seconds does |
 | ✅ | Tap a note on Log to open it full screen (`NoteViewer`): all its words and files, where it came from, and Edit and Delete where this token may change it; Delete asks first. Rows on Log carry no buttons, and a source line too long for the row moves its version down whole |
 | ✅ | Edit as the box on Log is: words, the tag row, and Photos, Camera and Record (files added to the note after the edit, `OutboxOperation.Attach`, `POST /v1/notes/{date}/{id}/media`); no Here, a note keeps its place |
-| ✅ | Log shows a day's notes with their words and files (photos by their small copy, voice memos to play, PDFs to open), oldest first, and steps a day back or on (`GET /v1/notes?from=&to=`, API 1.9.0); offline, today falls back to what this phone sent |
+| ✅ | Log shows today's notes with their words and files (photos by their small copy, voice memos to play, PDFs to open), oldest first (`GET /v1/notes?from=&to=`, API 1.9.0); offline, it falls back to what this phone sent. Days before are in Notes |
+| ✅ | Notes, a tab as the iPhone app's: today's notes, then the days before, newest first and paged (`GET /v1/days`, API 1.15.0), each with its version, counts, place and Paused; a day opens with its version, place, weather and every note (`GET /v1/days/{date}`); a note opens full screen to read, edit or delete, as on Log. Needs `notes:all` or `notes:read`, and says how to get it otherwise. Seen on the emulator against the dev server |
+| 🔲 | Notes: search, on this day, and a way to upgrade the token in the app | The API has search and on this day (1.15.0); the iPhone app upgrades an old token by OAuth from the tab, and can lock reading behind Face ID |
 | ✅ | A photo on a note opens in the app, full screen, to pinch or double-tap to zoom and drag (`PhotoViewer`); a photo the phone can't read offers to open it outside |
 | ✅ | Every note, from any channel, with a token that has `notes:all` (API 1.10.0, 1.11.0): each says where it came from, and Edit and Delete work on any of them; without it, only this token's own |
 | ✅ | Log shows notes only, never activity rows: activity is on its own tab. Today shows nothing until its first read is back, so nothing stands in and is swapped out |

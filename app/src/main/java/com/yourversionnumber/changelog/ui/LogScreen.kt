@@ -65,7 +65,7 @@ import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
 
-/** The home screen: today's version, the box, the tag row, Commit, and what happened today. */
+/** The home screen: today's version, the box, the tag row, Commit, and today's notes. Days before are in Notes. */
 @Composable
 fun LogScreen(model: AppModel) {
     val waiting by model.waiting.collectAsStateWithLifecycle()
@@ -138,14 +138,13 @@ fun LogScreen(model: AppModel) {
                 }
             }
             val notes = model.dayNotes
-            item(key = "day") { DayHeading(model) }
+            item(key = "day") { Heading(say(R.string.today), Modifier.padding(top = 16.dp)) }
             if (notes != null) {
                 // The notes on the day, with their words and files: this token's own, or every channel's with notes:all.
                 if (notes.isEmpty()) {
                     item(key = "empty") {
                         Text(
-                            if (model.isToday) model.me?.let { say(R.string.no_changes_yet_in, it.version) } ?: say(R.string.nothing_yet)
-                            else say(R.string.nothing_filed_this_day),
+                            model.me?.let { say(R.string.no_changes_yet_in, it.version) } ?: say(R.string.nothing_yet),
                             color = paper.ink3,
                             style = MaterialTheme.typography.bodyMedium,
                         )
@@ -156,14 +155,6 @@ fun LogScreen(model: AppModel) {
                 }
                 if (model.moreOnDay) {
                     item(key = "more") { QuietButton(say(R.string.older), { model.loadDay(more = true) }, enabled = !model.dayLoading) }
-                }
-            } else if (!model.isToday) {
-                item(key = "empty") {
-                    Text(
-                        if (model.dayLoading) say(R.string.nothing_yet) else say(R.string.cant_reach_release_notes),
-                        color = paper.ink3,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
                 }
             } else if (model.dayRead != model.day) {
                 // The day's first read is still out: nothing yet, rather than something swapped out a moment later.

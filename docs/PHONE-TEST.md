@@ -42,6 +42,9 @@ Upcoming and the activity log.
 8. **The build.** The foot of Settings names the version and the commit
    (`Changelog 0.0.0, build 1a2b3c4`).
 9. **Activity.** Rows from every channel; a filter; "Older" loads more.
+   **Notes.** Today's notes, then Earlier: scroll far back (more days come),
+   open a day (version, place, weather, its notes), open a note, edit it,
+   Back: the day shows the edit, and the list is where it was left.
 10. **Upcoming.** "Add a date" (a birthday), Save, then edit it and delete
     it. A trip: "Find the city" names it. The web's Upcoming agrees at each
     step.

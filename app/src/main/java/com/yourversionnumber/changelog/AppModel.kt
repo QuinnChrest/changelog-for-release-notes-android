@@ -14,6 +14,8 @@ import androidx.lifecycle.viewModelScope
 import com.yourversionnumber.changelog.kit.ActivityNoticeKind
 import com.yourversionnumber.changelog.kit.ActivityPage
 import com.yourversionnumber.changelog.kit.ApiException
+import com.yourversionnumber.changelog.kit.DayDetail
+import com.yourversionnumber.changelog.kit.DaySummary
 import com.yourversionnumber.changelog.kit.Hashtags
 import com.yourversionnumber.changelog.kit.Here
 import com.yourversionnumber.changelog.kit.MediaType
@@ -73,13 +75,11 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     /** `notes:all`: every note of the account is read, edited and deleted here, not only this token's own. */
     val readsAll: Boolean get() = me?.token?.readsAll == true
 
-    /** The day Log shows; null is today. */
-    var viewing by mutableStateOf<String?>(null)
-        private set
+    /** `notes:all` or `notes:read`: Notes reads the days, and every note on them. */
+    val readsNotes: Boolean get() = me?.token?.readsNotes == true
 
-    /** The day Log shows, as the account's own day. */
-    val day: String? get() = viewing ?: me?.today
-    val isToday: Boolean get() = viewing == null || viewing == me?.today
+    /** The day Log shows: today, as the account's own day. */
+    val day: String? get() = me?.today
 
     /** The notes on that day, oldest first; null until the first read, or when it couldn't be made (offline). */
     var dayNotes by mutableStateOf<List<NoteDetail>?>(null)
@@ -96,19 +96,6 @@ class AppModel(application: Application) : AndroidViewModel(application) {
 
     /** Whether a note on Log may be edited or deleted here. */
     fun canChange(note: NoteDetail) = note.mine || readsAll
-
-    /** One day back (-1) or on (+1), never past today. */
-    fun stepDay(by: Int) {
-        val today = me?.today ?: return
-        val to = LocalDate.parse(day ?: return).plusDays(by.toLong())
-        viewing = if (to >= LocalDate.parse(today)) null else to.toString()
-        loadDay()
-    }
-
-    fun showToday() {
-        viewing = null
-        loadDay()
-    }
 
     /** Reads the day Log shows: this token's notes, or every channel's with `notes:all`. `more` takes the next page. */
     fun loadDay(more: Boolean = false) {
@@ -477,7 +464,10 @@ class AppModel(application: Application) : AndroidViewModel(application) {
      */
     fun saveEdit(note: NoteDetail, text: String, files: List<QueuedFile>) {
         val changed = text != note.text
-        if (changed) dayNotes = dayNotes?.map { if (it.id == note.id) it.copy(text = text) else it }
+        if (changed) {
+            dayNotes = dayNotes?.map { if (it.id == note.id) it.copy(text = text) else it }
+            shownDayNotes = shownDayNotes.map { if (it.id == note.id) it.copy(text = text) else it }
+        }
         editFiles.clear()
         viewModelScope.launch {
             try {
@@ -494,6 +484,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         queue(OutboxOperation.Delete(target.date, target.id))
         graph.forget(target.id)
         dayNotes = dayNotes?.filterNot { it.id == target.id }
+        shownDayNotes = shownDayNotes.filterNot { it.id == target.id }
     }
 
     private fun queue(operation: OutboxOperation) = viewModelScope.launch {
@@ -504,6 +495,115 @@ class AppModel(application: Application) : AndroidViewModel(application) {
             graph.report(e.message)
         }
     }
+
+    // Notes: the timeline, and one day of it opened. Memory only, as Log's notes are; it needs `notes:all` or
+    // `notes:read`, and a refusal shows where the list would be.
+
+    /** The days, newest first, today among them; null until the first read. */
+    var days by mutableStateOf<List<DaySummary>?>(null)
+        private set
+    private var daysNext by mutableStateOf<String?>(null)
+    val moreDays: Boolean get() = daysNext != null
+    var daysLoading by mutableStateOf(false)
+        private set
+
+    /** Why the days couldn't be read, while none are shown. */
+    var daysProblem by mutableStateOf<String?>(null)
+        private set
+
+    /** Shown wherever the weather is. */
+    var weatherCredit by mutableStateOf<String?>(null)
+        private set
+    private var daysJob: Job? = null
+
+    /** Reads the days afresh, or with `more` the page after the last. */
+    fun loadDays(more: Boolean = false) {
+        val api = graph.api() ?: return
+        if (more && (daysNext == null || daysLoading)) return
+        daysJob?.cancel()
+        daysJob = viewModelScope.launch {
+            daysLoading = true
+            try {
+                val page = api.days(before = if (more) daysNext else null)
+                days = if (more) days.orEmpty() + page.days else page.days
+                daysNext = page.next
+                page.weatherCredit?.let { weatherCredit = it }
+                daysProblem = null
+            } catch (e: ApiException) {
+                if (days == null) daysProblem = e.message
+                if (e.signedOut) handle(e)
+            } finally {
+                if (daysJob == coroutineContext[Job]) daysLoading = false
+            }
+        }
+    }
+
+    /** The day opened in Notes, once read; its notes so far, oldest first. */
+    var shownDay by mutableStateOf<DayDetail?>(null)
+        private set
+    var shownDate by mutableStateOf<String?>(null)
+        private set
+    var shownDayNotes by mutableStateOf<List<NoteDetail>>(emptyList())
+        private set
+    private var shownDayNext by mutableStateOf<String?>(null)
+    val moreOnShownDay: Boolean get() = shownDayNext != null
+    var shownDayProblem by mutableStateOf<String?>(null)
+        private set
+    private var shownDayJob: Job? = null
+
+    /** Opens a day in Notes and reads it. */
+    fun showDay(date: String) {
+        if (shownDate != date) {
+            shownDay = null
+            shownDayNotes = emptyList()
+            shownDayNext = null
+            shownDayProblem = null
+        }
+        shownDate = date
+        readShownDay()
+    }
+
+    /** Reads the open day again, or with `more` its next notes. */
+    fun readShownDay(more: Boolean = false) {
+        val api = graph.api() ?: return
+        val date = shownDate ?: return
+        if (more && shownDayNext == null) return
+        shownDayJob?.cancel()
+        shownDayJob = viewModelScope.launch {
+            try {
+                if (more) {
+                    val page = api.notes(date, after = shownDayNext)
+                    if (shownDate == date) {
+                        shownDayNotes = shownDayNotes + page.items
+                        shownDayNext = page.next
+                    }
+                } else {
+                    val read = api.day(date)
+                    if (shownDate == date) {
+                        shownDay = read
+                        shownDayNotes = read.notes
+                        shownDayNext = read.next
+                        shownDayProblem = null
+                    }
+                }
+            } catch (e: ApiException) {
+                if (shownDate == date && shownDay == null) shownDayProblem = e.message
+                if (e.signedOut) handle(e)
+            }
+        }
+    }
+
+    fun closeDay() {
+        shownDayJob?.cancel()
+        shownDate = null
+        shownDay = null
+        shownDayNotes = emptyList()
+        shownDayNext = null
+        shownDayProblem = null
+    }
+
+    /** A note on Log or on the day open in Notes, as last read. */
+    fun noteShown(id: String): NoteDetail? = dayNotes?.firstOrNull { it.id == id } ?: shownDayNotes.firstOrNull { it.id == id }
 
     // Activity
 
@@ -537,9 +637,12 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         if (revoke) runCatching { graph.api()?.revokeToken() }
         graph.signOut()
         me = null
-        viewing = null
         dayNotes = null
         dayRead = null
+        days = null
+        daysNext = null
+        weatherCredit = null
+        closeDay()
         tags = null
         sticky = null
         activityShown.clear()

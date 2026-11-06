@@ -63,9 +63,9 @@ import com.yourversionnumber.changelog.target
  */
 @Composable
 internal fun NoteViewer(model: AppModel, target: NoteTarget, player: FilePlayer, onClose: () -> Unit) {
-    // The day's own copy while it's on the page, so a transcript read in on Log shows here too.
+    // The copy on Log, or on the day open in Notes, while it's there: a transcript or an edit read in shows here too.
     var loaded by remember(target) { mutableStateOf<NoteDetail?>(null) }
-    val onDay = model.dayNotes?.firstOrNull { it.id == target.id }
+    val onDay = model.noteShown(target.id)
     // As it was when opened, should it leave the page while it's open (deleted, or the day read again).
     val opened = remember(target) { onDay }
     val note = onDay ?: loaded ?: opened

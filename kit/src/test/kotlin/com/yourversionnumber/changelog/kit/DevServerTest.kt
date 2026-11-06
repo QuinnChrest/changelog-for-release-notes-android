@@ -160,4 +160,25 @@ class DevServerTest {
         assertEquals("image", api.note(first.note.date, first.note.id).media.single().kind)
         api.deleteNote(first.note.date, first.note.id, key())
     }
+
+    @Test
+    fun theTimelineAndADayReadWithATokenThatReadsNotes() = runTest {
+        // API 1.15.0: only a token with notes:all or notes:read reads the days; any other is refused by scope.
+        val me = api.me()
+        if (!me.token.readsNotes) {
+            val refused = assertFailsWith<ApiException> { api.days() }
+            assertEquals("scope_required", refused.code)
+            return@runTest
+        }
+        val receipt = api.createNote(NoteRequest("DevServerTest a day's note", writtenAt = Timestamp.now()), key())
+        val page = api.days(limit = 3)
+        val today = page.days.first()
+        assertEquals(page.today, today.date)
+        assertTrue(today.notesTotal >= 1)
+        assertTrue(page.days.zipWithNext().all { (a, b) -> a.date > b.date }, "newest first")
+        val day = api.day(receipt.note.date)
+        assertEquals(today.version, day.version)
+        assertTrue(day.notes.any { it.id == receipt.note.id })
+        api.deleteNote(receipt.note.date, receipt.note.id, key())
+    }
 }

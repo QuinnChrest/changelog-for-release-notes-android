@@ -111,15 +111,20 @@ moved past the version the app last read (`api_version` in `/v1/me`):
 3. run `DevServerTest` against the current dev server (`git pull`, restart
    it) before anything else.
 
-It was last read against API 1.17.2 (2026-11-05). Every new field is
+It was last read against API 1.18.2 (2026-11-06). Every new field is
 optional and `kit` ignores what it doesn't know, so nothing broke. Of what
-1.14.0 to 1.17.2 added, the app reads a recording's `transcript` and
-`writing` (1.14.0); not yet the rest of a note (`parts`, `place`, `markup`
-and the like), `include=urls`, the archive reads beyond `GET /v1/days` and
-`GET /v1/days/{date}` (search, on this day, releases and the rest, 1.15.0),
-rich notes and place writes (1.16.0), or taking one file off a note
-(1.17.0). Since 1.17.0 a `note.files` activity row can say `removed`, which
-Activity still words as "Files added".
+1.14.0 to 1.18.2 added, the app reads a recording's `transcript` and
+`writing` (1.14.0), a `note.files` row's `removed` (1.17.0), and the
+check-in activity rows (1.18.0: `checkin`, worded with its `label`, which
+is the owner's words and so never goes in a notice; `checkin.named`,
+`checkin.deleted` and `checkin.place`, kinds the ledger doesn't list but
+`packages/domain/activity.ts` does); not yet the rest of a note (`parts`,
+`place`, `markup` and the like), `include=urls`, the archive reads beyond
+`GET /v1/days` and `GET /v1/days/{date}` (search, on this day, releases and
+the rest, 1.15.0), rich notes and place writes (1.16.0), taking one file off
+a note (1.17.0), or sending and listing check-ins (1.18.0; sending them
+from the phone would need background location, which the rules here
+don't allow).
 
 ## Building
 

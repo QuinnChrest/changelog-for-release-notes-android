@@ -223,9 +223,21 @@ data class ActivityItem(
     val version: String? = null,
     val note: String? = null,
     val files: Int? = null,
+    /** A note.files row's count of files put on, or taken off (`removed`, API 1.17.0). */
+    val added: Int? = null,
+    val removed: Int? = null,
     val outcome: String? = null,
     val name: String? = null,
     val title: String? = null,
+    /** A check-in row's id (API 1.18.0). */
+    val checkin: String? = null,
+    /** The name a check-in shows: the one row that holds the owner's words, so it stays on screen, never in a notice. */
+    val label: String? = null,
+    /** checkin.place: added, spot, renamed or forgotten. */
+    val change: String? = null,
+    /** checkin.deleted: every check-in at once, and how many went. */
+    val all: Boolean? = null,
+    val count: Int? = null,
 ) {
     val family: String get() = kind.substringBefore('.')
 

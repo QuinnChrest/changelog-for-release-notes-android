@@ -4,7 +4,7 @@ What Changelog for Android does, what's left, and what's built but not yet
 checked. The iPhone app (`jthingelstad/changelog-ios`) is the reference;
 `AGENTS.md` says how each built piece works.
 
-**At a glance:** 52 built · 5 to do · 2 waiting on someone else · 7 to check
+**At a glance:** 52 built · 5 to do · 2 waiting on someone else · 8 to check
 
 Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 built, not yet checked
 
@@ -15,7 +15,7 @@ Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 b
 | 🔲 | Sign in with Release Notes (OAuth) instead of pasting a token | The server has it since API 1.3.0: authorization code with PKCE for the resource `/v1`, a private-use callback (`com.yourversionnumber.changelog:/oauth`), the owner names the token and ticks its scopes, no refresh token; sign out at `/oauth/revoke` or `DELETE /v1/token`. Needs the registration, a browser hop (Custom Tabs, which is AndroidX) and the token exchange. Pasting a token stays for the dev server. |
 | 🔲 | Notes for another day | The API takes a `date` back to the birthday and the queue already carries one; Log has no day picker, so every note files to today. |
 | 🔲 | "Where": search for a place by name | `GET /v1/places?q=` is the web's city search; Log only has Here. |
-| 🔲 | Take a file off a note | `/v1` can add files to a note but not remove one, so the editor shows a note's files and leaves them. Needs an API change first (an issue on yvn-release-notes). |
+| 🔲 | Take a file off a note | API 1.17.0 has `DELETE /v1/notes/{date}/{id}/media/{n}` (`media:write`, and `notes:all` on a note another channel wrote; a note with no words keeps its last file). The editor shows a note's files and leaves them; Activity already says "Files removed". |
 
 ## Waiting on someone else
 
@@ -36,6 +36,7 @@ These are written and built; something about them couldn't be seen on the emulat
 | 🔍 | The whole pass on a real phone | `docs/PHONE-TEST.md`, by hand, on a real account |
 | 🔍 | UI test cycle in CI | Runs on emulators here; CI runs the unit tests and lint only |
 | 🔍 | A voice memo's transcript under it | API 1.14.0 (jthingelstad/yvn-release-notes#301). Seen on the emulator against the dev server's made-up transcript: "Its words are still being written." on Log, then the words, read again without a refresh, and whole in the open note. Not yet a real transcript on a real account |
+| 🔍 | Check-in rows in Activity, and its Check-ins filter | API 1.18.0. Worded as the iPhone app ("Checked in at …", named, deleted, remembered places) and tested in `ActivityTextTest`; no check-in has been sent to the dev server to see a row on screen. The app doesn't send or list check-ins |
 | 🔍 | A photo's small copy on Log, and `notes:all` on a real account | The dev server's fixture photo has no small copy, so the thumbnail path ran only in a unit test; the whole-account list was seen on the dev server with a `notes:all` token, not on production |
 
 ## Built

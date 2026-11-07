@@ -29,6 +29,34 @@ class ActivityTextTest {
     }
 
     @Test
+    fun filesTakenOffSaySo() {
+        assertEquals("Files added in 4.5.137", row("note.files").copy(added = 1).headline)
+        assertEquals("Files removed in 4.5.137", row("note.files").copy(removed = 1).headline)
+        assertEquals("Files removed", row("note.files").copy(version = null, removed = 2).headline)
+    }
+
+    @Test
+    fun checkInsReadAsTheIphoneAppDoes() {
+        assertEquals("Checked in at Lake Harriet", row("checkin").copy(label = "Lake Harriet").headline)
+        assertEquals("Checked in at an unnamed stop", row("checkin").copy(label = "Unnamed stop").headline)
+        assertEquals("Checked in at an unnamed stop", row("checkin").headline)
+        assertEquals("Named a check-in", row("checkin.named").headline)
+        assertEquals("Deleted a check-in", row("checkin.deleted").copy(count = 2).headline)
+        assertEquals("Deleted all your check-ins, 12", row("checkin.deleted").copy(all = true, count = 12).headline)
+        assertEquals("Deleted all your check-ins", row("checkin.deleted").copy(all = true).headline)
+        assertEquals("Remembered a place", row("checkin.place").copy(change = "added").headline)
+        assertEquals("Added a spot to a remembered place", row("checkin.place").copy(change = "spot").headline)
+        assertEquals("Renamed a remembered place", row("checkin.place").copy(change = "renamed").headline)
+        assertEquals("Forgot a remembered place", row("checkin.place").copy(change = "forgotten").headline)
+    }
+
+    @Test
+    fun aCheckInNeverNotifies() {
+        val stop = row("checkin", via = "token", token = "Another phone").copy(label = "Home")
+        assertNull(ActivityNotices.kind(stop, pixel))
+    }
+
+    @Test
     fun onlyThisTokensNotesAreMine() {
         val mine = row("note.added", via = "token", token = "Pixel", note = "t-1")
         assertTrue(mine.isMine(pixel))

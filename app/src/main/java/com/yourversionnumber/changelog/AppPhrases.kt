@@ -23,6 +23,8 @@ object AppPhrases : Phrasebook {
             Phrase.NoteDeletedBare -> R.string.kit_note_deleted_bare
             Phrase.NoteFiles -> R.string.kit_note_files
             Phrase.NoteFilesBare -> R.string.kit_note_files_bare
+            Phrase.NoteFilesRemoved -> R.string.kit_note_files_removed
+            Phrase.NoteFilesRemovedBare -> R.string.kit_note_files_removed_bare
             Phrase.MailFiled -> R.string.kit_mail_filed
             Phrase.MailFiledBare -> R.string.kit_mail_filed_bare
             Phrase.MailNotFiled -> R.string.kit_mail_not_filed
@@ -56,8 +58,19 @@ object AppPhrases : Phrasebook {
             Phrase.PauseSet -> R.string.kit_pause_set
             Phrase.PauseEnded -> R.string.kit_pause_ended
             Phrase.PlaceChanged -> R.string.kit_place_changed
+            Phrase.CheckedIn -> R.string.kit_checked_in
+            Phrase.UnnamedStop -> R.string.kit_unnamed_stop
+            Phrase.CheckInNamed -> R.string.kit_check_in_named
+            Phrase.CheckInDeleted -> R.string.kit_check_in_deleted
+            Phrase.CheckInsDeletedAll -> R.string.kit_check_ins_deleted_all
+            Phrase.CheckInsDeletedAllCount -> R.string.kit_check_ins_deleted_all_count
+            Phrase.PlaceRemembered -> R.string.kit_place_remembered
+            Phrase.PlaceSpotAdded -> R.string.kit_place_spot_added
+            Phrase.PlaceRenamed -> R.string.kit_place_renamed
+            Phrase.PlaceForgotten -> R.string.kit_place_forgotten
             Phrase.FilterAll -> R.string.kit_filter_all
             Phrase.FilterNotes -> R.string.kit_filter_notes
+            Phrase.FilterCheckIns -> R.string.kit_filter_check_ins
             Phrase.FilterEmail -> R.string.kit_filter_email
             Phrase.FilterBadges -> R.string.kit_filter_badges
             Phrase.FilterUpcoming -> R.string.kit_filter_upcoming

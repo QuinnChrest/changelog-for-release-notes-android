@@ -224,7 +224,7 @@ private const val HELD_AFTER_MILLIS = 4_000L
 private fun queuedAt(item: OutboxItem): Long =
     runCatching { OffsetDateTime.parse(item.queuedAt).toInstant().toEpochMilli() }.getOrDefault(0L)
 
-/** The day, then its version, large, as the site's Today. */
+/** The day, then its version, large, and the weeks and days lived, as the site's Today. */
 @Composable
 private fun VersionHeader(model: AppModel) {
     val me = model.me
@@ -236,6 +236,10 @@ private fun VersionHeader(model: AppModel) {
         )
         Spacer(Modifier.height(8.dp))
         VersionText(me?.version, size = 52.sp)
+        // "Week 2,369 — Day 16,577", as the web's Today page, from the server (API 1.13.0); an older one sends none.
+        me?.lived?.let { lived ->
+            Text(lived.text, Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp), color = paper.ink2)
+        }
     }
 }
 
@@ -284,6 +288,8 @@ private fun WaitingRow(item: OutboxItem, onDiscard: () -> Unit, onFix: () -> Uni
         is OutboxOperation.Delete -> say(R.string.delete_a_note)
         is OutboxOperation.Attach -> say(R.string.adding_files_to_a_note, MediaType.count(op.files))
         is OutboxOperation.Pins -> say(R.string.pinned_tags)
+        is OutboxOperation.RemoveFile -> say(R.string.taking_a_file_off_a_note)
+        is OutboxOperation.CheckIn -> say(R.string.a_check_in)
         is OutboxOperation.Post -> op.text.ifBlank { MediaType.count(op.files) }
     }
     Column {

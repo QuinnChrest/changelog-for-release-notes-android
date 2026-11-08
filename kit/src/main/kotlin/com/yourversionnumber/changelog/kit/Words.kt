@@ -118,6 +118,14 @@ enum class Phrase {
     ProblemPlace,
     ProblemTag,
     ProblemReminders,
+    Lived,
+    LastedMinutes,
+    LastedHours,
+    LastedHoursMinutes,
+    StayRange,
+    StayAt,
+    StaySince,
+    StayUntil,
 }
 
 /** The phrases that change with a count: one photo, two photos. */

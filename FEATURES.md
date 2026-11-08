@@ -4,7 +4,7 @@ What Changelog for Android does, what's left, and what's built but not yet
 checked. The iPhone app (`jthingelstad/changelog-ios`) is the reference;
 `AGENTS.md` says how each built piece works.
 
-**At a glance:** 52 built · 5 to do · 2 waiting on someone else · 8 to check
+**At a glance:** 52 built · 4 to do · 2 waiting on someone else · 17 to check
 
 Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 built, not yet checked
 
@@ -15,7 +15,6 @@ Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 b
 | 🔲 | Sign in with Release Notes (OAuth) instead of pasting a token | The server has it since API 1.3.0: authorization code with PKCE for the resource `/v1`, a private-use callback (`com.yourversionnumber.changelog:/oauth`), the owner names the token and ticks its scopes, no refresh token; sign out at `/oauth/revoke` or `DELETE /v1/token`. Needs the registration, a browser hop (Custom Tabs, which is AndroidX) and the token exchange. Pasting a token stays for the dev server. |
 | 🔲 | Notes for another day | The API takes a `date` back to the birthday and the queue already carries one; Log has no day picker, so every note files to today. |
 | 🔲 | "Where": search for a place by name | `GET /v1/places?q=` is the web's city search; Log only has Here. |
-| 🔲 | Take a file off a note | API 1.17.0 has `DELETE /v1/notes/{date}/{id}/media/{n}` (`media:write`, and `notes:all` on a note another channel wrote; a note with no words keeps its last file). The editor shows a note's files and leaves them; Activity already says "Files removed". |
 
 ## Waiting on someone else
 
@@ -36,7 +35,16 @@ These are written and built; something about them couldn't be seen on the emulat
 | 🔍 | The whole pass on a real phone | `docs/PHONE-TEST.md`, by hand, on a real account |
 | 🔍 | UI test cycle in CI | Runs on emulators here; CI runs the unit tests and lint only |
 | 🔍 | A voice memo's transcript under it | API 1.14.0 (jthingelstad/yvn-release-notes#301). Seen on the emulator against the dev server's made-up transcript: "Its words are still being written." on Log, then the words, read again without a refresh, and whole in the open note. Not yet a real transcript on a real account |
-| 🔍 | Check-in rows in Activity, and its Check-ins filter | API 1.18.0. Worded as the iPhone app ("Checked in at …", named, deleted, remembered places) and tested in `ActivityTextTest`; no check-in has been sent to the dev server to see a row on screen. The app doesn't send or list check-ins |
+| 🔍 | Check-in rows in Activity, and its Check-ins filter | API 1.18.0. Worded as the iPhone app ("Checked in at …", named, deleted, remembered places) and tested in `ActivityTextTest`; no check-in has been sent to the dev server to see a row on screen. The app sends and lists them now (see below) |
+| 🔍 | Take a file off a note | API 1.17.0 (`DELETE /v1/notes/{date}/{id}/media/{n}`, as `OutboxOperation.RemoveFile`). The editor lists the note's files, each with a Remove that asks first; a note with no words keeps its last file and says so. `DevServerTest` takes one of two off on the dev server and is refused the last (`text_required`); not yet tapped through on the emulator |
+| 🔍 | Search in Notes | API 1.15.0 (`GET /v1/search`): words, or a `#tag` alone for its page, newest first and paged, each note with its day and version; Back or Clear returns to the days. `DevServerTest` finds a note by a word and by its tag with a `notes:all` token; the screen not yet seen on the emulator |
+| 🔍 | On this day in Notes | API 1.15.0 (`GET /v1/on-this-day`): under today's notes, each earlier year's day with its first notes and "3 more on this day" to open it. Read on the dev server, whose made-up account has no earlier years to show, so the section has only been empty there |
+| 🔍 | Activity rows open their notes, as the iPhone app's | A note's added, edited, files, transcript and description rows open the note (with `notes:all`/`notes:read`, or a note this token wrote); a filed reply opens its day in Notes; a note deleted since says so. `ArchiveTest` covers which rows open; not yet tapped on the emulator |
+| 🔍 | Week and day lived on Log and the widget, Upcoming's countdowns and months | "Week 2,369 — Day 16,583" from `/v1/me`'s `lived` (API 1.13.0) under the version and on the widget; Upcoming says "Tomorrow", "In 5 days", "3 weeks 2 days" and heads each month ("January 2027" when not this year's). Tested in `ArchiveTest`; not yet seen on screen |
+| 🔍 | Map of check-ins, as the iPhone app's | Map in Activity: MapLibre over OpenFreeMap's vector tiles recoloured in the app's paper, ink and cobalt (light and dark), a cobalt pin per place, the chosen one tangerine, opening its stops ("Today, 8:05 AM to 9:15 AM, 70 min"). Seen on the Android 17 emulator against the dev server with made-up check-ins, debug and shrunk, light and dark; `CheckInsTest` and `DevServerTest` read and group them. Not yet on a real phone or a real account's check-ins |
+| 🔍 | Check in now | A tap in Activity's top bar or the map's: one fix, queued as a `tap` through the Outbox. Seen on the Android 17 emulator against the dev server (the check-in arrived at the emulator's spot); `DevServerTest` sends one. Not yet on a real phone |
+| 🔍 | Record my stops (automatic check-ins) | Settings switch, off by default, asking "Allow all the time" as it goes on; Android's own location every five minutes in the background, `StopDetector` reporting a stop after ten minutes within 100 m and its end when the phone moves on, through the Outbox. Fused, passive and GPS fixes, late ones passed over. `StopDetectorTest` and `DevServerTest` pass. On the emulator the first version (fused only) heard one fix in 25 minutes and found no stop; the three-source version hasn't finished a run there yet. Not yet a day on a real phone: battery, and how often Android really wakes it |
+| 🔍 | Notes on the map | Notes with a place of their own (`GET /v1/map/pins`) as cobalt rings beside the check-ins' dots, "Check-ins" and "Notes" picked at the top; a ring lists its notes and each opens. Seen on the emulator with the dev server's notes (its made-up places all sit in one town) |
 | 🔍 | A photo's small copy on Log, and `notes:all` on a real account | The dev server's fixture photo has no small copy, so the thumbnail path ran only in a unit test; the whole-account list was seen on the dev server with a `notes:all` token, not on production |
 
 ## Built

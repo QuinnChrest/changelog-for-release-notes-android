@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -29,13 +31,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
@@ -45,6 +50,7 @@ import com.yourversionnumber.changelog.R
 import com.yourversionnumber.changelog.kit.Api
 import com.yourversionnumber.changelog.kit.DaySummary
 import com.yourversionnumber.changelog.kit.NoteDetail
+import com.yourversionnumber.changelog.kit.OnThisDayDay
 import com.yourversionnumber.changelog.kit.UpcomingDraft
 import com.yourversionnumber.changelog.say
 import com.yourversionnumber.changelog.sayCount
@@ -52,10 +58,11 @@ import com.yourversionnumber.changelog.target
 import java.time.format.DateTimeFormatter
 
 /**
- * Reading, as the iPhone app's Notes tab: today's notes, then the days before it, newest first and a page at
- * a time (`GET /v1/days`). A day opens here, with its place, weather and every note on it; a note opens full
- * screen, as on Log, to read, edit or delete. It needs a token that reads every note (`notes:all` or
- * `notes:read`); what it reads is held in memory only.
+ * Reading, as the iPhone app's Notes tab: today's notes, On this day (the same day in earlier years), then
+ * the days before, newest first and a page at a time (`GET /v1/days`). Search above them finds notes by their
+ * words, or a #tag's page (`GET /v1/search`). A day opens here, with its place, weather and every note on it;
+ * a note opens full screen, as on Log, to read, edit or delete. It needs a token that reads every note
+ * (`notes:all` or `notes:read`); what it reads is held in memory only.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,10 +72,19 @@ fun NotesScreen(model: AppModel) {
     // Kept here, so back from a day finds the list where it was left.
     val listPlace = rememberLazyListState()
     // Read as the tab opens, not again on the way back from a day, so the pages read stay.
-    LaunchedEffect(model.readsNotes) { if (model.readsNotes) model.loadDays() }
+    LaunchedEffect(model.readsNotes) {
+        if (model.readsNotes) {
+            model.loadDays()
+            model.loadOnThisDay()
+        }
+    }
     val date = model.shownDate
-    // Back from a day goes to the list; from the list, the bar takes it to Log.
+    // What's typed in Search, kept while the tab is away.
+    var query by rememberSaveable { mutableStateOf(model.searched.orEmpty()) }
+    // Back from a day goes to the list (or the search it came from); from a search, to the days; from the list,
+    // the bar takes it to Log.
     BackHandler(enabled = date != null) { model.closeDay() }
+    BackHandler(enabled = date == null && model.searched != null) { query = ""; model.closeSearch() }
 
     Scaffold(
         topBar = {
@@ -88,7 +104,7 @@ fun NotesScreen(model: AppModel) {
             model.me == null -> Explained(say(R.string.notes_opens_once_release_notes), modifier)
             !model.readsNotes -> AllowReading(modifier)
             date != null -> DayPage(model, date, player, modifier) { opened = it }
-            else -> DaysList(model, player, listPlace, modifier) { opened = it }
+            else -> DaysList(model, player, listPlace, query, { query = it }, modifier) { opened = it }
         }
     }
     opened?.let { target -> NoteViewer(model, target, player, onClose = { opened = null }) }
@@ -148,13 +164,55 @@ private fun Pulled(
     }
 }
 
-/** Today's notes whole, as on Log, then the days before it. */
+/** Search, then today's notes whole, as on Log, then On this day and the days before it; or what a search found. */
 @Composable
-private fun DaysList(model: AppModel, player: FilePlayer, place: LazyListState, modifier: Modifier, onOpen: (NoteTarget) -> Unit) {
+private fun DaysList(
+    model: AppModel,
+    player: FilePlayer,
+    place: LazyListState,
+    query: String,
+    onQuery: (String) -> Unit,
+    modifier: Modifier,
+    onOpen: (NoteTarget) -> Unit,
+) {
     var pulled by remember { mutableStateOf(false) }
-    LaunchedEffect(model.daysLoading) { if (!model.daysLoading) pulled = false }
+    LaunchedEffect(model.daysLoading, model.searching) { if (!model.daysLoading && !model.searching) pulled = false }
     val today = model.me?.today
-    Pulled(pulled && model.daysLoading, { pulled = true; model.loadDays(); model.loadDay() }, modifier, place) {
+    val focus = LocalFocusManager.current
+    val searching = model.searched != null
+    val refresh = {
+        pulled = true
+        if (searching) {
+            model.search()
+        } else {
+            model.loadDays()
+            model.loadDay()
+            model.loadOnThisDay()
+        }
+    }
+    Pulled(pulled && (model.daysLoading || model.searching), refresh, modifier, place) {
+        item(key = "search") {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                PaperField(
+                    query,
+                    onQuery,
+                    Modifier.weight(1f),
+                    placeholder = say(R.string.search_your_notes),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = {
+                        focus.clearFocus()
+                        model.search(query)
+                    }),
+                )
+                if (searching || query.isNotEmpty()) {
+                    QuietButton(say(R.string.clear), { onQuery(""); model.closeSearch(); focus.clearFocus() }, Modifier.padding(start = 8.dp))
+                }
+            }
+        }
+        if (searching) {
+            found(model, player, onOpen)
+            return@Pulled
+        }
         item(key = "today") {
             Row(Modifier.semantics(mergeDescendants = true) { heading() }) {
                 Heading(say(R.string.today_in) + " ", Modifier.alignByBaseline())
@@ -175,6 +233,19 @@ private fun DaysList(model: AppModel, player: FilePlayer, place: LazyListState, 
                 DayNote(model, note, player, onOpen = { onOpen(note.target) })
             }
         }
+        model.onThisDay?.days?.takeIf { it.isNotEmpty() }?.let { earlier ->
+            item(key = "on-this-day") { Heading(say(R.string.on_this_day), Modifier.padding(top = 16.dp)) }
+            earlier.forEach { day ->
+                item(key = "otd/" + day.date) { OnThisDayHead(day, today) { model.showDay(day.date) } }
+                items(day.notes, key = { "otd/" + day.date + "/" + it.id }) { note ->
+                    DayNote(model, note, player, onOpen = { onOpen(note.target) })
+                }
+                val rest = day.notesTotal - day.notes.size
+                if (rest > 0) item(key = "otd-more/" + day.date) {
+                    QuietButton(sayCount(R.plurals.more_on_this_day, rest, rest), { model.showDay(day.date) })
+                }
+            }
+        }
         val past = model.days.orEmpty().filter { it.date != today }
         if (past.isNotEmpty()) item(key = "earlier") { Heading(say(R.string.earlier), Modifier.padding(top = 16.dp)) }
         items(past, key = { "day/" + it.date }) { day ->
@@ -186,6 +257,42 @@ private fun DaysList(model: AppModel, player: FilePlayer, place: LazyListState, 
             if (model.days == null) item(key = "problem") { Text(problem, color = paper.orangeInk, style = MaterialTheme.typography.bodyMedium) }
         }
         if (model.days == null && model.daysProblem == null) item(key = "loading") { Spinner() }
+    }
+}
+
+/** What a search found, newest first, each note with its day and version; the next page as the last comes into view. */
+private fun LazyListScope.found(model: AppModel, player: FilePlayer, onOpen: (NoteTarget) -> Unit) {
+    val notes = model.found
+    when {
+        notes == null && model.searchProblem != null -> item(key = "search-problem") {
+            Text(model.searchProblem.orEmpty(), color = paper.orangeInk, style = MaterialTheme.typography.bodyMedium)
+        }
+        notes == null -> item(key = "search-loading") { Spinner() }
+        notes.isEmpty() -> item(key = "search-none") {
+            Text(say(R.string.no_notes_found), color = paper.ink3, style = MaterialTheme.typography.bodyMedium)
+        }
+        else -> {
+            item(key = "search-total") { Caption(sayCount(R.plurals.notes_found, model.foundTotal, model.foundTotal)) }
+            items(notes, key = { "found/" + it.date + "/" + it.id }) { note ->
+                Column {
+                    Caption(dayLabel(note.date, model.me?.today), Modifier.padding(bottom = 4.dp))
+                    DayNote(model, note, player, showVersion = true, onOpen = { onOpen(note.target) })
+                }
+                if (note == notes.last() && model.moreFound) LaunchedEffect(note.id) { model.search(more = true) }
+            }
+        }
+    }
+}
+
+/** An earlier year's day under On this day: when, and its version; tap for the whole day. */
+@Composable
+private fun OnThisDayHead(day: OnThisDayDay, today: String?, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClickLabel = say(R.string.open), role = Role.Button, onClick = onClick),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(dayLabel(day.date, today), Modifier.alignByBaseline().weight(1f, fill = false), style = MaterialTheme.typography.bodyLarge)
+        VersionText(day.version, size = 13.sp, modifier = Modifier.alignByBaseline())
     }
 }
 

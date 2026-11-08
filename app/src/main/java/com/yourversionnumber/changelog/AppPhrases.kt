@@ -120,6 +120,14 @@ object AppPhrases : Phrasebook {
             Phrase.ProblemPlace -> R.string.kit_problem_place
             Phrase.ProblemTag -> R.string.kit_problem_tag
             Phrase.ProblemReminders -> R.string.kit_problem_reminders
+            Phrase.Lived -> R.string.kit_lived
+            Phrase.LastedMinutes -> R.string.kit_lasted_minutes
+            Phrase.LastedHours -> R.string.kit_lasted_hours
+            Phrase.LastedHoursMinutes -> R.string.kit_lasted_hours_minutes
+            Phrase.StayRange -> R.string.kit_stay_range
+            Phrase.StayAt -> R.string.kit_stay_at
+            Phrase.StaySince -> R.string.kit_stay_since
+            Phrase.StayUntil -> R.string.kit_stay_until
         },
         *args.toTypedArray(),
     )

@@ -9,6 +9,8 @@
     <!-- Here: one fix when the owner asks, in the foreground only. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Recording stops (check-ins), only once the owner turns it on in Settings. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-feature android:name="android.hardware.location" android:required="false" />
     <!-- Voice memos, asked for when the owner first taps Record. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -59,6 +61,7 @@
 
         <!-- Reminders and the daily prompt: each comes as an alarm, set again after a restart. -->
         <receiver android:name=".NoticeReceiver" android:exported="false" />
+        <receiver android:name=".StopReceiver" android:exported="false" />
         <receiver android:name=".RestoreReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

@@ -46,8 +46,10 @@ class VersionWidget : AppWidgetProvider() {
             val views = RemoteViews(context.packageName, R.layout.widget_version)
             // A widget can't use the app's fonts, so the words are drawn in them,
             // and said aloud from the description.
-            views.setImageViewBitmap(R.id.widget_words, words(context, version, prompt))
-            views.setContentDescription(R.id.widget_words, say(R.string.version, version, prompt))
+            // "Week 2,369 — Day 16,577" under the version, as the site and the email have it (API 1.13.0).
+            val lived = me?.lived?.text
+            views.setImageViewBitmap(R.id.widget_words, words(context, version, lived, prompt))
+            views.setContentDescription(R.id.widget_words, say(R.string.version, version, listOfNotNull(lived, prompt).joinToString(". ")))
             val open = Intent(context, MainActivity::class.java)
                 .putExtra(MainActivity.OPEN, "log")
                 .putExtra(MainActivity.WRITE, true)
@@ -59,8 +61,8 @@ class VersionWidget : AppWidgetProvider() {
             return views
         }
 
-        /** The version in Martian Mono (cobalt, dots tangerine) over the prompt in Bricolage Grotesque. */
-        private fun words(context: Context, version: String, prompt: String): Bitmap {
+        /** The version in Martian Mono (cobalt, dots tangerine), the weeks and days lived, and the prompt, in Bricolage Grotesque. */
+        private fun words(context: Context, version: String, lived: String?, prompt: String): Bitmap {
             val density = context.resources.displayMetrics.density
             fun font(res: Int, weight: Int) = Typeface.create(ResourcesCompat.getFont(context, res) ?: Typeface.DEFAULT, weight, false)
             val big = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -73,11 +75,17 @@ class VersionWidget : AppWidgetProvider() {
                 textSize = 15 * density
                 color = ContextCompat.getColor(context, R.color.ink)
             }
+            // The lived line is quieter: the ink at two thirds, as the site's hint.
+            val hint = Paint(small).apply {
+                textSize = 13 * density
+                alpha = 170
+            }
             val gap = 8 * density
-            val width = maxOf(big.measureText(version), small.measureText(prompt)).toInt() + 2
+            val width = maxOf(big.measureText(version), small.measureText(prompt), lived?.let(hint::measureText) ?: 0f).toInt() + 2
             val bigHeight = -big.fontMetrics.ascent + big.fontMetrics.descent
             val smallHeight = -small.fontMetrics.ascent + small.fontMetrics.descent
-            val bitmap = Bitmap.createBitmap(width, (bigHeight + gap + smallHeight).toInt() + 2, Bitmap.Config.ARGB_8888)
+            val hintHeight = if (lived == null) 0f else -hint.fontMetrics.ascent + hint.fontMetrics.descent + 2 * density
+            val bitmap = Bitmap.createBitmap(width, (bigHeight + hintHeight + gap + smallHeight).toInt() + 2, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
             val cobalt = ContextCompat.getColor(context, R.color.cobalt)
             val tangerine = ContextCompat.getColor(context, R.color.tangerine)
@@ -87,7 +95,8 @@ class VersionWidget : AppWidgetProvider() {
                 canvas.drawText(c.toString(), x, -big.fontMetrics.ascent, big)
                 x += big.measureText(c.toString())
             }
-            canvas.drawText(prompt, 0f, bigHeight + gap - small.fontMetrics.ascent, small)
+            lived?.let { canvas.drawText(it, 0f, bigHeight + 2 * density - hint.fontMetrics.ascent, hint) }
+            canvas.drawText(prompt, 0f, bigHeight + hintHeight + gap - small.fontMetrics.ascent, small)
             return bitmap
         }
 

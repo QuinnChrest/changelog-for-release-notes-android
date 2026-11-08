@@ -341,3 +341,40 @@ data class UpcomingDraft(
         }
     }
 }
+
+/**
+ * How far off a date is, in whole calendar days from the account's today, as
+ * the iPhone app counts down: a clock change takes nothing off. From two
+ * weeks on it's said in weeks and days ("3 weeks 2 days").
+ */
+data class Countdown(val days: Long) {
+    val weeks: Long get() = days / 7
+    val rest: Long get() = days % 7
+    val inWeeks: Boolean get() = days >= 14
+
+    companion object {
+        /** Null for a date that's today or on now (those say so), or one that can't be read. */
+        fun of(entry: UpcomingEntry, today: String): Countdown? {
+            if (entry.status == "today" || entry.status == "ongoing") return null
+            val from = UpcomingDraft.parse(today) ?: return null
+            val to = UpcomingDraft.parse(entry.next) ?: return null
+            val days = java.time.temporal.ChronoUnit.DAYS.between(from, to)
+            return if (days > 0) Countdown(days) else null
+        }
+    }
+}
+
+/**
+ * The dates under their months, soonest first, as the iPhone app heads them:
+ * each month once, in the order the server listed the dates. A trip on now
+ * sits in this month.
+ */
+fun UpcomingList.byMonth(): List<Pair<java.time.YearMonth, List<UpcomingEntry>>> {
+    val now = UpcomingDraft.parse(today)?.let(java.time.YearMonth::from)
+    val groups = LinkedHashMap<java.time.YearMonth, MutableList<UpcomingEntry>>()
+    for (e in entries) {
+        val month = UpcomingDraft.parse(e.next)?.let(java.time.YearMonth::from) ?: now ?: continue
+        groups.getOrPut(month) { mutableListOf() } += e
+    }
+    return groups.map { it.key to it.value.toList() }
+}

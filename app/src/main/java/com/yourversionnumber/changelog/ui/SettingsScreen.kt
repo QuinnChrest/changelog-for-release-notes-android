@@ -1,5 +1,7 @@
 package com.yourversionnumber.changelog.ui
 
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.yourversionnumber.changelog.Stops
 import android.Manifest
 import android.content.Intent
 import android.os.Build
@@ -121,6 +123,22 @@ fun SettingsScreen(model: AppModel) {
         if (granted.values.any { it }) model.addWhereIAm(true)
         else model.graph.report(say(R.string.changelog_cant_add_where_you))
     }
+    // Recording stops: location while using first, then all the time, asked only as the switch goes on.
+    var allowedAllTime by remember { mutableStateOf(Stops.allowedInBackground(context)) }
+    val allTime = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        allowedAllTime = Stops.allowedInBackground(context)
+        if (granted) model.recordStops(true)
+    }
+    val whileUsing = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+        if (granted.values.any { it }) allTime.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        else model.graph.report(say(R.string.changelog_cant_check_in_without))
+    }
+    // Back from the phone's settings: what it allows now, and recording started if it may.
+    LifecycleResumeEffect(Unit) {
+        allowedAllTime = Stops.allowedInBackground(context)
+        if (model.recordingStops) Stops.start(context)
+        onPauseOrDispose {}
+    }
     val me = model.me
 
     Scaffold(
@@ -163,6 +181,28 @@ fun SettingsScreen(model: AppModel) {
                     Locator.allowed(context) -> model.addWhereIAm(true)
                     else -> whereAbouts.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
                 }
+            }
+
+            Heading(say(R.string.check_ins_setting), Modifier.padding(top = 12.dp))
+            Toggle(
+                say(R.string.record_my_stops),
+                say(R.string.record_my_stops_about),
+                checked = model.recordingStops,
+            ) { on ->
+                model.recordStops(on)
+                when {
+                    !on || allowedAllTime -> {}
+                    !Locator.allowed(context) -> whileUsing.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
+                    else -> allTime.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                }
+            }
+            if (model.recordingStops && !allowedAllTime) {
+                Caption(say(R.string.allow_all_the_time), color = paper.orangeInk)
+                QuietButton(say(R.string.open_location_settings), {
+                    context.startActivity(
+                        Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri()),
+                    )
+                })
             }
 
             Heading(say(R.string.pinned_tags), Modifier.padding(top = 12.dp))

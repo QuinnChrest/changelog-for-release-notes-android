@@ -20,6 +20,8 @@ import com.yourversionnumber.changelog.kit.Hashtags
 import com.yourversionnumber.changelog.kit.Here
 import com.yourversionnumber.changelog.kit.MediaType
 import com.yourversionnumber.changelog.kit.NoteDetail
+import com.yourversionnumber.changelog.kit.NoteMedia
+import com.yourversionnumber.changelog.kit.OnThisDay
 import com.yourversionnumber.changelog.kit.OutboxNotKept
 import com.yourversionnumber.changelog.kit.OutboxOperation
 import com.yourversionnumber.changelog.kit.QueuedFile
@@ -198,6 +200,8 @@ class AppModel(application: Application) : AndroidViewModel(application) {
                 if (e.signedOut) graph.tokenLost(e.message)
             }
             graph.send()
+            // Opening the app asks again for stops, should Android have dropped the request.
+            Stops.start(getApplication())
             // Opening the app tops up the reminders, as the client guide asks.
             PhoneNotices.refresh(getApplication())
         }
@@ -453,7 +457,8 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     suspend fun load(target: NoteTarget): NoteDetail? = try {
         graph.api()?.note(target.date, target.id)
     } catch (e: ApiException) {
-        handle(e)
+        // Opened from an older row (Activity, say), a note may have gone since.
+        if (e.code == "not_found") graph.report(say(R.string.this_note_was_deleted_since)) else handle(e)
         null
     }
 
@@ -464,10 +469,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
      */
     fun saveEdit(note: NoteDetail, text: String, files: List<QueuedFile>) {
         val changed = text != note.text
-        if (changed) {
-            dayNotes = dayNotes?.map { if (it.id == note.id) it.copy(text = text) else it }
-            shownDayNotes = shownDayNotes.map { if (it.id == note.id) it.copy(text = text) else it }
-        }
+        if (changed) changeShown(note.id) { it.copy(text = text) }
         editFiles.clear()
         viewModelScope.launch {
             try {
@@ -483,8 +485,30 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     fun delete(target: NoteTarget) {
         queue(OutboxOperation.Delete(target.date, target.id))
         graph.forget(target.id)
-        dayNotes = dayNotes?.filterNot { it.id == target.id }
-        shownDayNotes = shownDayNotes.filterNot { it.id == target.id }
+        changeShown(target.id) { null }
+    }
+
+    /** Whether a file can come off this note: a note with no words keeps its last file (`text_required`). */
+    fun canRemoveFile(note: NoteDetail): Boolean =
+        canChange(note) && canAddFiles && (note.text.isNotBlank() || note.media.size > 1)
+
+    /**
+     * Takes one file off a note (API 1.17.0), through the Outbox under its own key. It goes from every list
+     * at once; a refusal shows under Waiting to send, and the next read brings it back.
+     */
+    fun removeFile(note: NoteDetail, file: NoteMedia) {
+        if (!canRemoveFile(note)) return
+        changeShown(note.id) { shown -> shown.copy(media = shown.media.filterNot { it.n == file.n }) }
+        queue(OutboxOperation.RemoveFile(note.date, note.id, file.n))
+    }
+
+    /** Changes a note wherever it shows (Log, the open day, a search, On this day), or with null takes it off them. */
+    private fun changeShown(id: String, change: (NoteDetail) -> NoteDetail?) {
+        fun List<NoteDetail>.changed() = mapNotNull { if (it.id == id) change(it) else it }
+        dayNotes = dayNotes?.changed()
+        shownDayNotes = shownDayNotes.changed()
+        found = found?.changed()
+        onThisDay = onThisDay?.let { o -> o.copy(days = o.days.map { d -> d.copy(notes = d.notes.changed()) }) }
     }
 
     private fun queue(operation: OutboxOperation) = viewModelScope.launch {
@@ -602,8 +626,197 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         shownDayProblem = null
     }
 
-    /** A note on Log or on the day open in Notes, as last read. */
-    fun noteShown(id: String): NoteDetail? = dayNotes?.firstOrNull { it.id == id } ?: shownDayNotes.firstOrNull { it.id == id }
+    /** A note on Log, on the day open in Notes, in a search or On this day, as last read. */
+    fun noteShown(id: String): NoteDetail? =
+        dayNotes?.firstOrNull { it.id == id }
+            ?: shownDayNotes.firstOrNull { it.id == id }
+            ?: found?.firstOrNull { it.id == id }
+            ?: onThisDay?.days?.firstNotNullOfOrNull { d -> d.notes.firstOrNull { it.id == id } }
+
+    // Search (API 1.15.0): every word in a note's words, places, link names, transcripts and descriptions, or a
+    // tag's page; newest first, a page at a time. Memory only, as everything Notes reads.
+
+    /** What was searched for, as typed; null with no search open. */
+    var searched by mutableStateOf<String?>(null)
+        private set
+    /** The notes found so far, newest first; null until the first page comes. */
+    var found by mutableStateOf<List<NoteDetail>?>(null)
+        private set
+    var foundTotal by mutableIntStateOf(0)
+        private set
+    private var foundNext by mutableStateOf<String?>(null)
+    val moreFound: Boolean get() = foundNext != null
+    var searching by mutableStateOf(false)
+        private set
+    var searchProblem by mutableStateOf<String?>(null)
+        private set
+    private var searchJob: Job? = null
+
+    /** Searches afresh: "#family" alone is that tag's page, anything else words. `more` takes the next page. */
+    fun search(typed: String? = searched, more: Boolean = false) {
+        val api = graph.api() ?: return
+        val query = typed?.trim().orEmpty()
+        if (query.isEmpty()) return closeSearch()
+        if (more && (foundNext == null || searching)) return
+        if (!more) {
+            searched = query
+            found = null
+            foundNext = null
+            searchProblem = null
+        }
+        val tag = Regex("""^#(\S+)$""").find(query)?.groupValues?.get(1)
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            searching = true
+            try {
+                val page = if (tag != null) api.search(tag = tag, after = if (more) foundNext else null)
+                else api.search(q = query, after = if (more) foundNext else null)
+                if (searched == query) {
+                    found = if (more) found.orEmpty() + page.items else page.items
+                    foundNext = page.next
+                    foundTotal = page.total
+                }
+            } catch (e: ApiException) {
+                if (searched == query && found == null) searchProblem = e.message
+                if (e.signedOut) handle(e)
+            } finally {
+                if (searchJob == coroutineContext[Job]) searching = false
+            }
+        }
+    }
+
+    fun closeSearch() {
+        searchJob?.cancel()
+        searching = false
+        searched = null
+        found = null
+        foundNext = null
+        foundTotal = 0
+        searchProblem = null
+    }
+
+    // On this day (API 1.15.0): today's date in each earlier year of releases, as the morning email has it.
+
+    var onThisDay by mutableStateOf<OnThisDay?>(null)
+        private set
+
+    /** Reads On this day for today. Quiet: a read that fails leaves the section out. */
+    fun loadOnThisDay() {
+        val api = graph.api() ?: return
+        if (!readsNotes) return
+        viewModelScope.launch {
+            try {
+                onThisDay = api.onThisDay(date = day, limit = 5)
+            } catch (e: ApiException) {
+                if (e.signedOut) handle(e)
+            }
+        }
+    }
+
+    // Check-ins (API 1.18.0), as the iPhone app sends them: read whole for the map, in memory only. This phone
+    // never sends them.
+
+    /** Every stay read so far, newest first; null until the first page. */
+    var checkIns by mutableStateOf<List<com.yourversionnumber.changelog.kit.CheckIn>?>(null)
+        private set
+    var checkInsLoading by mutableStateOf(false)
+        private set
+    var checkInsProblem by mutableStateOf<String?>(null)
+        private set
+    private var checkInsJob: Job? = null
+
+    /**
+     * Reads every page in turn. The first read fills in as it goes; a later one takes the old pins away only once
+     * it has them all, as the iPhone app's map does.
+     */
+    fun loadCheckIns() {
+        val api = graph.api() ?: return
+        if (!hasActivity) return
+        checkInsJob?.cancel()
+        checkInsJob = viewModelScope.launch {
+            checkInsLoading = true
+            checkInsProblem = null
+            val read = mutableListOf<com.yourversionnumber.changelog.kit.CheckIn>()
+            var before: String? = null
+            try {
+                do {
+                    val page = api.checkIns(before = before)
+                    read += page.items
+                    if (read.size > (checkIns?.size ?: 0)) checkIns = read.toList()
+                    before = page.next
+                } while (before != null)
+                checkIns = read.toList()
+            } catch (e: ApiException) {
+                checkInsProblem = e.message
+                if (e.signedOut) handle(e)
+            } finally {
+                if (checkInsJob == coroutineContext[Job]) checkInsLoading = false
+            }
+        }
+    }
+
+    /** Checking in sends with `notes:write`, which every Changelog token has. */
+    val canCheckIn: Boolean get() = me?.token?.scopes?.contains("notes:write") == true
+
+    /** Check in now is finding the phone. */
+    var checkingIn by mutableStateOf(false)
+        private set
+
+    /** Check in now: one fix, sent as a tap; the map reads again once it's gone. */
+    fun checkInNow() {
+        if (checkingIn) return
+        viewModelScope.launch {
+            checkingIn = true
+            val problem = Stops.tap(getApplication())
+            checkingIn = false
+            if (problem != null) graph.report(problem) else graph.tell(say(R.string.checked_in))
+        }
+    }
+
+    /** Recording stops in the background, as this phone's switch says. */
+    var recordingStops by mutableStateOf(graph.recordingStops)
+        private set
+
+    /** Turns recording on or off; answers whether it runs (on needs location all the time). */
+    fun recordStops(on: Boolean): Boolean {
+        graph.recordingStops = on
+        recordingStops = on
+        return if (on) {
+            Stops.start(getApplication())
+        } else {
+            Stops.stop(getApplication())
+            false
+        }
+    }
+
+    // Notes with a place of their own, for the map (`GET /v1/map/pins`, `notes:read` or `notes:all`). Their opening
+    // words are held in memory only.
+
+    var notePins by mutableStateOf<List<com.yourversionnumber.changelog.kit.MapPin>?>(null)
+        private set
+    private var notePinsJob: Job? = null
+
+    /** Reads every page in turn. Quiet: a token that can't read every note leaves notes off the map. */
+    fun loadNotePins() {
+        val api = graph.api() ?: return
+        if (!readsNotes) return
+        notePinsJob?.cancel()
+        notePinsJob = viewModelScope.launch {
+            val read = mutableListOf<com.yourversionnumber.changelog.kit.MapPin>()
+            var after: String? = null
+            try {
+                do {
+                    val page = api.mapPins(after)
+                    read += page.pins
+                    if (read.size > (notePins?.size ?: 0)) notePins = read.toList()
+                    after = page.next
+                } while (after != null)
+                notePins = read.toList()
+            } catch (e: ApiException) {
+                if (e.signedOut) handle(e)
+            }
+        }
+    }
 
     // Activity
 
@@ -643,6 +856,11 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         daysNext = null
         weatherCredit = null
         closeDay()
+        closeSearch()
+        onThisDay = null
+        checkIns = null
+        notePins = null
+        recordingStops = false
         tags = null
         sticky = null
         activityShown.clear()

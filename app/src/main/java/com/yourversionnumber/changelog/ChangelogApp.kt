@@ -146,6 +146,16 @@ class AppGraph(private val context: Context) {
         get() = prefs.getBoolean("here", false)
         set(value) = prefs.edit().putBoolean("here", value).apply()
 
+    /** Recording stops in the background (check-ins), off until the owner turns it on in Settings. */
+    var recordingStops: Boolean
+        get() = prefs.getBoolean("stops", false)
+        set(value) = prefs.edit().putBoolean("stops", value).apply()
+
+    /** Says something in Log's ink capsule, as "Filed in 4.5.137." is. */
+    fun tell(text: String) {
+        _toast.value = text
+    }
+
     /** Light, dark or as the phone is: a choice about this phone, so signing out keeps it. */
     var themeMode: String
         get() = prefs.getString("theme", null) ?: ThemeMode.System.name
@@ -199,6 +209,8 @@ class AppGraph(private val context: Context) {
         remindersOn = false
         promptOn = false
         hereByDefault = false
+        recordingStops = false
+        Stops.stop(context)
         noticeKinds = emptySet()
         activityCursor = null
         PhoneNotices.clear(context)

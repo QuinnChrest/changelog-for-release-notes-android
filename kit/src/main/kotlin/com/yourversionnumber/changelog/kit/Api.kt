@@ -79,6 +79,57 @@ class Api(
     /** One day with its first notes (API 1.15.0, `notes:read` or `notes:all`); the rest come from [notes] after `next`. */
     suspend fun day(date: String): DayDetail = send("GET", "v1/days/$date")
 
+    /**
+     * Notes with every word of `q` in their words, places, link names,
+     * transcripts or descriptions, or with `tag`; newest first (API 1.15.0,
+     * `notes:read` or `notes:all`). `after` is the last page's `next`.
+     */
+    suspend fun search(
+        q: String? = null,
+        tag: String? = null,
+        from: String? = null,
+        to: String? = null,
+        after: String? = null,
+        limit: Int = 50,
+    ): SearchResults {
+        val query = buildList {
+            q?.takeIf { it.isNotBlank() }?.let { add("q" to it.trim()) }
+            tag?.takeIf { it.isNotBlank() }?.let { add("tag" to it.removePrefix("#")) }
+            from?.let { add("from" to it) }
+            to?.let { add("to" to it) }
+            after?.let { add("after" to it) }
+            add("limit" to limit.toString())
+        }
+        return send("GET", "v1/search", query = query)
+    }
+
+    /** The same day of each earlier release, newest first, as the email's On this day (API 1.15.0). */
+    suspend fun onThisDay(date: String? = null, before: String? = null, limit: Int = 10): OnThisDay {
+        val query = buildList {
+            date?.let { add("date" to it) }
+            before?.let { add("before" to it) }
+            add("limit" to limit.toString())
+        }
+        return send("GET", "v1/on-this-day", query = query)
+    }
+
+    /** The places the account stopped, newest first (API 1.18.0, the `activity` scope). `before` is the last page's `next`. */
+    suspend fun checkIns(before: String? = null, limit: Int = 100): CheckInPage {
+        val query = buildList {
+            add("limit" to limit.toString())
+            before?.let { add("before" to it) }
+        }
+        return send("GET", "v1/check-ins", query = query)
+    }
+
+    /** Sends a stop, or the end of one (API 1.18.0, `notes:write`). Through the Outbox, under its key. */
+    suspend fun addCheckIn(report: CheckInReport, idempotencyKey: String): CheckIn =
+        send<CheckInWritten>("POST", "v1/check-ins", body = encode(report), idempotencyKey = idempotencyKey).checkIn
+
+    /** Where the notes were (API 1.15.0, `notes:read` or `notes:all`): only a note's own place. `after` is the last page's `next`. */
+    suspend fun mapPins(after: String? = null): MapPins =
+        send("GET", "v1/map/pins", query = listOfNotNull(after?.let { "after" to it }))
+
     /** A signed address for file `n` of a note, or its small copy. */
     suspend fun noteFile(date: String, id: String, n: Int, thumb: Boolean = false): FileAddress =
         send("GET", "v1/notes/$date/$id/media/$n", query = if (thumb) listOf("size" to "thumb") else emptyList())
@@ -115,6 +166,14 @@ class Api(
     /** Adds posted files to a note this token wrote, or with `notes:all` any note (with `media:write`). */
     suspend fun attachFiles(date: String, id: String, uploads: List<UploadRef>, idempotencyKey: String): NoteRef =
         send<Wrapped>("POST", "v1/notes/$date/$id/media", body = encode(AttachBody(uploads)), idempotencyKey = idempotencyKey).note
+
+    /**
+     * Takes file `n` off a note (API 1.17.0, `media:write`, and `notes:all` on
+     * a note another channel wrote). The other files keep their numbers. A
+     * note with no words keeps its last file: `text_required`.
+     */
+    suspend fun removeFile(date: String, id: String, n: Int, idempotencyKey: String): NoteRef =
+        send<Wrapped>("DELETE", "v1/notes/$date/$id/media/$n", idempotencyKey = idempotencyKey).note
 
     suspend fun appendNote(date: String, id: String, text: String, idempotencyKey: String): NoteRef =
         send<Wrapped>("POST", "v1/notes/$date/$id/append", body = encode(AppendBody(text.wellFormed())), idempotencyKey = idempotencyKey).note

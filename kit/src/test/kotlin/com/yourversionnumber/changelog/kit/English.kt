@@ -115,6 +115,14 @@ object English : Phrasebook {
         Phrase.ProblemPlace -> "A trip needs a destination, like Zürich or Paris, Texas."
         Phrase.ProblemTag -> "A tag is one word of letters, numbers and hyphens, like family."
         Phrase.ProblemReminders -> "Choose from one to six reminders."
+        Phrase.Lived -> "Week %1\$s — Day %2\$s"
+        Phrase.LastedMinutes -> "%1\$s min"
+        Phrase.LastedHours -> "%1\$s hr"
+        Phrase.LastedHoursMinutes -> "%1\$s hr %2\$s min"
+        Phrase.StayRange -> "%1\$s to %2\$s, %3\$s"
+        Phrase.StayAt -> "At %1\$s"
+        Phrase.StaySince -> "Since %1\$s"
+        Phrase.StayUntil -> "Until %1\$s"
     }
 
     override fun say(phrase: Phrase, args: List<Any>): String = text(phrase).format(*args.toTypedArray())

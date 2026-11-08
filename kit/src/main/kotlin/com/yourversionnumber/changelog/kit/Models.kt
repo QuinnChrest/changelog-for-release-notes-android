@@ -25,6 +25,8 @@ data class Me(
     val days: List<DayVersion> = emptyList(),
     val token: TokenInfo,
     val apiVersion: String,
+    /** Weeks and days lived, today (API 1.13.0); an older server sends none. */
+    val lived: Lived? = null,
 ) {
     /** The version for a local day the server listed, without the arithmetic. */
     fun versionOn(date: String): String? =
@@ -32,7 +34,17 @@ data class Me(
 }
 
 @Serializable
-data class DayVersion(val date: String, val version: String)
+data class DayVersion(val date: String, val version: String, val lived: Lived? = null)
+
+/**
+ * The weeks and days lived, both from 1, as the Today page and the morning
+ * email set them (API 1.13.0). Never worked out here: it comes with `/v1/me`.
+ */
+@Serializable
+data class Lived(val week: Int, val day: Int) {
+    /** "Week 2,368 — Day 16,574". */
+    val text: String get() = Words.say(Phrase.Lived, "%,d".format(week), "%,d".format(day))
+}
 
 @Serializable
 data class TokenInfo(
@@ -188,6 +200,38 @@ data class DayDetail(
 ) {
     val placeLabel: String? get() = place?.label ?: around?.label
 }
+
+/** `GET /v1/search` (API 1.15.0): notes found, newest first; `next` is the `after` of the next page. */
+@Serializable
+data class SearchResults(
+    val terms: List<String> = emptyList(),
+    val tag: String? = null,
+    val from: String? = null,
+    val to: String? = null,
+    /** Every note found, across every page. */
+    val total: Int = 0,
+    val items: List<NoteDetail> = emptyList(),
+    val next: String? = null,
+)
+
+/** `GET /v1/on-this-day` (API 1.15.0): the same day of each earlier release, newest first. */
+@Serializable
+data class OnThisDay(
+    val date: String,
+    val version: String,
+    val days: List<OnThisDayDay> = emptyList(),
+    /** The `before` of the next page. */
+    val next: String? = null,
+)
+
+/** One earlier year's day: its first notes, and how many it holds in all. */
+@Serializable
+data class OnThisDayDay(
+    val date: String,
+    val version: String,
+    val notesTotal: Int = 0,
+    val notes: List<NoteDetail> = emptyList(),
+)
 
 /** A signed address for one file, fetched with no token and good for ten minutes. */
 @Serializable

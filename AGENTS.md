@@ -171,6 +171,27 @@ Release Notes' and the iPhone app's own. `app/build.gradle.kts` stamps it as
 `BuildConfig.COMMIT`, which the foot of Settings shows. Never set them by
 hand.
 
+### Releases
+
+Every push to `main` is a release on GitHub (Quinn's call, 2026-11-08):
+a tag and a release named for it, with notes that say in plain words what
+changed for someone using the app (what's new, what's fixed), no pictures,
+then an Install section and the signed `Changelog-x.y.z.apk` built by
+`assembleRelease`, with the signing certificate's SHA-256 so it can be
+checked. Releases are numbered by semantic versioning from 1.0.0 (the first
+under this rule; 0.0.2 to 0.0.7 before it were named for the build number):
+
+- **Major** (2.0.0) for a break: Quinn and Jamie's call, never assumed.
+- **Minor** (1.1.0) when anything new reaches the person using the app, a
+  feature or a change they see; the patch goes back to 0. A release with
+  features and fixes is a minor.
+- **Patch** (1.0.1) for fixes alone, with no change to what they see or do.
+
+This number is the release's, on the tag and the APK's file name. The
+build's own `versionName` stays Your Version Number's day count, stamped by
+`app/build.gradle.kts` and shown at the foot of Settings; never set it by
+hand to match.
+
 ### Release builds
 
 `./gradlew :app:bundleRelease` makes the Play bundle; `assembleRelease` an

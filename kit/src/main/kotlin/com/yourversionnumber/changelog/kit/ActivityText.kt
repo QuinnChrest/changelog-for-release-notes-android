@@ -23,7 +23,9 @@ val ActivityItem.headline: String
             "note.added" -> inVersion(Phrase.NoteAdded, Phrase.NoteAddedBare)
             "note.edited" -> inVersion(Phrase.NoteEdited, Phrase.NoteEditedBare)
             "note.deleted" -> inVersion(Phrase.NoteDeleted, Phrase.NoteDeletedBare)
-            "note.files" -> inVersion(Phrase.NoteFiles, Phrase.NoteFilesBare)
+            "note.files" ->
+                if (removed != null) inVersion(Phrase.NoteFilesRemoved, Phrase.NoteFilesRemovedBare)
+                else inVersion(Phrase.NoteFiles, Phrase.NoteFilesBare)
             "mail" -> if (outcome == "filed") inVersion(Phrase.MailFiled, Phrase.MailFiledBare) else Words.say(Phrase.MailNotFiled)
             "email.sent" -> inVersion(Phrase.EmailSent, Phrase.EmailSentBare)
             "reminder" -> named(Phrase.ReminderTitled, Phrase.ReminderRow, title)
@@ -45,9 +47,28 @@ val ActivityItem.headline: String
             "pause.set" -> Words.say(Phrase.PauseSet)
             "pause.ended" -> Words.say(Phrase.PauseEnded)
             "place.set", "place.removed" -> Words.say(Phrase.PlaceChanged)
+            "checkin" -> Words.say(Phrase.CheckedIn, stopName(label))
+            "checkin.named" -> Words.say(Phrase.CheckInNamed)
+            "checkin.deleted" -> when {
+                all != true -> Words.say(Phrase.CheckInDeleted)
+                count != null -> Words.say(Phrase.CheckInsDeletedAllCount, count)
+                else -> Words.say(Phrase.CheckInsDeletedAll)
+            }
+            "checkin.place" -> when (change) {
+                "added" -> Words.say(Phrase.PlaceRemembered)
+                "spot" -> Words.say(Phrase.PlaceSpotAdded)
+                "renamed" -> Words.say(Phrase.PlaceRenamed)
+                else -> Words.say(Phrase.PlaceForgotten)
+            }
             else -> kind.split('.').joinToString(" ") { w -> w.replaceFirstChar { it.uppercase() } }
         }
     }
+
+/** The server names a stop it can't place "Unnamed stop"; a row says "an unnamed stop", as the iPhone app does. */
+fun stopName(label: String?): String =
+    if (label.isNullOrEmpty() || label == UNNAMED_STOP) Words.say(Phrase.UnnamedStop) else label
+
+private const val UNNAMED_STOP = "Unnamed stop"
 
 val ActivityItem.detail: String?
     get() = listOfNotNull(source, day).joinToString(" · ").ifEmpty { null }
@@ -67,6 +88,7 @@ fun ActivityItem.isMine(by: TokenInfo?): Boolean =
 enum class ActivityFilter(private val phrase: Phrase, val kinds: List<String>) {
     All(Phrase.FilterAll, emptyList()),
     Notes(Phrase.FilterNotes, listOf("note", "transcript", "description", "import")),
+    CheckIns(Phrase.FilterCheckIns, listOf("checkin")),
     Email(Phrase.FilterEmail, listOf("mail", "email", "reminder")),
     Badges(Phrase.FilterBadges, listOf("badge")),
     Upcoming(Phrase.FilterUpcoming, listOf("upcoming", "reminder")),

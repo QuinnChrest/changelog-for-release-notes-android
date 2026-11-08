@@ -371,8 +371,8 @@ iPhone app do; a pin opens its stops, worded by `CheckInWords` ("Today,
 `AndroidView`. Its base is OpenFreeMap's `positron` style recoloured in the
 app's own palette, light or dark as the phone is (`paperStyle`, by
 OpenMapTiles' layer names): land as the paper, roads as rules, water a wash
-of cobalt, place names in ink on a paper halo, road names and shields left
-off; each colour is blended into the paper as a solid one, so crossings
+of cobalt, place names in ink and road names in lighter ink on a paper
+halo, route shields left off; each colour is blended into the paper as a solid one, so crossings
 don't darken. Pins are cobalt dots ringed in paper, over everything; the
 chosen one is tangerine. No stop's own
 page yet, and no naming or deleting stops (the iPhone app has both). The
@@ -392,6 +392,20 @@ Every report goes through the Outbox (`OutboxOperation.CheckIn`) under its
 own key. The detector's state (one spot) is kept in `noBackupFilesDir`,
 never logged. A restart or an update drops Android's request, so
 `RestoreReceiver` and opening the app ask again.
+
+Two widgets, as the iPhone app's (`VersionWidget.kt`): **Today** (2×2: the
+mark and TODAY, the version large in ink, Week and Day, and "Written today"
+with a check or "What changed?"; a tap opens Log to write) and **Coming up**
+(4×2: Today beside the next two dates in Upcoming, each day in cobalt
+capitals over its title; a tap there opens Upcoming). A widget can't use
+the app's fonts, so `TodayWidgets` draws the words into images, each twice,
+light and dark; the layout shows one by `@integer/widget_light` and
+`widget_dark`, which the home screen reads in the phone's own theme (a
+visibility given by integer is its place in visible, invisible, gone, so
+gone is 2, not 8). The next dates are kept on the phone (`AppGraph.soon`,
+a date's title is the owner's words, as a reminder's line is), refreshed
+whenever the app reads Upcoming, as it opens, and in the 12-hourly refresh;
+signing out drops them.
 
 Log, Notes, Upcoming, Activity and Settings are the five tabs along the bottom.
 Settings' Appearance (`ThemeMode`: same as the phone, light or dark) is about

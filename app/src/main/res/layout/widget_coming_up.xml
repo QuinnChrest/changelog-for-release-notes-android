@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Today beside Coming up, as the iPhone app's medium widget: two drawn images and a rule between them. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:orientation="horizontal"
+    android:padding="16dp">
+
+    <ImageView
+        android:id="@+id/widget_words"
+        android:visibility="@integer/widget_light"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:adjustViewBounds="true"
+        android:contentDescription="@string/widget_description"
+        android:scaleType="fitStart"
+        android:src="@drawable/widget_preview_words" />
+    <ImageView
+        android:id="@+id/widget_words_dark"
+        android:visibility="@integer/widget_dark"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:adjustViewBounds="true"
+        android:contentDescription="@string/widget_description"
+        android:scaleType="fitStart"
+        android:src="@drawable/widget_preview_words" />
+
+    <!-- An ImageView, not a View: a widget takes only the views RemoteViews allows. -->
+    <ImageView
+        android:importantForAccessibility="no"
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="14dp"
+        android:background="@color/widget_rule" />
+
+    <ImageView
+        android:id="@+id/widget_soon"
+        android:visibility="@integer/widget_light"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:adjustViewBounds="true"
+        android:contentDescription="@string/coming_up"
+        android:scaleType="fitStart" />
+    <ImageView
+        android:id="@+id/widget_soon_dark"
+        android:visibility="@integer/widget_dark"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:adjustViewBounds="true"
+        android:contentDescription="@string/coming_up"
+        android:scaleType="fitStart" />
+</LinearLayout>

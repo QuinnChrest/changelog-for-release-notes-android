@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="widget_description">Today\'s version, and a tap to write what changed.</string>
+    <string name="widget_coming_up_label">Changelog: Coming up</string>
+    <string name="widget_coming_up_description">Today\'s version beside the next dates in Upcoming.</string>
+    <string name="coming_up">Coming up</string>
+    <string name="nothing_coming_up">Nothing ahead yet.</string>
+    <string name="today_caps">TODAY</string>
+    <string name="week_n">Week %1$s</string>
+    <string name="day_n">Day %1$s</string>
     <string name="a_month_before">A month before</string>
     <string name="a_note_holds_up_to">A note holds up to %1$s files.</string>
     <string name="a_tag_is_letters_and">A tag is letters and numbers, with at least one letter.</string>

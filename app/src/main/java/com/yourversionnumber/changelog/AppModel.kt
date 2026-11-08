@@ -196,6 +196,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
                 val tags = api.tags()
                 graph.tags = tags
                 this@AppModel.tags = tags
+                if ("upcoming" in me.token.scopes) runCatching { api.upcoming() }.getOrNull()?.let(graph::keepSoon)
             } catch (e: ApiException) {
                 if (e.signedOut) graph.tokenLost(e.message)
             }
@@ -891,7 +892,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             upcomingLoading = true
             try {
-                upcoming = api.upcoming()
+                upcoming = api.upcoming().also(graph::keepSoon)
             } catch (e: ApiException) {
                 handle(e)
             }
@@ -938,7 +939,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun afterUpcomingChange(api: com.yourversionnumber.changelog.kit.Api) {
-        runCatching { upcoming = api.upcoming() }
+        runCatching { upcoming = api.upcoming().also(graph::keepSoon) }
         PhoneNotices.refresh(getApplication())
     }
 

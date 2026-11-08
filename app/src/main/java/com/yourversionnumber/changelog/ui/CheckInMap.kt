@@ -86,8 +86,8 @@ import org.maplibre.geojson.Point
  * note, `GET /v1/map/pins`). A stop is a cobalt dot, notes a cobalt ring; as the iPhone app's map, a pin for each place (a remembered place, or one name
  * within 100 m), opening its stops. Check-ins only, read whole (`GET /v1/check-ins`) and held in memory. The
  * map is MapLibre over OpenFreeMap's vector tiles (OpenStreetMap's data, no key), recoloured in the app's
- * own paper: the land is the paper, the roads its rules, water a wash of cobalt, place names in ink; road names
- * and shields left off. Pins are cobalt dots ringed in paper, and the chosen one tangerine. OpenFreeMap's servers
+ * own paper: the land is the paper, the roads its rules, water a wash of cobalt, place names in ink and road names
+ * in lighter ink; route shields left off. Pins are cobalt dots ringed in paper, and the chosen one tangerine. OpenFreeMap's servers
  * see which tiles are shown: roughly where the pins are.
  */
 @Composable
@@ -276,8 +276,8 @@ private fun Paper.tint(color: Color, strength: Float): Int = lerp(paper, color, 
 /**
  * The base map in the app's paper, whichever palette is on: land as the paper itself, parks, towns and buildings
  * a faint wash of ink, water a wash of cobalt, roads drawn as the site's rules (the big ones a little darker),
- * place names in ink with a paper halo. Road names and shields, casings and rail dashes go, so the pins are what
- * stands out. Layers are known by OpenMapTiles' names, the same in every style of theirs.
+ * place names in ink and road names in the lighter ink, each with a paper halo. Route shields, casings and rail
+ * dashes go, so the pins are what stands out. Layers are known by OpenMapTiles' names, the same in every style of theirs.
  */
 private fun paperStyle(style: Style, p: Paper) {
     for (layer in style.layers) {
@@ -302,8 +302,15 @@ private fun paperStyle(style: Style, p: Paper) {
                 else -> layer.setProperties(PropertyFactory.lineColor(p.rule.toArgb()), PropertyFactory.lineOpacity(1f))
             }
             is SymbolLayer -> when {
-                id.startsWith("highway") || id.contains("shield") || id == "airport" ->
-                    layer.setProperties(PropertyFactory.visibility(Property.NONE))
+                // Route shields are coloured pictures the palette can't reach, and airports a picture too.
+                id.contains("shield") || id == "airport" -> layer.setProperties(PropertyFactory.visibility(Property.NONE))
+                // Street and highway names, quieter than places': the paper's lighter ink.
+                id.startsWith("highway") -> layer.setProperties(
+                    PropertyFactory.textColor(p.ink3.toArgb()),
+                    PropertyFactory.textHaloColor(p.paper.toArgb()),
+                    PropertyFactory.textHaloWidth(1.5f),
+                    PropertyFactory.textHaloBlur(0f),
+                )
                 else -> layer.setProperties(
                     PropertyFactory.textColor(if (id.startsWith("water")) p.tint(p.blue, 0.7f) else p.ink2.toArgb()),
                     PropertyFactory.textHaloColor(p.paper.toArgb()),

@@ -96,6 +96,7 @@ object PhoneNotices {
             if (e.signedOut) graph.tokenLost(e.message)
             return
         }
+        if (hasUpcoming) runCatching { api.upcoming() }.getOrNull()?.let(graph::keepSoon)
         val reminders: Reminders? = if (hasUpcoming && graph.remindersOn) {
             try {
                 api.reminders()

@@ -57,6 +57,13 @@ fun sayCount(@PluralsRes id: Int, count: Int, vararg args: Any): String =
 
 val Context.graph: AppGraph get() = (applicationContext as ChangelogApp).graph
 
+/**
+ * One of the next dates in Upcoming, kept for the Coming up widget: its next day, its status and its title. A
+ * title is the owner's words, kept on the phone as a reminder's line is, never logged; signing out drops them.
+ */
+@Serializable
+data class Soon(val date: String, val status: String, val title: String)
+
 /** A note this phone filed, kept so Log can show it and take it back. */
 @Serializable
 data class Sent(val note: NoteRef, val text: String)
@@ -146,6 +153,19 @@ class AppGraph(private val context: Context) {
         get() = prefs.getBoolean("here", false)
         set(value) = prefs.edit().putBoolean("here", value).apply()
 
+    /** The next few dates in Upcoming, for the Coming up widget; set whenever the app reads Upcoming. */
+    var soon: List<Soon>
+        get() = runCatching { Api.json.decodeFromString(soonSerializer, prefs.getString("soon", null) ?: "[]") }.getOrDefault(emptyList())
+        set(value) {
+            prefs.edit().putString("soon", Api.json.encodeToString(soonSerializer, value)).apply()
+            VersionWidget.refresh(context)
+        }
+
+    /** Keeps the next dates from a read of Upcoming, for the widget. */
+    fun keepSoon(list: com.yourversionnumber.changelog.kit.UpcomingList) {
+        soon = list.entries.filter { it.status != "past" }.take(3).map { Soon(it.next, it.status, it.title) }
+    }
+
     /** Recording stops in the background (check-ins), off until the owner turns it on in Settings. */
     var recordingStops: Boolean
         get() = prefs.getBoolean("stops", false)
@@ -211,6 +231,7 @@ class AppGraph(private val context: Context) {
         hereByDefault = false
         recordingStops = false
         Stops.stop(context)
+        prefs.edit().remove("soon").apply()
         noticeKinds = emptySet()
         activityCursor = null
         PhoneNotices.clear(context)
@@ -285,5 +306,6 @@ class AppGraph(private val context: Context) {
 
     private companion object {
         val sentSerializer = ListSerializer(Sent.serializer())
+        val soonSerializer = ListSerializer(Soon.serializer())
     }
 }

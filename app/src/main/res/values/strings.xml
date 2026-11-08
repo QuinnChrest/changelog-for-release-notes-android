@@ -5,9 +5,6 @@
     <string name="widget_coming_up_description">Today\'s version beside the next dates in Upcoming.</string>
     <string name="coming_up">Coming up</string>
     <string name="nothing_coming_up">Nothing ahead yet.</string>
-    <string name="today_caps">TODAY</string>
-    <string name="week_n">Week %1$s</string>
-    <string name="day_n">Day %1$s</string>
     <string name="a_month_before">A month before</string>
     <string name="a_note_holds_up_to">A note holds up to %1$s files.</string>
     <string name="a_tag_is_letters_and">A tag is letters and numbers, with at least one letter.</string>
@@ -139,6 +136,13 @@
     <string name="record_my_stops_about">When this phone stays somewhere ten minutes or more, it checks in there, as Changelog for iPhone does. Each stop goes to Release Notes with its time and spot, and shows on the map and in Activity. It needs location all the time.</string>
     <string name="allow_all_the_time">Android hasn’t allowed location all the time, so stops aren’t recorded. Choose “Allow all the time” in Changelog’s location settings.</string>
     <string name="open_location_settings">Open location settings</string>
+    <string name="not_at_home">Not at home</string>
+    <string name="not_at_home_about">Set home from where you are, and no stop within 150 m of it is ever sent. Kept on this phone only. Check in still works there.</string>
+    <string name="not_at_home_set">Home is set. No stop within 150 m of it is sent. Kept on this phone only.</string>
+    <string name="set_home_here">Set home to where I am</string>
+    <string name="move_home_here">Move home to where I am</string>
+    <string name="forget_home">Forget home</string>
+    <string name="finding_where_you_are">Finding where you are…</string>
     <string name="notes_pick">Notes</string>
     <string name="try_again">Try again</string>
     <string name="osm_credit">© OpenMapTiles © OpenStreetMap</string>

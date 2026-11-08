@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Today, as the iPhone app's widget: the words are drawn into the image in Release Notes' fonts
-     (TodayWidgets in VersionWidget.kt), since a widget can't use an app's own. Also the picker's preview. -->
+<!-- Today's version on paper, as the site's front page. The words are drawn
+     into the image in Release Notes' fonts (TodayWidgets.Draw.words), since a
+     widget can't use an app's own: once light, once dark, and the home screen
+     shows the one for the phone's theme. This layout is also the picker's preview. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -11,17 +13,20 @@
     <ImageView
         android:id="@+id/widget_words"
         android:visibility="@integer/widget_light"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical|start"
         android:adjustViewBounds="true"
         android:contentDescription="@string/widget_description"
         android:scaleType="fitStart"
         android:src="@drawable/widget_preview_words" />
+
     <ImageView
         android:id="@+id/widget_words_dark"
         android:visibility="@integer/widget_dark"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical|start"
         android:adjustViewBounds="true"
         android:contentDescription="@string/widget_description"
         android:scaleType="fitStart"

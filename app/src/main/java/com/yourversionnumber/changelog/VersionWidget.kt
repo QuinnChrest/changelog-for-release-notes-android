@@ -6,26 +6,27 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.RectF
 import android.graphics.Typeface
 import android.text.TextPaint
 import android.text.TextUtils
 import android.widget.RemoteViews
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
+import com.yourversionnumber.changelog.kit.Countdown
 import com.yourversionnumber.changelog.kit.UpcomingDraft
+import com.yourversionnumber.changelog.kit.UpcomingEntry
+import com.yourversionnumber.changelog.kit.UpcomingKind
 import java.time.format.DateTimeFormatter
 
 /**
- * Today, on the home screen, as the iPhone app's Today widget: the app's mark and TODAY, today's version large,
- * the weeks and days lived, and "Written today" or "What changed?". A tap opens Log ready to write. Everything is
- * the server's, from the last `/v1/me` the app read, never worked out here. Updated whenever the app reads it,
- * and by Android twice a day (`updatePeriodMillis`), which is enough to turn the day over.
+ * Today's version on the home screen, as the site writes it (cobalt, the dots tangerine), the weeks and days
+ * lived under it, and "What changed?"; a tap opens Log ready to write. The version is the server's, from the last
+ * `/v1/me` the app read, never worked out here. Updated whenever the app reads it, and by Android twice a day
+ * (`updatePeriodMillis`), which is enough to turn the day over.
  *
  * A widget can't use the app's fonts, so the words are drawn into images in them, and said aloud from each
  * image's description. Each is drawn twice, light and dark: the layout shows one or the other by resources the
@@ -43,15 +44,24 @@ class VersionWidget : AppWidgetProvider() {
             manager.getAppWidgetIds(ComponentName(context, VersionWidget::class.java))
                 .forEach { manager.updateAppWidget(it, TodayWidgets.small(context)) }
             manager.getAppWidgetIds(ComponentName(context, ComingUpWidget::class.java))
-                .forEach { manager.updateAppWidget(it, TodayWidgets.wide(context)) }
+                .forEach { manager.updateAppWidget(it, TodayWidgets.wide(context, manager, it)) }
         }
     }
 }
 
-/** Today beside Coming up, as the iPhone app's medium widget: the next two dates in Upcoming, each in its words. */
+/**
+ * The bigger widget: today's version, as the small one has it, with the streak under it, beside the next dates in
+ * Upcoming (as many as its height holds), each in the server's own line with its day and how far off, as the
+ * Upcoming tab says them. Taps open Log or Upcoming.
+ */
 class ComingUpWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
-        for (id in ids) manager.updateAppWidget(id, TodayWidgets.wide(context))
+        for (id in ids) manager.updateAppWidget(id, TodayWidgets.wide(context, manager, id))
+    }
+
+    /** Resized: as many dates as now fit. */
+    override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, id: Int, options: android.os.Bundle) {
+        manager.updateAppWidget(id, TodayWidgets.wide(context, manager, id))
     }
 }
 
@@ -64,36 +74,66 @@ internal object TodayWidgets {
         return views
     }
 
-    fun wide(context: Context): RemoteViews {
+    /**
+     * Today beside Coming up, drawn as one picture so both keep one scale (as separate images the home screen
+     * squeezed the second); clear halves over it take the taps: Today opens Log, Coming up opens Upcoming.
+     */
+    fun wide(context: Context, manager: AppWidgetManager, id: Int): RemoteViews {
+        val graph = context.graph
+        val me = graph.me
         val views = RemoteViews(context.packageName, R.layout.widget_coming_up)
-        today(context, views)
-        val soon = context.graph.soon.take(2)
-        val said = if (soon.isEmpty()) say(R.string.nothing_coming_up) else say(R.string.coming_up) + ". " + soon.joinToString(". ") { "${dateLabel(it)}, ${it.title}" }
-        for ((id, night) in listOf(R.id.widget_soon to false, R.id.widget_soon_dark to true)) {
-            views.setImageViewBitmap(id, Draw(context, night).comingUp(soon))
-            views.setContentDescription(id, said)
-            views.setOnClickPendingIntent(id, open(context, "upcoming", write = false))
+        val t = Today.of(context)
+        val day = me?.today
+        val standing = when {
+            me == null || !graph.signedIn.value -> null
+            me.status == "stopped" -> say(R.string.your_email_is_stopped)
+            me.streak > 1 -> sayCount(R.plurals.streak, me.streak, me.streak)
+            else -> null
+        }
+        // As many dates as the widget's height holds: its height on a phone held upright, in dp.
+        val tall = manager.getAppWidgetOptions(id).getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT).takeIf { it > 0 } ?: 180
+        val room = tall - 32 - 28
+        val soon = graph.soon.take((room / 46).coerceIn(1, 4))
+        val said = listOfNotNull(
+            t.said,
+            standing,
+            if (soon.isEmpty()) say(R.string.nothing_coming_up) else say(R.string.coming_up) + ". " + soon.joinToString(". ") { "${it.words}, ${whenSaid(it, day)}" },
+        ).joinToString(". ")
+        for ((view, night) in listOf(R.id.widget_words to false, R.id.widget_words_dark to true)) {
+            val draw = Draw(context, night)
+            views.setImageViewBitmap(view, draw.beside(draw.words(t.version, t.lived, t.prompt, standing), draw.comingUp(soon, day)))
+            views.setContentDescription(view, said)
         }
         views.setOnClickPendingIntent(R.id.widget_root, open(context, "log", write = true))
+        views.setOnClickPendingIntent(R.id.widget_tap_today, open(context, "log", write = true))
+        views.setOnClickPendingIntent(R.id.widget_tap_soon, open(context, "upcoming", write = false))
         return views
     }
 
-    /** The Today side: drawn, and said. */
-    private fun today(context: Context, views: RemoteViews) {
-        val graph = context.graph
-        val me = graph.me
-        val version = me?.version ?: "?.?.???"
-        val written = graph.signedIn.value && me?.wroteToday == true
-        val status = when {
-            !graph.signedIn.value -> say(R.string.sign_in_to_changelog)
-            written -> say(R.string.written_today)
-            else -> say(R.string.what_changed)
+    /** What Today says: the version, the weeks and days lived, and the prompt. */
+    private data class Today(val version: String, val lived: String?, val prompt: String) {
+        val said: String get() = say(R.string.version, version, listOfNotNull(lived, prompt).joinToString(". "))
+
+        companion object {
+            fun of(context: Context): Today {
+                val me = context.graph.me
+                val prompt = when {
+                    !context.graph.signedIn.value -> say(R.string.sign_in_to_changelog)
+                    me?.wroteToday == true -> say(R.string.written_today_anything_else)
+                    else -> say(R.string.what_changed)
+                }
+                // "Week 2,369 — Day 16,577" under the version, as the site and the email have it (API 1.13.0).
+                return Today(me?.version ?: "?.?.???", me?.lived?.text, prompt)
+            }
         }
-        val lived = me?.lived
-        val said = say(R.string.version, version, listOfNotNull(lived?.text, status).joinToString(". "))
+    }
+
+    /** Today's version, lived and prompt: drawn in both palettes, and said. */
+    private fun today(context: Context, views: RemoteViews) {
+        val t = Today.of(context)
         for ((id, night) in listOf(R.id.widget_words to false, R.id.widget_words_dark to true)) {
-            views.setImageViewBitmap(id, Draw(context, night).today(version, lived?.week, lived?.day, status, written))
-            views.setContentDescription(id, said)
+            views.setImageViewBitmap(id, Draw(context, night).words(t.version, t.lived, t.prompt))
+            views.setContentDescription(id, t.said)
         }
     }
 
@@ -105,112 +145,132 @@ internal object TodayWidgets {
         return PendingIntent.getActivity(context, screen.hashCode(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
     }
 
-    private val day = DateTimeFormatter.ofPattern("EEE, MMM d")
+    private val dayFormat = DateTimeFormatter.ofPattern("EEE, MMM d")
 
-    /** "MON, NOV 16", "TODAY" or "ON NOW", as the iPhone widget heads a date. */
-    fun dateLabel(soon: Soon): String = when (soon.status) {
+    /** "Mon, Nov 16 · In 9 days", "Today" or "On now", as the Upcoming tab says when a date is. */
+    fun whenSaid(soon: Soon, today: String?): String = when (soon.status) {
         "today" -> say(R.string.today)
         "ongoing" -> say(R.string.on_now)
-        else -> UpcomingDraft.parse(soon.date)?.format(day) ?: soon.date
-    }.uppercase()
+        else -> {
+            val day = UpcomingDraft.parse(soon.date)?.format(dayFormat) ?: soon.date
+            val entry = UpcomingEntry(id = "", revision = 0, next = soon.date, status = soon.status, line = "", kind = UpcomingKind.Event, title = "", date = soon.date)
+            val off = today?.let { Countdown.of(entry, it) }?.let { c ->
+                val days = c.days.toInt()
+                when {
+                    days == 1 -> say(R.string.tomorrow)
+                    !c.inWeeks -> sayCount(R.plurals.in_days, days, days)
+                    c.rest == 0L -> sayCount(R.plurals.weeks_count, c.weeks.toInt(), c.weeks.toInt())
+                    else -> sayCount(R.plurals.weeks_count, c.weeks.toInt(), c.weeks.toInt()) + " " + sayCount(R.plurals.days_count, c.rest.toInt(), c.rest.toInt())
+                }
+            }
+            if (off == null) day else "$day · $off"
+        }
+    }
 
     /** The drawing, at the screen's density, in the light palette or the dark one. */
     private class Draw(base: Context, night: Boolean) {
         private val context: Context = base.createConfigurationContext(
-            android.content.res.Configuration(base.resources.configuration).apply {
-                uiMode = (uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK.inv()) or
-                    (if (night) android.content.res.Configuration.UI_MODE_NIGHT_YES else android.content.res.Configuration.UI_MODE_NIGHT_NO)
+            Configuration(base.resources.configuration).apply {
+                uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
+                    (if (night) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO)
             },
         )
-        private val d = context.resources.displayMetrics.density
+        private val density = context.resources.displayMetrics.density
         private val ink = ContextCompat.getColor(context, R.color.ink)
-        private val quiet = Color.argb(170, Color.red(ink), Color.green(ink), Color.blue(ink))
-        private val cobalt = ContextCompat.getColor(context, R.color.cobalt)
 
         private fun font(res: Int, weight: Int) = Typeface.create(ResourcesCompat.getFont(context, res) ?: Typeface.DEFAULT, weight, false)
 
-        private fun paint(res: Int, weight: Int, sp: Float, color: Int, spacing: Float = 0f) = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = font(res, weight)
-            textSize = sp * d
-            this.color = color
-            letterSpacing = spacing
-        }
-
         private fun height(p: Paint) = -p.fontMetrics.ascent + p.fontMetrics.descent
 
-        /** A line of text with its top at y; answers the y under it. */
-        private fun Canvas.line(text: String, x: Float, y: Float, p: Paint): Float {
-            drawText(text, x, y - p.fontMetrics.ascent, p)
-            return y + height(p)
-        }
-
-        /** TODAY with the mark, the version, Week and Day, and the status. */
-        fun today(version: String, week: Int?, dayNumber: Int?, status: String, written: Boolean): Bitmap {
-            val head = paint(R.font.martian_mono, 500, 12f, quiet, 0.08f)
-            val big = paint(R.font.bricolage_grotesque, 800, 34f, ink, -0.02f)
-            val small = paint(R.font.bricolage_grotesque, 500, 15f, quiet)
-            val mark = 18 * d
-            val lines = listOfNotNull(week?.let { say(R.string.week_n, "%,d".format(it)) }, dayNumber?.let { say(R.string.day_n, "%,d".format(it)) })
-            val check = if (written) 16 * d + 6 * d else 0f
-            val width = maxOf(
-                mark + 8 * d + head.measureText(say(R.string.today_caps)),
-                big.measureText(version),
-                lines.maxOfOrNull(small::measureText) ?: 0f,
-                check + small.measureText(status),
-            )
-            val height = mark + 8 * d + height(big) + 4 * d + lines.size * height(small) + 14 * d + height(small)
-            val bitmap = Bitmap.createBitmap(width.toInt() + 2, height.toInt() + 2, Bitmap.Config.ARGB_8888)
-            val c = Canvas(bitmap)
-            // The app's mark, as the iPhone widget's corner.
-            ContextCompat.getDrawable(context, R.mipmap.ic_launcher)?.let { icon ->
-                c.save()
-                c.clipPath(Path().apply { addRoundRect(RectF(0f, 0f, mark, mark), 4 * d, 4 * d, Path.Direction.CW) })
-                icon.setBounds(0, 0, mark.toInt(), mark.toInt())
-                icon.draw(c)
-                c.restore()
+        /** The version in Martian Mono (cobalt, dots tangerine), the weeks and days lived, and the prompt, in Bricolage Grotesque. */
+        fun words(version: String, lived: String?, prompt: String, standing: String? = null): Bitmap {
+            val big = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                typeface = font(R.font.martian_mono, 700)
+                textSize = 26 * density
+                letterSpacing = -0.02f
             }
-            c.drawText(say(R.string.today_caps), mark + 8 * d, (mark - height(head)) / 2 - head.fontMetrics.ascent, head)
-            var y = mark + 8 * d
-            y = c.line(version, 0f, y, big) + 4 * d
-            for (l in lines) y = c.line(l, 0f, y, small)
-            y += 14 * d
-            if (written) {
-                // A filled check, in ink, as the iPhone's.
-                val r = 8 * d
-                val cy = y + height(small) / 2
-                c.drawCircle(r, cy, r, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = ink })
-                val tick = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = ContextCompat.getColor(context, R.color.paper)
-                    style = Paint.Style.STROKE
-                    strokeWidth = 1.8f * d
-                    strokeCap = Paint.Cap.ROUND
-                    strokeJoin = Paint.Join.ROUND
-                }
-                c.drawPath(Path().apply { moveTo(r - 3.5f * d, cy); lineTo(r - 1f * d, cy + 2.5f * d); lineTo(r + 3.8f * d, cy - 2.8f * d) }, tick)
+            val small = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                typeface = font(R.font.bricolage_grotesque, 500)
+                textSize = 15 * density
+                color = ink
             }
-            c.line(status, check, y, small)
+            // The lived line is quieter: the ink at two thirds, as the site's hint.
+            val hint = Paint(small).apply {
+                textSize = 13 * density
+                alpha = 170
+            }
+            val gap = 8 * density
+            // The streak, or the email stopped, quietly under the prompt.
+            val extraHeight = if (standing == null) 0f else 10 * density + height(hint)
+            val width = maxOf(big.measureText(version), small.measureText(prompt), lived?.let(hint::measureText) ?: 0f, standing?.let(hint::measureText) ?: 0f).toInt() + 2
+            val bigHeight = height(big)
+            val hintHeight = if (lived == null) 0f else height(hint) + 2 * density
+            val bitmap = Bitmap.createBitmap(width, (bigHeight + hintHeight + gap + height(small) + extraHeight).toInt() + 2, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            val cobalt = ContextCompat.getColor(context, R.color.cobalt)
+            val tangerine = ContextCompat.getColor(context, R.color.tangerine)
+            var x = 0f
+            for (c in version) {
+                big.color = if (c == '.') tangerine else cobalt
+                canvas.drawText(c.toString(), x, -big.fontMetrics.ascent, big)
+                x += big.measureText(c.toString())
+            }
+            lived?.let { canvas.drawText(it, 0f, bigHeight + 2 * density - hint.fontMetrics.ascent, hint) }
+            canvas.drawText(prompt, 0f, bigHeight + hintHeight + gap - small.fontMetrics.ascent, small)
+            val y = bigHeight + hintHeight + gap + height(small) + 10 * density
+            standing?.let { canvas.drawText(it, 0f, y - hint.fontMetrics.ascent, hint) }
             return bitmap
         }
 
-        /** COMING UP, and the next dates: each day in cobalt capitals, its title under it. */
-        fun comingUp(soon: List<Soon>): Bitmap {
-            val head = paint(R.font.martian_mono, 500, 12f, quiet, 0.08f)
-            val date = paint(R.font.martian_mono, 600, 13f, cobalt)
-            val title = paint(R.font.bricolage_grotesque, 500, 16f, ink)
-            val width = 170 * d
-            val rows = if (soon.isEmpty()) 1 else soon.size
-            val height = height(head) + 10 * d + rows * (height(date) + 2 * d + height(title) + 10 * d)
-            val bitmap = Bitmap.createBitmap(width.toInt() + 2, height.toInt() + 2, Bitmap.Config.ARGB_8888)
-            val c = Canvas(bitmap)
-            var y = c.line(say(R.string.coming_up).uppercase(), 0f, 0f, head) + 10 * d
-            if (soon.isEmpty()) {
-                val none = paint(R.font.bricolage_grotesque, 500, 15f, quiet)
-                c.line(TextUtils.ellipsize(say(R.string.nothing_coming_up), none, width, TextUtils.TruncateAt.END).toString(), 0f, y, none)
+        /** Two drawings side by side, centred on each other, with a rule between, as the app draws its rules. */
+        fun beside(left: Bitmap, right: Bitmap): Bitmap {
+            val gap = 16 * density
+            val height = maxOf(left.height, right.height)
+            val out = Bitmap.createBitmap((left.width + gap * 2 + density + right.width).toInt(), height, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(out)
+            canvas.drawBitmap(left, 0f, 0f, null)
+            val x = left.width + gap
+            canvas.drawRect(x, 0f, x + density, height.toFloat(), Paint().apply { color = ContextCompat.getColor(context, R.color.widget_rule) })
+            canvas.drawBitmap(right, x + density + gap, 0f, null)
+            return out
+        }
+
+        /** "Coming up", then each date's own line in ink with its day and how far off in the quieter ink, as Upcoming. */
+        fun comingUp(soon: List<Soon>, today: String?): Bitmap {
+            // Named apart: inside a TextPaint's apply, `density` is the paint's own (1), not the screen's.
+            val dp = density
+            val heading = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+                typeface = font(R.font.bricolage_grotesque, 700)
+                textSize = 15 * dp
+                color = ink
             }
+            val line = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+                typeface = font(R.font.bricolage_grotesque, 500)
+                textSize = 15 * dp
+                color = ink
+            }
+            val caption = TextPaint(line).apply {
+                textSize = 13 * dp
+                alpha = 170
+            }
+            // As wide as its longest line, up to 160dp: the rest is cut short with an ellipsis.
+            val widest = (listOf(heading.measureText(say(R.string.coming_up))) +
+                soon.flatMap { listOf(line.measureText(it.words), caption.measureText(whenSaid(it, today))) } +
+                listOfNotNull(caption.measureText(say(R.string.nothing_coming_up)).takeIf { soon.isEmpty() })).max()
+            val width = minOf(widest, 160 * density)
+            val rows = if (soon.isEmpty()) 1 else soon.size
+            val height = height(heading) + 8 * density + rows * (height(line) + height(caption) + 8 * density)
+            val bitmap = Bitmap.createBitmap(width.toInt() + 2, height.toInt() + 2, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            fun Canvas.text(s: String, y: Float, p: TextPaint): Float {
+                drawText(TextUtils.ellipsize(s, p, width, TextUtils.TruncateAt.END).toString(), 0f, y - p.fontMetrics.ascent, p)
+                return y + height(p)
+            }
+            var y = canvas.text(say(R.string.coming_up), 0f, heading) + 8 * density
+            if (soon.isEmpty()) canvas.text(say(R.string.nothing_coming_up), y, caption)
             for (s in soon) {
-                y = c.line(dateLabel(s), 0f, y, date) + 2 * d
-                val cut = TextUtils.ellipsize(s.title, title, width, TextUtils.TruncateAt.END).toString()
-                y = c.line(cut, 0f, y, title) + 10 * d
+                y = canvas.text(s.words, y, line)
+                y = canvas.text(whenSaid(s, today), y, caption) + 8 * density
             }
             return bitmap
         }

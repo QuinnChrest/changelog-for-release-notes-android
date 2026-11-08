@@ -4,7 +4,7 @@ What Changelog for Android does, what's left, and what's built but not yet
 checked. The iPhone app (`jthingelstad/changelog-ios`) is the reference;
 `AGENTS.md` says how each built piece works.
 
-**At a glance:** 51 built · 4 to do · 2 waiting on someone else · 18 to check
+**At a glance:** 53 built · 4 to do · 2 waiting on someone else · 19 to check
 
 Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 built, not yet checked
 
@@ -45,7 +45,9 @@ These are written and built; something about them couldn't be seen on the emulat
 | 🔍 | Check in now | A tap in Activity's top bar or the map's: one fix, queued as a `tap` through the Outbox. Seen on the Android 17 emulator against the dev server (the check-in arrived at the emulator's spot); `DevServerTest` sends one. Not yet on a real phone |
 | 🔍 | Record my stops (automatic check-ins) | Settings switch, off by default, asking "Allow all the time" as it goes on; Android's own location every five minutes in the background, `StopDetector` reporting a stop after ten minutes within 100 m and its end when the phone moves on, through the Outbox. Fused, passive and GPS fixes, late ones passed over. `StopDetectorTest` and `DevServerTest` pass. On the emulator the first version (fused only) heard one fix in 25 minutes and found no stop; the three-source version hasn't finished a run there yet. Not yet a day on a real phone: battery, and how often Android really wakes it |
 | 🔍 | Notes on the map | Notes with a place of their own (`GET /v1/map/pins`) as cobalt rings beside the check-ins' dots, "Check-ins" and "Notes" picked at the top; a ring lists its notes and each opens. Seen on the emulator with the dev server's notes (its made-up places all sit in one town) |
-| 🔍 | Widgets as the iPhone app's: Today (2×2) and Today with Coming up (4×2) | Version, Week and Day, Written today; the next two Upcoming dates. Light and dark drawn apart and switched by the phone's theme. The 4×2 seen on the Android 17 emulator in light and dark with the dev server's made-up dates; the 2×2 seen only in the picker (it draws the same Today side). Not yet on a real phone |
+| ✅ | Home-screen widget: today's version (cobalt, tangerine dots), the weeks and days lived, and the prompt, a tap to write |
+| 🔍 | A bigger widget: Today beside Coming up | 4×2: the same Today with the streak, and the next Upcoming dates in the app's own words and look (as many as its height holds, up to four, each line, then its day and countdown). Light and dark drawn apart and switched by the phone's theme. Seen on the Android 17 emulator in light and dark with the dev server's made-up dates. Not yet on a real phone |
+| 🔍 | Not at home: no stops recorded near home | Settings, under Record my stops: set home from where you are (kept on the phone), and no stop within 150 m of it is sent. `StopDetectorTest` covers it; not yet set on a real phone through a day |
 | 🔍 | A photo's small copy on Log, and `notes:all` on a real account | The dev server's fixture photo has no small copy, so the thumbnail path ran only in a unit test; the whole-account list was seen on the dev server with a `notes:all` token, not on production |
 
 ## Built
@@ -131,4 +133,5 @@ These are written and built; something about them couldn't be seen on the emulat
 | ✅ | MIT licensed, and the repo is public |
 | ✅ | Version numbers by Your Version Number's arithmetic from 2026-10-29 |
 | ✅ | Checked against the live API's OpenAPI file (1.8.0): the client reads every field it uses, tags work in any script, activity rows are told apart by token id, and a note's words are made well-formed before sending |
+| ✅ | Picks (filters, Appearance, the map's, tags, kinds) in one style: quiet words, the chosen one in ink over a tangerine rule; no underlines |
 | ✅ | Tests: unit tests, tests against the dev server, and a UI test cycle on the emulator; CI on every push |

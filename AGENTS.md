@@ -50,8 +50,10 @@ yvn-release-notes): type on paper, the email's colours, light and dark as
 the phone is. `ui/Theme.kt` holds it: the site's colours (`paper`), its two
 fonts (Bricolage Grotesque for words, Martian Mono for versions; OFL, see
 `docs/fonts/`), `VersionText` (cobalt, the dots tangerine), `GoButton` (the
-one tangerine button on a screen), `QuietButton` (blue words), `Pick` (the
-site's tag picks: underlined blue, the chosen one in bold ink), `PaperField`
+one tangerine button on a screen), `QuietButton` (blue words), `Pick` (a choice,
+or a thing turned on or off: quiet words, the chosen one in semibold ink
+over a 2dp tangerine rule, as a field being typed in; no underlines, which
+read as links on a phone; Quinn's call, 2026-11-08), `PaperField`
 and `Select` (no box, a 2dp rule that turns tangerine), `Rule` and `Bar`.
 No boxes, no shadows, no Material chips or outlined fields: build new
 screens from these. The one exception is the tab bar along the bottom
@@ -387,25 +389,39 @@ at that moment; **Record my stops** (Settings, off by default) records in
 the background, as the location rule above says. `kit`'s `StopDetector`
 reports a stop's arrival once the phone has stayed ten minutes, and its
 end, with the same `arrived`, once a fix lands more than 100 m away; the
-server takes the two as one stay. Fixes vaguer than 250 m are passed over.
+server takes the two as one stay, so a stop of five hours is one arrival
+and one end, never one every ten minutes (the detector's `reported` holds
+until the phone leaves, and the server merges a stop that starts within 30
+minutes of the last one ending at the same place). Fixes vaguer than 250 m
+are passed over. **Not at home** (Settings, under Record my stops): home is
+set from one fix where the phone is and kept on the phone only
+(`AppGraph.home`, no backups, gone on sign-out); `kit`'s `QuietPlaces` drops
+every stop within 150 m of it, arrival and end, before the Outbox. Check in
+now isn't filtered: a tap is the owner's choice.
 Every report goes through the Outbox (`OutboxOperation.CheckIn`) under its
 own key. The detector's state (one spot) is kept in `noBackupFilesDir`,
 never logged. A restart or an update drops Android's request, so
 `RestoreReceiver` and opening the app ask again.
 
-Two widgets, as the iPhone app's (`VersionWidget.kt`): **Today** (2×2: the
-mark and TODAY, the version large in ink, Week and Day, and "Written today"
-with a check or "What changed?"; a tap opens Log to write) and **Coming up**
-(4×2: Today beside the next two dates in Upcoming, each day in cobalt
-capitals over its title; a tap there opens Upcoming). A widget can't use
-the app's fonts, so `TodayWidgets` draws the words into images, each twice,
-light and dark; the layout shows one by `@integer/widget_light` and
-`widget_dark`, which the home screen reads in the phone's own theme (a
-visibility given by integer is its place in visible, invisible, gone, so
-gone is 2, not 8). The next dates are kept on the phone (`AppGraph.soon`,
-a date's title is the owner's words, as a reminder's line is), refreshed
-whenever the app reads Upcoming, as it opens, and in the 12-hourly refresh;
-signing out drops them.
+Two widgets (`VersionWidget.kt`), in the app's own look: **Changelog**
+(3×1, as it has always been: the version in Martian Mono, cobalt with
+tangerine dots, the weeks and days lived, and "What changed?"; a tap opens
+Log to write) and **Changelog: Coming up** (4×2: that same Today, with the
+streak, or "Your email is stopped", under it; beside it as many dates in
+Upcoming as its height holds, up to four, each in the server's line with
+its day and countdown, as the Upcoming tab says them. Today's half opens
+Log, Coming up's Upcoming. Tomorrow's version and On this day were tried
+there and taken off, Quinn's call, 2026-11-08). A widget can't use the app's fonts, so
+`TodayWidgets` draws the words into images, each twice, light and dark; the
+layout shows one by `@integer/widget_light` and `widget_dark`, which the
+home screen reads in the phone's own theme (a visibility given by integer
+is its place in visible, invisible, gone, so gone is 2, not 8). The wide
+one is a single picture, so both halves keep one scale, with clear halves
+over it for the taps. Inside a `TextPaint`'s `apply`, `density` is the
+paint's own (1), not the screen's: name the screen's apart. The next dates
+are kept on the phone (`AppGraph.soon`; a date's line is the owner's words,
+as a reminder's is), refreshed whenever the app reads Upcoming, as it
+opens, and in the 12-hourly refresh; signing out drops them.
 
 Log, Notes, Upcoming, Activity and Settings are the five tabs along the bottom.
 Settings' Appearance (`ThemeMode`: same as the phone, light or dark) is about

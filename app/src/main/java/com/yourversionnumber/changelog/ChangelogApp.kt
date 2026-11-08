@@ -62,7 +62,10 @@ val Context.graph: AppGraph get() = (applicationContext as ChangelogApp).graph
  * title is the owner's words, kept on the phone as a reminder's line is, never logged; signing out drops them.
  */
 @Serializable
-data class Soon(val date: String, val status: String, val title: String)
+data class Soon(val date: String, val status: String, val title: String, val line: String = "") {
+    /** The server's own line ("Robin turns 42."), as Upcoming shows it; the title for one kept before lines were. */
+    val words: String get() = line.ifBlank { title }
+}
 
 /** A note this phone filed, kept so Log can show it and take it back. */
 @Serializable
@@ -163,8 +166,16 @@ class AppGraph(private val context: Context) {
 
     /** Keeps the next dates from a read of Upcoming, for the widget. */
     fun keepSoon(list: com.yourversionnumber.changelog.kit.UpcomingList) {
-        soon = list.entries.filter { it.status != "past" }.take(3).map { Soon(it.next, it.status, it.title) }
+        soon = list.entries.filter { it.status != "past" }.take(4).map { Soon(it.next, it.status, it.title, it.line) }
     }
+
+    /**
+     * Home, as the owner set it from where the phone was: Record my stops never sends a stop near it. Kept on this
+     * phone only (no backups), never sent or logged; signing out forgets it.
+     */
+    var home: com.yourversionnumber.changelog.kit.Spot?
+        get() = runCatching { Api.json.decodeFromString(com.yourversionnumber.changelog.kit.Spot.serializer(), prefs.getString("home", null)!!) }.getOrNull()
+        set(value) = prefs.edit().putString("home", value?.let { Api.json.encodeToString(com.yourversionnumber.changelog.kit.Spot.serializer(), it) }).apply()
 
     /** Recording stops in the background (check-ins), off until the owner turns it on in Settings. */
     var recordingStops: Boolean
@@ -231,7 +242,7 @@ class AppGraph(private val context: Context) {
         hereByDefault = false
         recordingStops = false
         Stops.stop(context)
-        prefs.edit().remove("soon").apply()
+        prefs.edit().remove("soon").remove("thisday").remove("home").apply() // "thisday": an earlier build's, for its widget
         noticeKinds = emptySet()
         activityCursor = null
         PhoneNotices.clear(context)

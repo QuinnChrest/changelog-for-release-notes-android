@@ -16,6 +16,7 @@ import com.yourversionnumber.changelog.kit.CheckInReport
 import com.yourversionnumber.changelog.kit.Fix
 import com.yourversionnumber.changelog.kit.OutboxNotKept
 import com.yourversionnumber.changelog.kit.OutboxOperation
+import com.yourversionnumber.changelog.kit.QuietPlaces
 import com.yourversionnumber.changelog.kit.StopDetector
 import com.yourversionnumber.changelog.kit.Timestamp
 import java.io.File
@@ -113,7 +114,8 @@ object Stops {
         for (l in locations.sortedBy { it.time }) {
             val (next, found) = detector.next(Fix(l.latitude, l.longitude, if (l.hasAccuracy()) l.accuracy.toDouble() else null, Instant.ofEpochMilli(l.time)), zone)
             detector = next
-            reports += found
+            // Never a stop at home: its arrival and its end both stay on the phone.
+            reports += QuietPlaces.keep(found, listOfNotNull(graph.home))
         }
         save(context, detector)
         if (reports.isEmpty()) return@withLock

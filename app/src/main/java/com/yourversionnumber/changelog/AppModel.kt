@@ -774,6 +774,34 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Home, where Record my stops never checks in; null until set. */
+    var home by mutableStateOf(graph.home)
+        private set
+    var findingHome by mutableStateOf(false)
+        private set
+
+    /** Sets home to where the phone is now: one fix, kept on the phone. */
+    fun setHomeHere() {
+        if (findingHome) return
+        viewModelScope.launch {
+            findingHome = true
+            val spot = Locator.fix(getApplication())
+            findingHome = false
+            if (spot == null) {
+                graph.report(say(R.string.this_phone_couldnt_say_where))
+            } else {
+                val kept = Spot(spot.lat, spot.lon)
+                graph.home = kept
+                home = kept
+            }
+        }
+    }
+
+    fun forgetHome() {
+        graph.home = null
+        home = null
+    }
+
     /** Recording stops in the background, as this phone's switch says. */
     var recordingStops by mutableStateOf(graph.recordingStops)
         private set
@@ -862,6 +890,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         checkIns = null
         notePins = null
         recordingStops = false
+        home = null
         tags = null
         sticky = null
         activityShown.clear()

@@ -267,3 +267,16 @@ data class NotePin(val notes: List<MapPin>) {
         }
     }
 }
+
+/**
+ * Spots the owner keeps out of Record my stops (home): a stop found within [METRES] of one is never sent, its
+ * arrival or its end. Wider than a stop's own 100 m, so drift inside a house doesn't leak out as a stop next door.
+ * Check in now isn't filtered: a tap is the owner's own choice.
+ */
+object QuietPlaces {
+    const val METRES = 150.0
+
+    /** The reports to send: those not near any quiet spot. */
+    fun keep(reports: List<CheckInReport>, quiet: List<Spot>): List<CheckInReport> =
+        reports.filter { r -> quiet.none { CheckInMap.metres(it.lat, it.lon, r.lat, r.lon) <= METRES } }
+}

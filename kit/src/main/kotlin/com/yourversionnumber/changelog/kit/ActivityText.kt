@@ -50,10 +50,12 @@ val ActivityItem.headline: String
             "checkin" -> Words.say(Phrase.CheckedIn, stopName(label))
             "checkin.named" -> Words.say(Phrase.CheckInNamed)
             "checkin.deleted" -> when {
-                all != true -> Words.say(Phrase.CheckInDeleted)
-                count != null -> Words.say(Phrase.CheckInsDeletedAllCount, count)
-                else -> Words.say(Phrase.CheckInsDeletedAll)
+                all == true -> count?.let { Words.say(Phrase.CheckInsDeletedAllCount, it) } ?: Words.say(Phrase.CheckInsDeletedAll)
+                place != null -> Words.say(Phrase.CheckInsDeletedAtPlace)
+                else -> Words.say(Phrase.CheckInDeleted)
             }
+            "checkin.ignored" -> Words.say(Phrase.PlaceIgnored)
+            "checkin.unignored" -> Words.say(Phrase.PlaceUnignored)
             "checkin.place" -> when (change) {
                 "added" -> Words.say(Phrase.PlaceRemembered)
                 "spot" -> Words.say(Phrase.PlaceSpotAdded)
@@ -69,6 +71,18 @@ fun stopName(label: String?): String =
     if (label.isNullOrEmpty() || label == UNNAMED_STOP) Words.say(Phrase.UnnamedStop) else label
 
 private const val UNNAMED_STOP = "Unnamed stop"
+
+/**
+ * A second line, under the headline, for the rows that need one (API 1.20.0):
+ * what ignoring a place did, or how many check-ins went from one.
+ */
+val ActivityItem.more: String?
+    get() = when (kind) {
+        "checkin.ignored" -> Words.say(Phrase.PlaceIgnoredMore)
+        "checkin.unignored" -> Words.say(Phrase.PlaceUnignoredMore)
+        "checkin.deleted" -> if (all != true && place != null) count?.let { Words.count(CountPhrase.CheckInsWent, it) } else null
+        else -> null
+    }
 
 val ActivityItem.detail: String?
     get() = listOfNotNull(source, day).joinToString(" · ").ifEmpty { null }

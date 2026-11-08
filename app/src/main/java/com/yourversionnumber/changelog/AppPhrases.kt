@@ -64,10 +64,16 @@ object AppPhrases : Phrasebook {
             Phrase.CheckInDeleted -> R.string.kit_check_in_deleted
             Phrase.CheckInsDeletedAll -> R.string.kit_check_ins_deleted_all
             Phrase.CheckInsDeletedAllCount -> R.string.kit_check_ins_deleted_all_count
+            Phrase.CheckInsDeletedAtPlace -> R.string.kit_check_ins_deleted_at_place
             Phrase.PlaceRemembered -> R.string.kit_place_remembered
             Phrase.PlaceSpotAdded -> R.string.kit_place_spot_added
             Phrase.PlaceRenamed -> R.string.kit_place_renamed
             Phrase.PlaceForgotten -> R.string.kit_place_forgotten
+            Phrase.PlaceIgnored -> R.string.kit_place_ignored
+            Phrase.PlaceIgnoredMore -> R.string.kit_place_ignored_more
+            Phrase.PlaceUnignored -> R.string.kit_place_unignored
+            Phrase.PlaceUnignoredMore -> R.string.kit_place_unignored_more
+            Phrase.HomeNotIgnored -> R.string.kit_home_not_ignored
             Phrase.FilterAll -> R.string.kit_filter_all
             Phrase.FilterNotes -> R.string.kit_filter_notes
             Phrase.FilterCheckIns -> R.string.kit_filter_check_ins
@@ -137,6 +143,7 @@ object AppPhrases : Phrasebook {
             CountPhrase.PhotoCount -> R.plurals.kit_photo_count
             CountPhrase.MemoCount -> R.plurals.kit_memo_count
             CountPhrase.FileCount -> R.plurals.kit_file_count
+            CountPhrase.CheckInsWent -> R.plurals.kit_check_ins_went
         },
         n,
         n,

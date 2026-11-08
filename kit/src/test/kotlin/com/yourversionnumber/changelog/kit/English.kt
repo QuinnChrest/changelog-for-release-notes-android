@@ -59,10 +59,16 @@ object English : Phrasebook {
         Phrase.CheckInDeleted -> "Deleted a check-in"
         Phrase.CheckInsDeletedAll -> "Deleted all your check-ins"
         Phrase.CheckInsDeletedAllCount -> "Deleted all your check-ins, %1\$d"
+        Phrase.CheckInsDeletedAtPlace -> "Deleted the check-ins at a remembered place"
         Phrase.PlaceRemembered -> "Remembered a place"
         Phrase.PlaceSpotAdded -> "Added a spot to a remembered place"
         Phrase.PlaceRenamed -> "Renamed a remembered place"
         Phrase.PlaceForgotten -> "Forgot a remembered place"
+        Phrase.PlaceIgnored -> "Ignored a remembered place"
+        Phrase.PlaceIgnoredMore -> "Its check-ins are hidden, and no new ones are kept there."
+        Phrase.PlaceUnignored -> "Stopped ignoring a remembered place"
+        Phrase.PlaceUnignoredMore -> "Its check-ins show again."
+        Phrase.HomeNotIgnored -> "The server didn't ignore the place, so home stays on this phone for now."
         Phrase.FilterAll -> "All"
         Phrase.FilterNotes -> "Notes"
         Phrase.FilterCheckIns -> "Check-ins"
@@ -131,6 +137,7 @@ object English : Phrasebook {
         CountPhrase.PhotoCount -> if (n == 1) "1 photo" else "$n photos"
         CountPhrase.MemoCount -> if (n == 1) "1 voice memo" else "$n voice memos"
         CountPhrase.FileCount -> if (n == 1) "1 file" else "$n files"
+        CountPhrase.CheckInsWent -> if (n == 1) "1 check-in went." else "$n check-ins went."
     }
 
     /** Makes it the book in use; the kit's tests that read words call it first. */

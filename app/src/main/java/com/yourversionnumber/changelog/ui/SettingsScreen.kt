@@ -31,9 +31,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,11 +56,15 @@ import com.yourversionnumber.changelog.kit.ActivityNoticeKind
 import com.yourversionnumber.changelog.kit.Api
 import com.yourversionnumber.changelog.kit.DailyPrompt
 import com.yourversionnumber.changelog.kit.Hashtags
+import com.yourversionnumber.changelog.kit.HomeMove
+import com.yourversionnumber.changelog.kit.RememberedPlace
 import com.yourversionnumber.changelog.say
+import com.yourversionnumber.changelog.sayCount
 import com.yourversionnumber.changelog.ui.ThemeMode
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import kotlinx.coroutines.launch
 
 @Composable
 private fun Toggle(title: String, about: String?, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
@@ -133,10 +139,6 @@ fun SettingsScreen(model: AppModel) {
         if (granted.values.any { it }) allTime.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
         else model.graph.report(say(R.string.changelog_cant_check_in_without))
     }
-    // Home is set from one fix, so it needs location while using, asked for here if it must be.
-    val homeWhere = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
-        if (granted.values.any { it }) model.setHomeHere() else model.graph.report(say(R.string.changelog_cant_check_in_without))
-    }
     // Back from the phone's settings: what it allows now, and recording started if it may.
     LifecycleResumeEffect(Unit) {
         allowedAllTime = Stops.allowedInBackground(context)
@@ -208,28 +210,8 @@ fun SettingsScreen(model: AppModel) {
                     )
                 })
             }
-            // Home: never a stop there. Set from where the phone is, so it asks for location the way Here does.
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(say(R.string.not_at_home), style = MaterialTheme.typography.bodyLarge)
-                Caption(say(if (model.home == null) R.string.not_at_home_about else R.string.not_at_home_set))
-                Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                    QuietButton(
-                        say(
-                            when {
-                                model.findingHome -> R.string.finding_where_you_are
-                                model.home == null -> R.string.set_home_here
-                                else -> R.string.move_home_here
-                            },
-                        ),
-                        {
-                            if (Locator.allowed(context)) model.setHomeHere()
-                            else homeWhere.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
-                        },
-                        enabled = !model.findingHome,
-                    )
-                    if (model.home != null) QuietButton(say(R.string.forget_home), model::forgetHome, color = paper.orangeInk)
-                }
-            }
+            if (model.hasActivity) RememberedPlaces(model)
+            if (model.home != null) HomeNotMoved(model)
 
             Heading(say(R.string.pinned_tags), Modifier.padding(top = 12.dp))
             PinnedTags(model)
@@ -305,6 +287,98 @@ fun SettingsScreen(model: AppModel) {
                 }
             },
         )
+    }
+}
+
+/** Delete existing check-ins here, asked with the count read just before; [changed] when it moved since. */
+private data class DeleteAsked(val place: RememberedPlace, val count: Int, val changed: Boolean = false)
+
+/**
+ * The account's remembered places (API 1.18.0), each with Ignore this location and its check-ins to delete
+ * (API 1.20.0), as on the web and the iPhone. Anyone who can see activity reads them; changing them needs
+ * `notes:all`. An ignored place stays listed: only its check-ins hide.
+ */
+@Composable
+private fun RememberedPlaces(model: AppModel) {
+    val scope = rememberCoroutineScope()
+    var asked by remember { mutableStateOf<DeleteAsked?>(null) }
+    var nothingAt by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(model.me?.token?.id) { model.loadPlaces() }
+    val places = model.places
+    val canChange = model.readsAll
+
+    fun count(place: RememberedPlace) = scope.launch {
+        val n = model.checkInsAt(place) ?: return@launch
+        if (n == 0) nothingAt = say(R.string.no_check_ins_at, place.name) else asked = DeleteAsked(place, n)
+    }
+
+    Text(say(R.string.remembered_places), style = MaterialTheme.typography.bodyLarge)
+    model.placesProblem?.let { Caption(it, color = paper.orangeInk) }
+    if (places?.isEmpty() == true) Caption(say(R.string.no_remembered_places))
+    places.orEmpty().forEach { place ->
+        Column {
+            Column(Modifier.semantics(mergeDescendants = true) {}) {
+                Text(place.name)
+                val spots = sayCount(R.plurals.place_spots, place.spots.size, place.spots.size)
+                Caption(if (place.ignored) say(R.string.place_spots_ignored, spots) else spots)
+            }
+            if (canChange) {
+                Pick(say(R.string.ignore_this_location), selected = place.ignored, onClick = { model.setIgnored(place, !place.ignored) })
+                Caption(say(if (place.ignored) R.string.ignore_this_location_on else R.string.ignore_this_location_off))
+                QuietButton(say(R.string.delete_existing_check_ins_here), { count(place) }, enabled = !model.placeBusy, color = paper.orangeInk)
+            }
+        }
+    }
+    if (!places.isNullOrEmpty() && !canChange) Caption(say(R.string.to_ignore_a_place_sign_in))
+
+    asked?.let { ask ->
+        AlertDialog(
+            onDismissRequest = { asked = null },
+            title = { Text(sayCount(R.plurals.delete_check_ins_at, ask.count, ask.count, ask.place.name)) },
+            text = { Text(say(if (ask.changed) R.string.delete_check_ins_at_changed else R.string.delete_check_ins_at_about, ask.place.name)) },
+            confirmButton = {
+                QuietButton(say(R.string.delete), {
+                    asked = null
+                    scope.launch {
+                        // The count moved since it was read: ask again with the number now.
+                        val now = model.deleteCheckInsAt(ask.place, ask.count) ?: return@launch
+                        if (now == 0) nothingAt = say(R.string.no_check_ins_at, ask.place.name) else asked = DeleteAsked(ask.place, now, changed = true)
+                    }
+                }, color = paper.orangeInk)
+            },
+            dismissButton = { QuietButton(say(R.string.keep), { asked = null }) },
+        )
+    }
+    nothingAt?.let { words ->
+        AlertDialog(
+            onDismissRequest = { nothingAt = null },
+            text = { Text(words) },
+            confirmButton = { QuietButton(say(R.string.ok), { nothingAt = null }) },
+        )
+    }
+}
+
+/**
+ * Not at home from an earlier build, still on this phone: what moving it waits for, and Forget home. It moves by
+ * itself as the app opens once this sign-in may (HomeMove); nothing here sets a new one.
+ */
+@Composable
+private fun HomeNotMoved(model: AppModel) {
+    val me = model.me
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(say(R.string.not_at_home), style = MaterialTheme.typography.bodyLarge)
+        Caption(say(R.string.home_still_on_this_phone))
+        Caption(
+            say(
+                when (me?.let { HomeMove.lack(it) }) {
+                    HomeMove.Lack.Scopes -> R.string.home_waits_for_scopes
+                    HomeMove.Lack.Server -> R.string.home_waits_for_server
+                    else -> R.string.home_waits_for_connection
+                },
+            ),
+        )
+        model.homeProblem?.let { Caption(it, color = paper.orangeInk) }
+        QuietButton(say(R.string.forget_home), model::forgetHome, color = paper.orangeInk)
     }
 }
 

@@ -62,10 +62,16 @@ enum class Phrase {
     CheckInDeleted,
     CheckInsDeletedAll,
     CheckInsDeletedAllCount,
+    CheckInsDeletedAtPlace,
     PlaceRemembered,
     PlaceSpotAdded,
     PlaceRenamed,
     PlaceForgotten,
+    PlaceIgnored,
+    PlaceIgnoredMore,
+    PlaceUnignored,
+    PlaceUnignoredMore,
+    HomeNotIgnored,
     FilterAll,
     FilterNotes,
     FilterCheckIns,
@@ -133,6 +139,7 @@ enum class CountPhrase {
     PhotoCount,
     MemoCount,
     FileCount,
+    CheckInsWent,
 }
 
 /** A language for the kit's phrases. */

@@ -73,19 +73,19 @@ class StopDetectorTest {
     }
 
     @Test
-    fun aStopAtHomeIsNeverSentButOneElsewhereIs() {
+    fun aStopAtAHomeNotMovedYetIsNeverSentButOneElsewhereIs() {
         val home = Spot(44.9778, -93.2650)
         // A stop at home (and its end), then one 2 km away.
         val (_, reports) = run(fix(0), fix(12), fix(20, lat = 44.9960), fix(32, lat = 44.9960), fix(40, lat = 45.0100))
         assertEquals(4, reports.size)
-        val sent = QuietPlaces.keep(reports, listOf(home))
+        val sent = HomeMove.keep(reports, home)
         assertEquals(listOf(44.9960, 44.9960), sent.map { it.lat })
         // 120 m off is still home; 200 m off isn't.
         val near = reports[0].copy(lat = 44.9789)
         val far = reports[0].copy(lat = 44.9796)
-        assertEquals(listOf(far), QuietPlaces.keep(listOf(near, far), listOf(home)))
-        // Nothing quiet set: everything goes.
-        assertEquals(reports, QuietPlaces.keep(reports, emptyList()))
+        assertEquals(listOf(far), HomeMove.keep(listOf(near, far), home))
+        // No home kept on the phone (none set, or moved to the server): everything goes.
+        assertEquals(reports, HomeMove.keep(reports, null))
     }
 
     @Test

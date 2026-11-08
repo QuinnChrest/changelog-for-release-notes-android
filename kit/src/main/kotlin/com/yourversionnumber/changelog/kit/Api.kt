@@ -12,6 +12,7 @@ import kotlinx.serialization.serializer
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.ProtocolException
 import java.net.URI
 import java.net.URLEncoder
 import java.util.UUID
@@ -27,6 +28,8 @@ class ApiException(
     /** The note's current revision, with `revision_mismatch`. */
     val revision: String? = null,
     val retryAfterSeconds: Long? = null,
+    /** How many check-ins a remembered place holds now, with deleting them's `revision_mismatch` (API 1.20.0). */
+    val count: Int? = null,
 ) : Exception(message) {
     /** The token no longer works: stop sending, keep the queue, ask for a new one. */
     val signedOut: Boolean get() = status == 401
@@ -122,9 +125,42 @@ class Api(
         return send("GET", "v1/check-ins", query = query)
     }
 
-    /** Sends a stop, or the end of one (API 1.18.0, `notes:write`). Through the Outbox, under its key. */
-    suspend fun addCheckIn(report: CheckInReport, idempotencyKey: String): CheckIn =
-        send<CheckInWritten>("POST", "v1/check-ins", body = encode(report), idempotencyKey = idempotencyKey).checkIn
+    /**
+     * Sends a stop, or the end of one (API 1.18.0, `notes:write`). Through the Outbox, under its key. `kept` false
+     * (1.20.0): it was at an ignored place and nothing was stored.
+     */
+    suspend fun addCheckIn(report: CheckInReport, idempotencyKey: String): CheckInWritten =
+        send("POST", "v1/check-ins", body = encode(report), idempotencyKey = idempotencyKey)
+
+    /** The places the account remembers (API 1.18.0, `activity`), each saying whether it's ignored (1.20.0). */
+    suspend fun rememberedPlaces(): List<RememberedPlace> = send<RememberedPlaces>("GET", "v1/check-ins/places").places
+
+    /** One remembered place, with `checkIns`: how many stays are at it, hidden ones too (API 1.20.0, `activity`). */
+    suspend fun rememberedPlace(id: String): RememberedPlace = send<RememberedPlaceAnswer>("GET", "v1/check-ins/places/$id").place
+
+    /**
+     * Remembers a place, or adds the spot to the one of that name, in any case (API 1.18.0, `notes:all`). `ignored`
+     * ignores it or stops ignoring it as it's remembered (1.20.0); null leaves it as it was.
+     */
+    suspend fun rememberPlace(name: String, lat: Double, lon: Double, ignored: Boolean? = null, idempotencyKey: String): RememberedPlace =
+        send<RememberedPlaceAnswer>("POST", "v1/check-ins/places", body = encode(PlaceBody(name, lat, lon, ignored)), idempotencyKey = idempotencyKey).place
+
+    /**
+     * Renames a remembered place, or ignores it or stops ignoring it (`ignored`, API 1.20.0), or both (`notes:all`).
+     * Ignored, no new stop there is kept and the stays there are hidden; unignored, they show again.
+     */
+    suspend fun changePlace(id: String, name: String? = null, ignored: Boolean? = null, idempotencyKey: String): RememberedPlace {
+        require(name != null || ignored != null) { "a name, ignored, or both" }
+        return send<RememberedPlaceAnswer>("PATCH", "v1/check-ins/places/$id", body = encode(PlaceChange(name, ignored)), idempotencyKey = idempotencyKey).place
+    }
+
+    /**
+     * Delete existing check-ins here (API 1.20.0, `notes:all`): every stay at the place, hidden ones too, for the
+     * `count` the owner was shown from [rememberedPlace]. Another count there now is `revision_mismatch`, with that
+     * count in [ApiException.count], and nothing goes. The place stays. Answers how many went.
+     */
+    suspend fun deleteCheckInsAt(id: String, count: Int, idempotencyKey: String): Int =
+        send<CheckInsDeleted>("DELETE", "v1/check-ins/places/$id/check-ins", query = listOf("count" to count.toString()), idempotencyKey = idempotencyKey).deleted
 
     /** Where the notes were (API 1.15.0, `notes:read` or `notes:all`): only a note's own place. `after` is the last page's `next`. */
     suspend fun mapPins(after: String? = null): MapPins =
@@ -299,6 +335,13 @@ class Api(
     @Serializable
     private data class PinsBody(val pinned: List<String>)
 
+    /** Nulls are left out (`explicitNulls` off): the server takes no field it doesn't know, and a null isn't one. */
+    @Serializable
+    private data class PlaceBody(val name: String, val lat: Double, val lon: Double, val ignored: Boolean? = null)
+
+    @Serializable
+    private data class PlaceChange(val name: String? = null, val ignored: Boolean? = null)
+
     private inline fun <reified T> encode(value: T): String = json.encodeToString(serializer<T>(), value)
 
     private suspend inline fun <reified T> send(
@@ -330,7 +373,7 @@ class Api(
             throw ApiException(0, "unreadable", Words.say(Phrase.ServerAddressBad))
         }
         try {
-            connection.requestMethod = method
+            connection.sendAs(method)
             connection.connectTimeout = 30_000
             connection.readTimeout = 30_000
             connection.useCaches = false
@@ -379,12 +422,26 @@ class Api(
 
         private fun enc(s: String) = URLEncoder.encode(s, Charsets.UTF_8)
 
+        /**
+         * Sets the request's method. Android's HttpURLConnection (OkHttp's) sends PATCH; Java's own refuses it,
+         * so on a JVM (the kit's tests) it's set beneath, which needs `--add-opens java.base/java.net=ALL-UNNAMED`
+         * (kit/build.gradle.kts gives the tests that).
+         */
+        private fun HttpURLConnection.sendAs(method: String) {
+            try {
+                requestMethod = method
+            } catch (e: ProtocolException) {
+                if (method != "PATCH") throw e
+                HttpURLConnection::class.java.getDeclaredField("method").apply { isAccessible = true }.set(this, method)
+            }
+        }
+
         internal fun error(status: Int, body: String, retryAfter: String?): ApiException {
             val seconds = retryAfter?.trim()?.toLongOrNull()
             val parsed = runCatching { json.decodeFromString(ErrorBody.serializer(), body) }.getOrNull()
             if (parsed != null) {
                 val e = parsed.error
-                return ApiException(status, e.code, e.message, e.field, e.revision, seconds)
+                return ApiException(status, e.code, e.message, e.field, e.revision, seconds, e.count)
             }
             val code = if (status >= 500) "unavailable" else "http_$status"
             val message = if (status >= 500) Words.say(Phrase.ServerUnavailable) else Words.say(Phrase.ServerRefused, status)

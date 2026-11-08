@@ -85,15 +85,33 @@ fun NotesScreen(model: AppModel) {
     // the bar takes it to Log.
     BackHandler(enabled = date != null) { model.closeDay() }
     BackHandler(enabled = date == null && model.searched != null) { query = ""; model.closeSearch() }
+    // A tag's page is over everything else in the tab, and every tag's list over the days: Back goes to what it
+    // was opened from. Declared last, so they take Back first.
+    BackHandler(enabled = model.tagsOpen && model.shownTag == null && date == null) { model.tagsOpen = false }
+    BackHandler(enabled = model.shownTag != null) { model.closeTag() }
+    val tag = model.shownTag
+    val back: (() -> Unit)? = when {
+        tag != null -> model::closeTag
+        date != null -> model::closeDay
+        model.tagsOpen -> { { model.tagsOpen = false } }
+        else -> null
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(if (date == null) say(R.string.notes) else dayLabel(date, model.me?.today))
+                    Text(
+                        when {
+                            tag != null -> tag.name
+                            date != null -> dayLabel(date, model.me?.today)
+                            model.tagsOpen -> say(R.string.tags)
+                            else -> say(R.string.notes)
+                        },
+                    )
                 },
                 navigationIcon = {
-                    if (date != null) QuietButton("‹ " + say(R.string.back), model::closeDay, Modifier.padding(start = 8.dp))
+                    back?.let { QuietButton("‹ " + say(R.string.back), it, Modifier.padding(start = 8.dp)) }
                 },
             )
         },
@@ -103,7 +121,9 @@ fun NotesScreen(model: AppModel) {
             // Offline since the app opened: nothing says yet what this token may read.
             model.me == null -> Explained(say(R.string.notes_opens_once_release_notes), modifier)
             !model.readsNotes -> AllowReading(modifier)
+            tag != null -> TagPage(model, tag, player, modifier) { opened = it }
             date != null -> DayPage(model, date, player, modifier) { opened = it }
+            model.tagsOpen -> TagsPage(model, modifier)
             else -> DaysList(model, player, listPlace, query, { query = it }, modifier) { opened = it }
         }
     }
@@ -213,6 +233,8 @@ private fun DaysList(
             found(model, player, onOpen)
             return@Pulled
         }
+        // Every tag, as the web's Search lists them under its box.
+        item(key = "tags") { QuietButton(say(R.string.tags), { focus.clearFocus(); model.tagsOpen = true }) }
         item(key = "today") {
             Row(Modifier.semantics(mergeDescendants = true) { heading() }) {
                 Heading(say(R.string.today_in) + " ", Modifier.alignByBaseline())

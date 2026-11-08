@@ -74,6 +74,11 @@ data class NoteRequest(
     val uploads: List<UploadRef>? = null,
     /** Where it was written, as Here named it. */
     val place: DevicePlace? = null,
+    /**
+     * Tags by name (API 1.21.0): "Road Trip", "🚗 Lake". The hashtags in `text` are tags too, after these. Left
+     * out when there are none, as a server before 1.21.0 takes no field it doesn't know.
+     */
+    val tags: List<String>? = null,
 )
 
 /** A note this token wrote, as the API names it. */
@@ -109,7 +114,40 @@ data class NoteDetail(
     val mine: Boolean = true,
     val token: String? = null,
     val version: String? = null,
-)
+    /** Its tags' keys, and their names beside them (API 1.21.0). */
+    val tags: List<String>? = null,
+    val tagNames: List<String>? = null,
+) {
+    /**
+     * Its tags by name: from its tags field and its #words, as kept. A server before 1.21.0 names them by their
+     * keys, or by the words' #words.
+     */
+    val tagList: List<Tag>
+        get() {
+            val keys = tags ?: return Hashtags.textTags(text)
+            val typed = if ((tagNames?.size ?: 0) < keys.size) Hashtags.textTags(text) else emptyList()
+            return Hashtags.merge(
+                keys.mapIndexed { i, key ->
+                    val name = tagNames?.getOrNull(i)?.takeIf { it.isNotEmpty() } ?: typed.firstOrNull { it.key == key }?.name ?: key
+                    Tag(key, name)
+                },
+            )
+        }
+
+    /** The tags its words don't show as #words: the ones its tags field gave it, said under it. */
+    val fieldTags: List<Tag> get() = Hashtags.fieldOnly(text, tagList)
+
+    /**
+     * What an edit sends for its tags field (API 1.21.0): the whole new list by name, or null when the field holds
+     * the tags it has, by key and by name, so the edit leaves them as they are. A respelling is a change: a name is
+     * kept as typed (call 3).
+     */
+    fun tagsSent(field: List<Tag>): List<String>? = if (field == fieldTags) null else field.map { it.name }
+
+    /** Why Release Notes would refuse those tags with these words, or null: tags go on a note with words. */
+    fun tagsRefusal(words: String, field: List<Tag>): String? =
+        if (tagsSent(field) != null && words.isBlank()) Words.say(Phrase.TagsNeedWords) else null
+}
 
 /** One file on a note, from `media` (API 1.9.0): `kind` is image, audio or file. */
 @Serializable
@@ -237,16 +275,44 @@ data class OnThisDayDay(
 @Serializable
 data class FileAddress(val url: String, val type: String? = null, val expiresIn: Int? = null)
 
-/** `GET /v1/tags`: the pinned list, then the most used in the last 30 days. */
+/**
+ * `GET /v1/tags`: the pinned list, then the most used in the last 30 days. Since API 1.21.0 the pins are kept by
+ * name, and each tag has its name.
+ */
 @Serializable
 data class Tags(
     val pinned: List<String> = emptyList(),
     val recent: List<RecentTag> = emptyList(),
     val windowDays: Int? = null,
-)
+    val pinnedNames: List<String>? = null,
+) {
+    /** The pins by name. */
+    val pinnedTags: List<Tag> get() = Hashtags.named(pinned, pinnedNames)
+}
 
 @Serializable
-data class RecentTag(val tag: String, val count: Int, val lastUsed: String? = null)
+data class RecentTag(val tag: String, val count: Int, val lastUsed: String? = null, val name: String? = null)
+
+/**
+ * `GET /v1/tags/all` (API 1.21.0, `notes:read` or `notes:all`): every tag, most used first, by name, with what
+ * carries it. `upcoming` is null without the `upcoming` scope, and `checkIns` without `activity`.
+ */
+@Serializable
+data class TagTotals(val tags: List<TagTotal> = emptyList())
+
+@Serializable
+data class TagTotal(
+    val tag: String,
+    val name: String? = null,
+    val notes: Int = 0,
+    val days: Int = 0,
+    val first: String? = null,
+    val last: String? = null,
+    val upcoming: Int? = null,
+    val checkIns: Int? = null,
+) {
+    val named: Tag get() = Tag(tag, name ?: tag)
+}
 
 /** `GET /v1/activity`: newest first, trimmed of words on the server. */
 @Serializable
@@ -303,7 +369,11 @@ internal data class ErrorBody(val error: Detail) {
         val code: String,
         val message: String,
         val field: String? = null,
-        val revision: String? = null,
+        /**
+         * The revision now, with `revision_mismatch`: a note's is a string, a check-in's a number (API 1.21.0's
+         * stale retag), so either is read, as its text.
+         */
+        val revision: kotlinx.serialization.json.JsonPrimitive? = null,
         /** Deleting a place's check-ins for a count no longer right: the count now (API 1.20.0). */
         val count: Int? = null,
     )

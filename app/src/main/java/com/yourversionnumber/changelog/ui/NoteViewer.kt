@@ -52,6 +52,9 @@ import com.yourversionnumber.changelog.R
 import com.yourversionnumber.changelog.kit.Hashtags
 import com.yourversionnumber.changelog.kit.NoteDetail
 import com.yourversionnumber.changelog.kit.NoteMedia
+import com.yourversionnumber.changelog.kit.Tag
+import com.yourversionnumber.changelog.kit.TagRefusal
+import com.yourversionnumber.changelog.kit.TagTyping
 import com.yourversionnumber.changelog.kit.UpcomingDraft
 import com.yourversionnumber.changelog.kit.awaitingWords
 import kotlinx.coroutines.delay
@@ -109,7 +112,11 @@ internal fun NoteViewer(model: AppModel, target: NoteTarget, player: FilePlayer,
             when {
                 shown == null -> CircularProgressIndicator(Modifier.align(Alignment.Center), color = paper.orange)
                 editing -> NoteEditor(model, shown, player, onCancel = { editing = false }, onSaved = onClose)
-                else -> NoteReader(model, shown, player, onBack = onClose, onEdit = { editing = true }, onDelete = { deleting = true })
+                else -> NoteReader(
+                    model, shown, player, onBack = onClose, onEdit = { editing = true }, onDelete = { deleting = true },
+                    // A tag's page opens in Notes, over whatever this was opened from.
+                    onTag = { tag -> onClose(); model.openTag(tag) },
+                )
             }
         }
     }
@@ -132,7 +139,15 @@ internal fun NoteViewer(model: AppModel, target: NoteTarget, player: FilePlayer,
 }
 
 @Composable
-private fun NoteReader(model: AppModel, note: NoteDetail, player: FilePlayer, onBack: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun NoteReader(
+    model: AppModel,
+    note: NoteDetail,
+    player: FilePlayer,
+    onBack: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onTag: (Tag) -> Unit,
+) {
     Column(Modifier.fillMaxSize().navigationBarsPadding()) {
         Row(
             Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 4.dp),
@@ -155,6 +170,9 @@ private fun NoteReader(model: AppModel, note: NoteDetail, player: FilePlayer, on
                 }
             }
             if (note.media.isNotEmpty()) NoteFiles(model, note, player, whole = true)
+            // The tags its words don't show as #words, from its tags field, as the web and the email have them
+            // under it; each opens its page, with a token that reads every note.
+            TagLinks(note.fieldTags, onTag.takeIf { model.readsNotes }, Modifier.padding(top = 10.dp))
             Rule(Modifier.padding(top = 16.dp, bottom = 8.dp))
             Caption(noteSource(note))
             if (note.version != null) {
@@ -169,9 +187,9 @@ private fun NoteReader(model: AppModel, note: NoteDetail, player: FilePlayer, on
 }
 
 /**
- * The note as the box on Log is: its words, the tag row, photos, camera and
- * voice memo, and Save where Commit is. Files already on it are listed, each
- * with a Remove that asks first and goes at once, apart from Save (API 1.17.0).
+ * The note as the box on Log is: its words, its tags as chips (its #words among them: taking one off takes the
+ * word out, call 1), the tag row, photos, camera and voice memo, and Save where Commit is. Files already on it are
+ * listed, each with a Remove that asks first and goes at once, apart from Save (API 1.17.0).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -183,6 +201,9 @@ private fun NoteEditor(model: AppModel, note: NoteDetail, player: FilePlayer, on
     // The numbers of files taken off while this is open: gone from here at once, whatever list the note is on.
     var gone by remember(note.id) { mutableStateOf(emptySet<Int>()) }
     var removing by remember(note.id) { mutableStateOf<NoteMedia?>(null) }
+    // Its tags field as edited: the tags its words don't carry. Null until read.
+    var fieldTags by remember(note.id) { mutableStateOf<List<Tag>?>(null) }
+    var typing by remember(note.id) { mutableStateOf(TagTyping()) }
     val box = remember { FocusRequester() }
     LaunchedEffect(note.id) {
         val read = model.load(note.target)
@@ -191,6 +212,7 @@ private fun NoteEditor(model: AppModel, note: NoteDetail, player: FilePlayer, on
         } else {
             fresh = read
             text = TextFieldValue(read.text, TextRange(read.text.length))
+            fieldTags = read.fieldTags
         }
     }
     // The box is there once the note is read: then the keyboard comes up.
@@ -208,7 +230,57 @@ private fun NoteEditor(model: AppModel, note: NoteDetail, player: FilePlayer, on
     }
     val words = text.text.trim()
     val changed = fresh != null && words != fresh?.text?.trim()
-    val canSave = fresh != null && (changed || model.editFiles.isNotEmpty()) && (!changed || words.isNotBlank())
+    val field = fieldTags.orEmpty()
+    val chips = Hashtags.chips(text.text, field)
+    // The field's own: a tag typed as a #word since goes with the words.
+    val tagsSent = fresh?.tagsSent(Hashtags.fieldOnly(text.text, field))
+    val tagsRefusal = fresh?.tagsRefusal(if (changed) words else fresh?.text.orEmpty(), Hashtags.fieldOnly(text.text, field))
+    // A tag typed and not yet a chip counts as a change: Save takes it.
+    val canSave = fresh != null &&
+        (changed || model.editFiles.isNotEmpty() || tagsSent != null || !typing.isEmpty) &&
+        (!changed || words.isNotBlank()) &&
+        tagsRefusal == null
+
+    fun setText(next: String) {
+        text = TextFieldValue(next, TextRange(next.length))
+    }
+
+    fun addTag(tag: Tag) {
+        if (chips.any { it.key == tag.key }) return
+        if (chips.size >= Hashtags.MAX_TAGS) {
+            typing = typing.copy(problem = TagRefusal.Many.said)
+            return
+        }
+        fieldTags = Hashtags.merge(field, listOf(tag))
+    }
+
+    fun removeTag(tag: Tag) {
+        fieldTags = field.filter { it.key != tag.key }
+        if (Hashtags.contains(tag.key, text.text)) setText(Hashtags.removing(tag.key, text.text))
+    }
+
+    fun save() {
+        val got = fresh ?: return
+        // A tag typed without Return is saved too, or stays in its box saying why, and nothing is saved yet.
+        var kept = field
+        val (left, taken) = typing.take(Hashtags.chips(text.text, kept))
+        typing = left
+        when (taken) {
+            TagTyping.Taken.Refused -> return
+            is TagTyping.Taken.Added -> kept = Hashtags.merge(kept, listOf(taken.tag))
+            TagTyping.Taken.None -> {}
+        }
+        fieldTags = kept
+        val only = Hashtags.fieldOnly(text.text, kept)
+        val sent = got.tagsSent(only)
+        val wordsNow = if (changed) words else got.text
+        if (!changed && sent == null && model.editFiles.isEmpty()) return
+        // Tags go on a note with words: said under the tags, and nothing is saved yet.
+        if (got.tagsRefusal(wordsNow, only) != null) return
+        saved = true
+        model.saveEdit(got, wordsNow, model.editFiles.toList(), sent)
+        onSaved()
+    }
 
     Column(Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
         Row(
@@ -232,24 +304,27 @@ private fun NoteEditor(model: AppModel, note: NoteDetail, player: FilePlayer, on
                     minLines = 3,
                 )
                 if (model.editFiles.isNotEmpty()) AttachmentStrip(model, edit = true)
+                TagField(
+                    chips,
+                    typing,
+                    { typing = it },
+                    add = ::addTag,
+                    remove = ::removeTag,
+                    heading = say(R.string.tags),
+                    offer = model.tagRow,
+                )
+                tagsRefusal?.let { Caption(it, color = paper.orangeInk) }
+                // The tag row, as on Log: a tap puts the tag on the note, or takes it off (its #words too).
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                     model.tagRow.forEach { tag ->
-                        Pick("#$tag", selected = Hashtags.contains(tag, text.text), onClick = {
-                            val next = Hashtags.toggling(tag, text.text)
-                            text = TextFieldValue(next, TextRange(next.length))
-                        })
+                        val on = chips.any { it.key == tag.key }
+                        Pick(tag.name, selected = on, onClick = { if (on) removeTag(tag) else addTag(tag) })
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (model.canAddFiles) FileTools(model, edit = true)
                     Spacer(Modifier.weight(1f))
-                    GoButton(say(R.string.save), {
-                        fresh?.let { read ->
-                            saved = true
-                            model.saveEdit(read, if (changed) words else read.text, model.editFiles.toList())
-                            onSaved()
-                        }
-                    }, enabled = canSave)
+                    GoButton(say(R.string.save), ::save, enabled = canSave)
                 }
                 if (held.media.isNotEmpty()) {
                     Rule()

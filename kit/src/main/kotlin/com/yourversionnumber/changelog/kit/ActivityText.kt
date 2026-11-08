@@ -49,6 +49,8 @@ val ActivityItem.headline: String
             "place.set", "place.removed" -> Words.say(Phrase.PlaceChanged)
             "checkin" -> Words.say(Phrase.CheckedIn, stopName(label))
             "checkin.named" -> Words.say(Phrase.CheckInNamed)
+            // A stay's tags changed, or a remembered place's were put on the check-ins already there (API 1.21.0).
+            "checkin.tagged" -> if (place != null) Words.say(Phrase.CheckInsTaggedAtPlace) else Words.say(Phrase.CheckInTagged)
             "checkin.deleted" -> when {
                 all == true -> count?.let { Words.say(Phrase.CheckInsDeletedAllCount, it) } ?: Words.say(Phrase.CheckInsDeletedAll)
                 place != null -> Words.say(Phrase.CheckInsDeletedAtPlace)
@@ -60,6 +62,8 @@ val ActivityItem.headline: String
                 "added" -> Words.say(Phrase.PlaceRemembered)
                 "spot" -> Words.say(Phrase.PlaceSpotAdded)
                 "renamed" -> Words.say(Phrase.PlaceRenamed)
+                // Its tags changed (API 1.21.0), as the web says it.
+                "tagged" -> Words.say(Phrase.PlaceTagged)
                 else -> Words.say(Phrase.PlaceForgotten)
             }
             else -> kind.split('.').joinToString(" ") { w -> w.replaceFirstChar { it.uppercase() } }
@@ -74,13 +78,14 @@ private const val UNNAMED_STOP = "Unnamed stop"
 
 /**
  * A second line, under the headline, for the rows that need one (API 1.20.0):
- * what ignoring a place did, or how many check-ins went from one.
+ * what ignoring a place did, or how many check-ins went from one or were tagged at one (1.21.0).
  */
 val ActivityItem.more: String?
     get() = when (kind) {
         "checkin.ignored" -> Words.say(Phrase.PlaceIgnoredMore)
         "checkin.unignored" -> Words.say(Phrase.PlaceUnignoredMore)
         "checkin.deleted" -> if (all != true && place != null) count?.let { Words.count(CountPhrase.CheckInsWent, it) } else null
+        "checkin.tagged" -> if (place != null) count?.let { Words.count(CountPhrase.CheckInsTagged, it) } else null
         else -> null
     }
 

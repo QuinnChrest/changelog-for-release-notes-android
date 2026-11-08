@@ -52,9 +52,10 @@ class UpcomingTest {
         assertEquals(UpcomingDraft.Problem.Title, problem(d.copy(title = "Two\nlines").fields()))
         assertEquals(UpcomingDraft.Problem.TitleTooLong, problem(d.copy(title = "x".repeat(121)).fields()))
         assertEquals(UpcomingDraft.Problem.Year, problem(d.copy(year = "2027").fields()))
-        assertEquals(UpcomingDraft.Problem.Tag, problem(d.copy(tag = "#2026").fields()))
         assertEquals(UpcomingDraft.Problem.Reminders, problem(d.copy(reminders = emptyList()).fields()))
-        assertEquals("family", d.copy(tag = "#Family").fields().getOrThrow().tag)
+        // Tags go by name, as the tags field took them, each key once.
+        val tags = listOf(Tag("family", "Family"), Tag("road-trip", "Road Trip"), Tag("family", "family"))
+        assertEquals(listOf("Family", "Road Trip"), d.copy(tags = tags).fields().getOrThrow().tags)
     }
 
     @Test
@@ -82,7 +83,7 @@ class UpcomingTest {
     fun aBatchSendsOnlyWhatItHolds() {
         val f = UpcomingFields(UpcomingKind.Event, "Recital", "2026-12-01")
         assertEquals(
-            """{"add":[{"kind":"event","title":"Recital","date":"2026-12-01","reminders":[7,1,0],"email":true}]}""",
+            """{"add":[{"kind":"event","title":"Recital","date":"2026-12-01","tags":[],"reminders":[7,1,0],"email":true}]}""",
             Api.json.encodeToString(UpcomingBatch.serializer(), UpcomingBatch.adding(f)),
         )
         assertTrue(Api.json.encodeToString(UpcomingBatch.serializer(), UpcomingBatch.adding(f, dryRun = true)).endsWith(""","dry_run":true}"""))
@@ -98,6 +99,28 @@ class UpcomingTest {
         assertEquals(listOf("a"), list.entries.map { it.id })
         assertEquals(1, list.unreadable)
         assertEquals(2, list.pastLeftOut)
+    }
+
+    @Test
+    fun aDateHasSeveralTagsAndReadsTheOneTagOfAServerBefore() {
+        val body = """{"today":"2026-11-08","entries":[
+            {"id":"a","revision":2,"next":"2026-11-20","line":"Lake weekend.","kind":"trip","title":"Lake weekend","date":"2026-11-20","end_date":"2026-11-22","place":"Duluth","tags":["family","🚗-road-trip"],"tag_names":["Family","🚗 Road Trip"],"tag":"family"},
+            {"id":"b","revision":1,"next":"2026-12-01","line":"Recital.","kind":"event","title":"Recital","date":"2026-12-01","tag":"music"},
+            {"id":"c","revision":1,"next":"2026-12-02","line":"Party.","kind":"event","title":"Party","date":"2026-12-02","tags":[]}
+            ]}"""
+        val (a, b, c) = UpcomingList.from(Api.json.decodeFromString(JsonObject.serializer(), body)).entries
+        assertEquals(listOf(Tag("family", "Family"), Tag("🚗-road-trip", "🚗 Road Trip")), a.tagList)
+        assertEquals(listOf(Tag("music", "music")), b.tagList)
+        assertEquals(emptyList(), c.tagList)
+        // An edit opens with them and sends the whole list back, by name, never the single tag.
+        val draft = UpcomingDraft.of(a, "2026-11-08")
+        assertEquals(a.tagList, draft.tags)
+        val change = Api.json.encodeToString(UpcomingBatch.serializer(), draft.copy(tags = draft.tags.take(1)).batch(a).getOrThrow())
+        assertTrue(""""tags":["Family"]""" in change, change)
+        assertTrue(""""tag":""" !in change, change)
+        // Taking the last one off sends an empty list, which takes them all off.
+        val none = Api.json.encodeToString(UpcomingBatch.serializer(), UpcomingDraft.of(b, "2026-11-08").copy(tags = emptyList()).batch(b).getOrThrow())
+        assertTrue(""""tags":[]""" in none, none)
     }
 
     @Test

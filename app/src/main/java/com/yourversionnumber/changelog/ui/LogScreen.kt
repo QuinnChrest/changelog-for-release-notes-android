@@ -52,7 +52,6 @@ import com.yourversionnumber.changelog.AppModel
 import com.yourversionnumber.changelog.NoteTarget
 import com.yourversionnumber.changelog.R
 import com.yourversionnumber.changelog.Sent
-import com.yourversionnumber.changelog.kit.Hashtags
 import com.yourversionnumber.changelog.kit.MediaType
 import com.yourversionnumber.changelog.kit.OutboxItem
 import com.yourversionnumber.changelog.kit.OutboxOperation
@@ -120,6 +119,17 @@ fun LogScreen(model: AppModel) {
                 )
             }
             if (model.draftFiles.isNotEmpty()) item(key = "attachments") { AttachmentStrip(model) }
+            item(key = "tag field") {
+                TagField(
+                    model.draftChips,
+                    model.draftTyping,
+                    { model.draftTyping = it },
+                    add = model::addTag,
+                    remove = model::removeTag,
+                    hint = say(R.string.tags_hint_note),
+                    offer = model.tagRow,
+                )
+            }
             item(key = "tags") { TagRowView(model) }
             item(key = "tools") { ComposerTools(model) }
             if (model.placeLabel != null) item(key = "place") { PlaceLine(model) }
@@ -262,21 +272,23 @@ private fun StreakNote(model: AppModel) {
 @Composable
 private fun TagRowView(model: AppModel) {
     val haptics = LocalHapticFeedback.current
+    val chips = model.draftChips.map { it.key }.toSet()
+    val sticky = model.stickyTag
     Column {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
             model.tagRow.forEach { tag ->
                 Pick(
-                    "#$tag",
-                    selected = Hashtags.contains(tag, model.draft) || model.sticky == tag,
+                    tag.name,
+                    selected = tag.key in chips || sticky?.key == tag.key,
                     onClick = { model.toggle(tag) },
                     onLongClick = {
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        model.stick(if (model.sticky == tag) null else tag)
+                        model.stick(if (sticky?.key == tag.key) null else tag)
                     },
                 )
             }
         }
-        model.sticky?.let { Caption(say(R.string.goes_on_every_note_touch, it)) }
+        sticky?.let { Caption(say(R.string.goes_on_every_note_touch, it.name)) }
     }
 }
 

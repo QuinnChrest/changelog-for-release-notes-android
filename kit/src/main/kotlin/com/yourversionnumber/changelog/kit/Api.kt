@@ -6,6 +6,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.JsonNamingStrategy
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.serializer
@@ -116,13 +117,34 @@ class Api(
         return send("GET", "v1/on-this-day", query = query)
     }
 
-    /** The places the account stopped, newest first (API 1.18.0, the `activity` scope). `before` is the last page's `next`. */
-    suspend fun checkIns(before: String? = null, limit: Int = 100): CheckInPage {
+    /**
+     * The places the account stopped, newest first (API 1.18.0, the `activity` scope), or only those with a tag, by
+     * any spelling (1.21.0). `before` is the last page's `next`.
+     */
+    suspend fun checkIns(before: String? = null, tag: String? = null, limit: Int = 100): CheckInPage {
         val query = buildList {
             add("limit" to limit.toString())
             before?.let { add("before" to it) }
+            tag?.let { add("tag" to it) }
         }
         return send("GET", "v1/check-ins", query = query)
+    }
+
+    /**
+     * Every stay with a tag, newest first, a page at a time to the last, as the web's tag page lists them all (from
+     * Codex's review of Changelog for iPhone #57: one page of 100 left the rest out of the page and its count). A
+     * cursor that comes round again ends it.
+     */
+    suspend fun checkInsTagged(tag: String): List<CheckIn> {
+        val stays = mutableListOf<CheckIn>()
+        val seen = mutableSetOf<String>()
+        var before: String? = null
+        do {
+            val page = checkIns(before = before, tag = tag)
+            stays += page.items
+            before = page.next?.takeIf { seen.add(it) }
+        } while (before != null)
+        return stays
     }
 
     /**
@@ -146,13 +168,48 @@ class Api(
         send<RememberedPlaceAnswer>("POST", "v1/check-ins/places", body = encode(PlaceBody(name, lat, lon, ignored)), idempotencyKey = idempotencyKey).place
 
     /**
-     * Renames a remembered place, or ignores it or stops ignoring it (`ignored`, API 1.20.0), or both (`notes:all`).
-     * Ignored, no new stop there is kept and the stays there are hidden; unignored, they show again.
+     * Renames a remembered place, or ignores it or stops ignoring it (`ignored`, API 1.20.0), or sets its whole list
+     * of tags, by name (`tags`, 1.21.0), or any of them (`notes:all`). Ignored, no new stop there is kept and the
+     * stays there are hidden; unignored, they show again. Tags go on each new stop there, and the ones already there
+     * keep theirs: when the place gained a tag, the answer's `checkIns` counts them, to offer tagging them too
+     * (Jamie's call 6, [tagCheckInsAt]).
      */
-    suspend fun changePlace(id: String, name: String? = null, ignored: Boolean? = null, idempotencyKey: String): RememberedPlace {
-        require(name != null || ignored != null) { "a name, ignored, or both" }
-        return send<RememberedPlaceAnswer>("PATCH", "v1/check-ins/places/$id", body = encode(PlaceChange(name, ignored)), idempotencyKey = idempotencyKey).place
+    suspend fun changePlace(
+        id: String,
+        name: String? = null,
+        ignored: Boolean? = null,
+        tags: List<Tag>? = null,
+        idempotencyKey: String,
+    ): RememberedPlace {
+        require(name != null || ignored != null || tags != null) { "a name, ignored, tags, or more than one" }
+        val change = PlaceChange(name, ignored, tags?.map { it.name.wellFormed() })
+        return send<RememberedPlaceAnswer>("PATCH", "v1/check-ins/places/$id", body = encode(change), idempotencyKey = idempotencyKey).place
     }
+
+    /**
+     * Tags the stays already at a place, hidden ones too, for the `count` the owner was shown, and answers how many it
+     * tagged (API 1.21.0, `notes:all`). Another count there now is `revision_mismatch`, with that count in
+     * [ApiException.count], and nothing changes: ask again with the new number.
+     */
+    suspend fun tagCheckInsAt(id: String, tags: List<Tag>, count: Int, idempotencyKey: String): Int =
+        send<CheckInsTagged>(
+            "PATCH",
+            "v1/check-ins/places/$id/check-ins",
+            body = encode(PlaceCheckInsTag(tags.map { it.name.wellFormed() }, count)),
+            idempotencyKey = idempotencyKey,
+        ).tagged
+
+    /**
+     * A stay's whole list of tags, by name, set on every check-in in it, from the `revision` read; its name stays as it
+     * is (API 1.21.0, `notes:write`: this token's own stays, or any with `notes:all`).
+     */
+    suspend fun tagCheckIn(id: String, tags: List<Tag>, revision: Int, idempotencyKey: String): CheckIn =
+        send<CheckInWritten>(
+            "PATCH",
+            "v1/check-ins/$id",
+            body = encode(CheckInTags(tags.map { it.name.wellFormed() }, revision)),
+            idempotencyKey = idempotencyKey,
+        ).checkIn
 
     /**
      * Delete existing check-ins here (API 1.20.0, `notes:all`): every stay at the place, hidden ones too, for the
@@ -196,8 +253,17 @@ class Api(
         }
     }
 
-    suspend fun editNote(date: String, id: String, text: String, revision: String, idempotencyKey: String): NoteRef =
-        send<Wrapped>("PUT", "v1/notes/$date/$id", body = encode(EditBody(text.wellFormed(), revision)), idempotencyKey = idempotencyKey).note
+    /**
+     * New words from the revision read. `tags`, by name, is the note's whole list from its tags field, with the
+     * hashtags in `text` after them; null keeps the tags its old words didn't carry (API 1.21.0).
+     */
+    suspend fun editNote(date: String, id: String, text: String, revision: String, tags: List<String>? = null, idempotencyKey: String): NoteRef =
+        send<Wrapped>(
+            "PUT",
+            "v1/notes/$date/$id",
+            body = encode(EditBody(text.wellFormed(), revision, tags?.map { it.wellFormed() })),
+            idempotencyKey = idempotencyKey,
+        ).note
 
     /** Adds posted files to a note this token wrote, or with `notes:all` any note (with `media:write`). */
     suspend fun attachFiles(date: String, id: String, uploads: List<UploadRef>, idempotencyKey: String): NoteRef =
@@ -220,6 +286,10 @@ class Api(
 
     suspend fun tags(): Tags = send("GET", "v1/tags")
 
+    /** Every tag, most used first, by name, with what carries it (API 1.21.0, `notes:read` or `notes:all`). */
+    suspend fun allTags(): TagTotals = send("GET", "v1/tags/all")
+
+    /** The pins, by name (kept by name since API 1.21.0), at most 12. */
     suspend fun setPinned(pinned: List<String>, idempotencyKey: String): Tags =
         send("PUT", "v1/tags/pinned", body = encode(PinsBody(pinned)), idempotencyKey = idempotencyKey)
 
@@ -324,7 +394,7 @@ class Api(
     private data class Wrapped(val note: NoteRef)
 
     @Serializable
-    private data class EditBody(val text: String, val revision: String)
+    private data class EditBody(val text: String, val revision: String, val tags: List<String>? = null)
 
     @Serializable
     private data class AppendBody(val text: String)
@@ -340,7 +410,17 @@ class Api(
     private data class PlaceBody(val name: String, val lat: Double, val lon: Double, val ignored: Boolean? = null)
 
     @Serializable
-    private data class PlaceChange(val name: String? = null, val ignored: Boolean? = null)
+    private data class PlaceChange(val name: String? = null, val ignored: Boolean? = null, val tags: List<String>? = null)
+
+    @Serializable
+    private data class PlaceCheckInsTag(val tags: List<String>, val count: Int)
+
+    @Serializable
+    private data class CheckInsTagged(val tagged: Int = 0)
+
+    /** Never a `name`: the stay's own stays as it is. */
+    @Serializable
+    private data class CheckInTags(val tags: List<String>, val revision: Int)
 
     private inline fun <reified T> encode(value: T): String = json.encodeToString(serializer<T>(), value)
 
@@ -441,7 +521,7 @@ class Api(
             val parsed = runCatching { json.decodeFromString(ErrorBody.serializer(), body) }.getOrNull()
             if (parsed != null) {
                 val e = parsed.error
-                return ApiException(status, e.code, e.message, e.field, e.revision, seconds, e.count)
+                return ApiException(status, e.code, e.message, e.field, e.revision?.contentOrNull, seconds, e.count)
             }
             val code = if (status >= 500) "unavailable" else "http_$status"
             val message = if (status >= 500) Words.say(Phrase.ServerUnavailable) else Words.say(Phrase.ServerRefused, status)

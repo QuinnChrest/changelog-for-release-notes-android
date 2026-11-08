@@ -45,8 +45,11 @@ data class UpcomingFields(
     val endDate: String? = null,
     /** A trip's destination (an event's place, if it has one), as the city search knows it. */
     val place: String? = null,
-    /** One word, like `family`, without the `#`. */
-    val tag: String? = null,
+    /**
+     * Its tags by name, the whole list (API 1.21.0; call 5: several), like `family` or `Road Trip`. Always sent,
+     * so an empty list takes them all off; the deprecated single `tag` never is.
+     */
+    val tags: List<String> = emptyList(),
     /** Days before to remind: one to six. */
     val reminders: List<Int> = kind.defaultReminders,
     /** Remind in the morning email, and so in apps. */
@@ -72,11 +75,24 @@ data class UpcomingEntry(
     val year: Int? = null,
     val endDate: String? = null,
     val place: String? = null,
+    /** Its tag keys (API 1.21.0), with [tagNames] beside them. */
+    val tags: List<String>? = null,
+    val tagNames: List<String>? = null,
+    /** The one tag a server before 1.21.0 kept, its key and name alike. Deprecated; read only when [tags] is absent. */
     val tag: String? = null,
     val reminders: List<Int> = emptyList(),
     val email: Boolean = true,
 ) {
-    val fields: UpcomingFields get() = UpcomingFields(kind, title, date, year, endDate, place, tag, reminders, email)
+    /** Its tags, each name beside its key: `tags` and `tag_names`, or the one `tag` from a server before. */
+    val tagList: List<Tag>
+        get() = when {
+            tags != null -> Hashtags.named(tags, tagNames)
+            !tag.isNullOrEmpty() -> listOf(Tag(tag, tag))
+            else -> emptyList()
+        }
+
+    val fields: UpcomingFields
+        get() = UpcomingFields(kind, title, date, year, endDate, place, tagList.map { it.name }, reminders, email)
 }
 
 /**
@@ -118,12 +134,13 @@ data class UpcomingChange(
     val year: Int? = null,
     val endDate: String? = null,
     val place: String? = null,
-    val tag: String? = null,
+    /** The whole list by name: an empty one takes them all off. */
+    val tags: List<String> = emptyList(),
     val reminders: List<Int>,
     val email: Boolean,
 ) {
     constructor(entry: UpcomingEntry, f: UpcomingFields) :
-        this(entry.id, entry.revision, f.kind, f.title, f.date, f.year, f.endDate, f.place, f.tag, f.reminders, f.email)
+        this(entry.id, entry.revision, f.kind, f.title, f.date, f.year, f.endDate, f.place, f.tags, f.reminders, f.email)
 }
 
 @Serializable
@@ -230,7 +247,8 @@ data class UpcomingDraft(
     val end: String,
     /** A trip's destination, or an event's place. */
     val place: String = "",
-    val tag: String = "",
+    /** Its tags, as the tags field took them (call 5: several); the field checks each as it takes it. */
+    val tags: List<Tag> = emptyList(),
     val reminders: List<Int> = kind.defaultReminders,
     val email: Boolean = true,
     /** The account's today, for the year check. */
@@ -243,7 +261,6 @@ data class UpcomingDraft(
         Year(Phrase.ProblemYear),
         End(Phrase.ProblemEnd),
         Place(Phrase.ProblemPlace),
-        Tag(Phrase.ProblemTag),
         Reminders(Phrase.ProblemReminders);
 
         val message: String get() = Words.say(phrase)
@@ -263,8 +280,7 @@ data class UpcomingDraft(
         if (title.isEmpty() || title.any { it == '\n' || it == '\r' }) return fail(Problem.Title)
         if (title.codePointCount(0, title.length) > TITLE_MAX) return fail(Problem.TitleTooLong)
 
-        val typed = tag.trim()
-        val tag = if (typed.isEmpty() || typed == "#") null else Hashtags.normalize(typed) ?: return fail(Problem.Tag)
+        val tags = Hashtags.merge(tags).map { it.name }
 
         val days = reminders.filter { it in 0..365 }.distinct().sortedDescending()
         if (days.size !in 1..6) return fail(Problem.Reminders)
@@ -275,15 +291,15 @@ data class UpcomingDraft(
                 val y = year.trim().takeIf { it.isNotEmpty() }?.let { it.toIntOrNull() ?: return fail(Problem.Year) }
                 if (y != null && (y < 1 || y > (parse(today)?.year ?: Int.MAX_VALUE))) return fail(Problem.Year)
                 val date = "%02d-%02d".format(month, minOf(day, daysIn(month)))
-                Result.success(UpcomingFields(kind, title, date, year = y, tag = tag, reminders = days, email = email))
+                Result.success(UpcomingFields(kind, title, date, year = y, tags = tags, reminders = days, email = email))
             }
             UpcomingKind.Trip -> {
                 if (end < start) return fail(Problem.End)
                 if (place.isEmpty()) return fail(Problem.Place)
-                Result.success(UpcomingFields(kind, title, start, endDate = end, place = place, tag = tag, reminders = days, email = email))
+                Result.success(UpcomingFields(kind, title, start, endDate = end, place = place, tags = tags, reminders = days, email = email))
             }
             UpcomingKind.Event ->
-                Result.success(UpcomingFields(kind, title, start, place = place.ifEmpty { null }, tag = tag, reminders = days, email = email))
+                Result.success(UpcomingFields(kind, title, start, place = place.ifEmpty { null }, tags = tags, reminders = days, email = email))
         }
     }
 
@@ -313,7 +329,7 @@ data class UpcomingDraft(
                 title = entry.title,
                 year = entry.year?.toString().orEmpty(),
                 place = entry.place.orEmpty(),
-                tag = entry.tag.orEmpty(),
+                tags = entry.tagList,
                 reminders = entry.reminders.ifEmpty { entry.kind.defaultReminders },
                 email = entry.email,
             )

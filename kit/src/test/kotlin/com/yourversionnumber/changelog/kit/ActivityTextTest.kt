@@ -48,6 +48,7 @@ class ActivityTextTest {
         assertEquals("Added a spot to a remembered place", row("checkin.place").copy(change = "spot").headline)
         assertEquals("Renamed a remembered place", row("checkin.place").copy(change = "renamed").headline)
         assertEquals("Forgot a remembered place", row("checkin.place").copy(change = "forgotten").headline)
+        assertEquals("Changed a remembered place’s tags", row("checkin.place").copy(change = "tagged").headline)
     }
 
     @Test

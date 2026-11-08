@@ -52,9 +52,9 @@ class DevServerTest {
         assertEquals(me.version, first.note.version)
 
         val read = api.note(first.note.date, first.note.id)
-        val edited = api.editNote(read.date, read.id, read.text + " (edited)", read.revision, key())
+        val edited = api.editNote(read.date, read.id, read.text + " (edited)", read.revision, idempotencyKey = key())
         assertEquals("DevServerTest note #devtest (edited)", api.note(edited.date, edited.id).text)
-        val stale = assertFailsWith<ApiException> { api.editNote(read.date, read.id, "stale", read.revision, key()) }
+        val stale = assertFailsWith<ApiException> { api.editNote(read.date, read.id, "stale", read.revision, idempotencyKey = key()) }
         assertEquals("revision_mismatch", stale.code)
 
         api.deleteNote(edited.date, edited.id, key())
@@ -147,10 +147,114 @@ class DevServerTest {
 
     @Test
     fun tagsArePinnedAndPutBack() = runTest {
-        val before = api.tags().pinned
-        val pinned = api.setPinned(before + "devtest", key()).pinned
-        assertTrue("devtest" in pinned)
-        assertEquals(before, api.setPinned(before, key()).pinned)
+        // By name since API 1.21.0: a pin keeps its spaces and its capitals, and goes back as it was.
+        val before = api.tags().pinnedTags.map { it.name }
+        val name = "Dev Test " + UUID.randomUUID().toString().take(6)
+        val pin = Hashtags.spelling(name).getOrThrow()
+        val pinned = api.setPinned(before + name, key()).pinnedTags
+        assertTrue(pin in pinned, pinned.toString())
+        assertEquals(before, api.setPinned(before, key()).pinnedTags.map { it.name })
+    }
+
+    /** A tag of its own each run, with a space and capitals, as the field takes one. */
+    private fun aTag(what: String): Tag = Hashtags.spelling("DevServerTest $what " + UUID.randomUUID().toString().take(6)).getOrThrow()
+
+    @Test
+    fun aNoteKeepsItsTagsByNameAndAnEditSetsTheWholeList() = runTest {
+        // API 1.21.0: a note's tags field by name, beside its #words; an edit sends the field's whole new list.
+        val me = api.me()
+        if (!HomeMove.atLeast(me.apiVersion, "1.21.0")) return@runTest
+        val trip = aTag("Trip")
+        val lake = aTag("Lake")
+        val receipt = api.createNote(
+            NoteRequest("DevServerTest a tagged note #devtest", writtenAt = Timestamp.now(), tags = listOf(trip.name)),
+            key(),
+        )
+        try {
+            val read = api.note(receipt.note.date, receipt.note.id)
+            assertEquals(listOf(trip), read.fieldTags)
+            assertTrue(read.tagList.any { it.key == "devtest" }, read.tagList.toString())
+            // The whole new list, by name, as typed: one more, then none.
+            val both = api.editNote(read.date, read.id, read.text, read.revision, tags = listOf(trip.name, lake.name), idempotencyKey = key())
+            val twice = api.note(both.date, both.id)
+            assertEquals(listOf(trip, lake), twice.fieldTags)
+            assertEquals(null, twice.tagsSent(listOf(trip, lake)))
+            val none = api.editNote(twice.date, twice.id, twice.text, twice.revision, tags = emptyList(), idempotencyKey = key())
+            val bare = api.note(none.date, none.id)
+            assertEquals(emptyList(), bare.fieldTags)
+            assertEquals(listOf("devtest"), bare.tagList.map { it.key })
+            // A refused name is the server's too.
+            val long = assertFailsWith<ApiException> {
+                api.editNote(bare.date, bare.id, bare.text, bare.revision, tags = listOf("x".repeat(Hashtags.MAX_TAG + 1)), idempotencyKey = key())
+            }
+            assertEquals(400, long.status)
+
+            if (me.token.readsNotes) {
+                // Found by its tag's key, and listed with every tag by its latest name.
+                api.editNote(bare.date, bare.id, bare.text, bare.revision, tags = listOf(trip.name), idempotencyKey = key())
+                assertTrue(api.search(tag = trip.key).items.any { it.id == receipt.note.id })
+                val all = api.allTags().tags.single { it.tag == trip.key }
+                assertEquals(trip, all.named)
+                assertTrue(all.days >= 1)
+            }
+        } finally {
+            api.deleteNote(receipt.note.date, receipt.note.id, key())
+        }
+    }
+
+    @Test
+    fun aStayIsTaggedFromItsRevisionAndItsTagFindsIt() = runTest {
+        // API 1.21.0: a stay's whole list of tags, from the revision read; a stale one is refused. Its tag's
+        // check-ins come a page at a time to the last.
+        val me = api.me()
+        if (!HomeMove.atLeast(me.apiVersion, "1.21.0") || "activity" !in me.token.scopes || "notes:write" !in me.token.scopes) return@runTest
+        val lat = 45.6100 + Math.random() / 100
+        val lon = -94.2400
+        val stay = api.addCheckIn(
+            CheckInReport(arrived = Timestamp.now(), lat = lat, lon = lon, accuracyM = 10.0, timeZone = "America/Chicago", source = "tap"),
+            key(),
+        ).checkIn
+        val walk = aTag("Walk")
+        val tagged = api.tagCheckIn(stay.id, listOf(walk), stay.revision, key())
+        assertEquals(listOf(walk), tagged.tagList)
+        val stale = assertFailsWith<ApiException> { api.tagCheckIn(stay.id, emptyList(), stay.revision, key()) }
+        assertEquals("revision_mismatch", stale.code)
+        assertTrue(api.checkInsTagged(walk.key).any { it.id == stay.id || stay.id in it.ids })
+        assertTrue(MapTags.stays(listOf(tagged), walk.key).isNotEmpty())
+        assertEquals(emptyList(), api.tagCheckIn(stay.id, emptyList(), tagged.revision, key()).tagList)
+        assertTrue(api.checkInsTagged(walk.key).none { it.id == stay.id || stay.id in it.ids })
+    }
+
+    @Test
+    fun aPlacesTagGoesOnItsNewCheckInsAndOnTheOldOnesForTheCountShown() = runTest {
+        // Call 6: a remembered place's tags go on each new stop there; its check-ins already there are tagged only
+        // when asked, for the count shown, and another count now is refused with that count.
+        val me = api.me()
+        if (!HomeMove.atLeast(me.apiVersion, "1.21.0") || !me.token.readsAll || "activity" !in me.token.scopes) return@runTest
+        val lat = 45.6300 + Math.random() / 100
+        val lon = -94.2600
+        fun tap() = CheckInReport(arrived = Timestamp.now(), lat = lat, lon = lon, accuracyM = 10.0, timeZone = "America/Chicago", source = "tap")
+        val before = api.addCheckIn(tap(), key()).checkIn
+        val place = api.rememberPlace("DevServerTest " + UUID.randomUUID().toString().take(8), lat, lon, idempotencyKey = key())
+        try {
+            val cabin = aTag("Cabin")
+            val saved = api.changePlace(place.id, tags = listOf(cabin), idempotencyKey = key())
+            assertEquals(listOf(cabin), saved.tagList)
+            assertEquals(1, saved.checkIns)
+            // The one already there keeps its tags until asked.
+            assertTrue(api.checkInsTagged(cabin.key).none { it.id == before.id || before.id in it.ids })
+            val stale = assertFailsWith<ApiException> { api.tagCheckInsAt(place.id, listOf(cabin), 3, key()) }
+            assertEquals("revision_mismatch", stale.code)
+            assertEquals(1, stale.count)
+            assertEquals(1, api.tagCheckInsAt(place.id, listOf(cabin), 1, key()))
+            assertTrue(api.checkInsTagged(cabin.key).any { it.id == before.id || before.id in it.ids })
+            // Taken off the place, the check-ins keep it.
+            assertEquals(emptyList(), api.changePlace(place.id, tags = emptyList(), idempotencyKey = key()).tagList)
+            assertTrue(api.checkInsTagged(cabin.key).any { it.id == before.id || before.id in it.ids })
+            api.deleteCheckInsAt(place.id, 1, key())
+        } finally {
+            raw("DELETE", "v1/check-ins/places/${place.id}", null)
+        }
     }
 
     @Test

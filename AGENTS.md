@@ -22,7 +22,10 @@ says how every client behaves.
   API's stable codes), `Outbox` (the offline queue, one JSON file),
   `Hashtags` and `TagRow` (a port of Release Notes'
   `packages/domain/tags.ts`, by way of the iPhone app's `Hashtags.swift`;
-  keep all three in step), `TokenFormat`, and `YourVersionNumber` (only for
+  keep all three in step; `kit/src/test/resources/tag-vectors.json` is
+  Release Notes' `contracts/tag-vectors.json` copied as it is, which
+  `TagVectorTest` checks `Hashtags` against, as the iPhone app checks itself:
+  copy it again whenever the server's changes, and never edit the copy), `TokenFormat`, and `YourVersionNumber` (only for
   Changelog's own build number). It has its own tests: `./gradlew :kit:test`.
 - `app/` is the Compose app: `AppGraph` (in `ChangelogApp.kt`) holds the
   shared state for the screens and for `SendWorker`; `AppModel` is the
@@ -130,8 +133,16 @@ moved past the version the app last read (`api_version` in `/v1/me`):
 3. run `DevServerTest` against the current dev server (`git pull`, restart
    it) before anything else.
 
-It was last read against API 1.20.0 (2026-11-08). Every new field is
-optional and `kit` ignores what it doesn't know, so nothing broke. Of what
+It was last read against API 1.21.0 (2026-11-08). Every new field is
+optional and `kit` ignores what it doesn't know, so nothing broke. 1.21.0
+made tags first-class, and the app reads and sends all of it (see Tags
+below): `tag_names` beside `tags` everywhere, a note's `tags` by name on
+`POST /v1/notes` and on an edit, Upcoming's several `tags` (the single
+`tag`, deprecated, is still read from an older server), a stay's and a
+remembered place's `tags` (`PATCH /v1/check-ins/{id}`, `PATCH
+/v1/check-ins/places/{id}` and its `check_ins`, `PATCH
+/v1/check-ins/places/{id}/check-ins`), `tag` on `GET /v1/check-ins`, `GET
+/v1/tags/all`, `pinned_names`, and the `checkin.tagged` activity row. Of what
 1.13.0 to 1.20.0 added, the app reads `lived` on `/v1/me` (1.13.0), a
 recording's `transcript` and `writing` (1.14.0), `GET /v1/search` and
 `GET /v1/on-this-day` (1.15.0), listing check-ins for the map
@@ -377,7 +388,52 @@ other files go to what the phone opens them with. A note says where it came
 from (`source`, `mine`).
 
 Pinned tags are set in Settings (`PUT /v1/tags/pinned`, through the
-Outbox) and come first in the tag row.
+Outbox), by name since 1.21.0 ("Road Trip", not `road-trip`), and come
+first in the tag row.
+
+**Tags** (API 1.21.0), as Jamie decided them on 2026-11-08 for the web, the
+iPhone app and this one. A tag is a `Tag`: its `key`, which matches every
+spelling ("Road Trip", `road-trip`, `#road_trip`), and its `name`, as
+written, with spaces and emoji. `Hashtags` has the server's rules
+(`tags.ts`); keep them in step through `tag-vectors.json` (see Layout).
+What the app does with them:
+
+1. A note's #words are still tags, shown as chips beside the tags field's;
+   taking a #word's chip off takes the word out of the note
+   (`Hashtags.removing`).
+2. Keys decide what is the same tag, and an emoji is part of the key, so
+   "🚗 Road Trip" and "Road Trip" are two.
+3. Each note, date, stay and place keeps the spelling it was given; lists
+   (the tag row, every tag's list, the map's menu) show the latest.
+4. A tags field (`ui/TagViews.kt`'s `TagField`: chips with their own
+   remove, a box, Return or leaving the box to add, up to six used tags
+   offered) refuses more than 50 characters, a 21st tag, a comma and a line
+   break, saying why (`TagRefusal`, from the kit's phrasebook); #words keep
+   the cut they always had (`Hashtags.spans`, which the vectors check).
+   What is typed and not yet a chip
+   is the caller's (`TagTyping`): Commit on Log, Save on an edit and Save
+   on an Upcoming date take it first, and a refused one stops the save with
+   the reason under the box (ported from Codex's review of the iPhone
+   app's #57).
+5. An Upcoming date takes several tags. A tag's page (Notes, from every
+   tag's list or a note's "Tags:" links) lists its notes, a page at a time,
+   its Upcoming dates and every one of its check-ins (`Api.checkInsTagged`
+   follows `next` to the end, and stops if a cursor comes round again: the
+   other #57 fix).
+6. A remembered place's tags (Settings, with `notes:all`) go on each new
+   check-in there. A tag added asks, once, whether to tag the check-ins
+   already there, for the count the server answered; a count that changed
+   comes back as `revision_mismatch` with the count now and asks again with
+   it. Taking a tag off leaves the check-ins as they are. A stay's own tags
+   are set from the map's sheet (Tags beside it, `notes:write`), from the
+   revision read; a stale one reads the map again and says so.
+7. Tags show in the app; the email is the server's.
+8. The map's Tag menu ("Every tag", then each tag on what it has) keeps the
+   notes and the check-ins with that tag, with a line saying what it kept;
+   words in Search still keep notes only.
+
+The sticky tag is kept by name and goes in the note's tags field, not its
+words. Renaming and merging tags are for later.
 
 Notes (`ui/NotesScreen.kt`) is reading, as the iPhone app's tab of the same
 name (Jamie asked for the name): a search field, today's notes, On this day
@@ -391,7 +447,10 @@ version, place, weather (with the credit the API asks for) and every note
 `NoteViewer`, as from Log, with Edit and Delete where the token may; the open
 day's notes live in `AppModel` (`shownDayNotes`) beside Log's, so an edit or
 delete shows on both at once. Search (`GET /v1/search`) takes words, or a
-`#tag` alone for that tag's page; what it finds stands in for the days,
+`#tag` alone for that tag's notes, read by the server's own rules
+(`NoteSearch`: "#lake," and "#Road Trip" are words, not a tag, so they no
+longer search a tag the server would never make); a tag's page proper is
+under Tags, beside the search field; what it finds stands in for the days,
 newest first and paged, until Clear or Back; its notes, and On this day's,
 live in `AppModel` too (`found`, `onThisDay`), and `changeShown` changes a
 note on every list at once. It needs `notes:all` or `notes:read`
@@ -416,7 +475,8 @@ chosen one is tangerine. No stop's own
 page yet, and no naming or deleting stops (the iPhone app has both). The
 map also shows notes with a place of their own (`GET /v1/map/pins`, with a
 token that reads every note), as cobalt rings under the stops' dots, picked
-on or off at the top ("Check-ins", "Notes"); a ring opens its notes, each
+on or off at the top ("Check-ins", "Notes"), with the Tag menu beside them
+(call 8 above, `kit`'s `MapTags`); a ring opens its notes, each
 opening `NoteViewer`.
 
 Check-ins from this phone (`Stops.kt`), as the iPhone app's: **Check in

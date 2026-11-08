@@ -28,10 +28,19 @@ sealed interface OutboxOperation {
     @SerialName("note")
     data class Note(val text: String, val date: String? = null, val writtenAt: String) : OutboxOperation
 
-    /** New words for a note this token wrote, from the revision it read. */
+    /**
+     * New words for a note this token wrote, from the revision it read, and its tags field's whole list by name
+     * (API 1.21.0), or null to keep the tags its old words didn't carry. Null in a queue an earlier build saved.
+     */
     @Serializable
     @SerialName("edit")
-    data class Edit(val date: String, val id: String, val text: String, val revision: String) : OutboxOperation
+    data class Edit(
+        val date: String,
+        val id: String,
+        val text: String,
+        val revision: String,
+        val tags: List<String>? = null,
+    ) : OutboxOperation
 
     @Serializable
     @SerialName("delete")
@@ -86,6 +95,8 @@ sealed interface OutboxOperation {
         val spot: Spot? = null,
         /** The place, as Here named it (with a business, if one was picked). */
         val place: DevicePlace? = null,
+        /** Its tags by name, from the tags field and the sticky tag (API 1.21.0); its words' hashtags come after them. */
+        val tags: List<String>? = null,
     ) : OutboxOperation {
         /** Every file posted and the place named: ready to send. */
         val ready: Boolean get() = files.all { it.upload != null } && (spot == null || place != null)
@@ -97,6 +108,7 @@ sealed interface OutboxOperation {
                 writtenAt = writtenAt,
                 uploads = files.map { UploadRef(it.upload.orEmpty(), it.type, it.name) }.ifEmpty { null },
                 place = place,
+                tags = tags?.ifEmpty { null },
             )
     }
 }
@@ -192,12 +204,21 @@ class Outbox(private val file: File?, files: File? = null) {
         files: List<QueuedFile> = emptyList(),
         spot: Spot? = null,
         place: DevicePlace? = null,
+        tags: List<Tag> = emptyList(),
     ): OutboxItem {
         val stamp = Timestamp.format(writtenAt)
-        val op = if (files.isEmpty() && spot == null && place == null) {
+        val op = if (files.isEmpty() && spot == null && place == null && tags.isEmpty()) {
             OutboxOperation.Note(text, date, stamp)
         } else {
-            OutboxOperation.Post(text, date, stamp, files, spot = spot ?: place?.let { Spot(it.lat, it.lon, it.accuracyM) }, place = place)
+            OutboxOperation.Post(
+                text,
+                date,
+                stamp,
+                files,
+                spot = spot ?: place?.let { Spot(it.lat, it.lon, it.accuracyM) },
+                place = place,
+                tags = tags.map { it.name }.ifEmpty { null },
+            )
         }
         return enqueue(op, writtenAt)
     }
@@ -386,7 +407,7 @@ suspend fun Api.perform(item: OutboxItem): OutboxResult {
     return when (val op = item.operation) {
         is OutboxOperation.Note -> OutboxResult.Filed(createNote(NoteRequest(op.text, op.date, op.writtenAt), key))
         is OutboxOperation.Post -> OutboxResult.Filed(createNote(op.request, key))
-        is OutboxOperation.Edit -> OutboxResult.Edited(editNote(op.date, op.id, op.text, op.revision, key))
+        is OutboxOperation.Edit -> OutboxResult.Edited(editNote(op.date, op.id, op.text, op.revision, op.tags, key))
         is OutboxOperation.Attach ->
             OutboxResult.Attached(attachFiles(op.date, op.id, op.files.map { UploadRef(it.upload.orEmpty(), it.type, it.name) }, key))
         is OutboxOperation.CheckIn -> {

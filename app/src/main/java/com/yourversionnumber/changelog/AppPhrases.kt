@@ -61,6 +61,8 @@ object AppPhrases : Phrasebook {
             Phrase.CheckedIn -> R.string.kit_checked_in
             Phrase.UnnamedStop -> R.string.kit_unnamed_stop
             Phrase.CheckInNamed -> R.string.kit_check_in_named
+            Phrase.CheckInTagged -> R.string.kit_check_in_tagged
+            Phrase.CheckInsTaggedAtPlace -> R.string.kit_check_ins_tagged_at_place
             Phrase.CheckInDeleted -> R.string.kit_check_in_deleted
             Phrase.CheckInsDeletedAll -> R.string.kit_check_ins_deleted_all
             Phrase.CheckInsDeletedAllCount -> R.string.kit_check_ins_deleted_all_count
@@ -68,6 +70,7 @@ object AppPhrases : Phrasebook {
             Phrase.PlaceRemembered -> R.string.kit_place_remembered
             Phrase.PlaceSpotAdded -> R.string.kit_place_spot_added
             Phrase.PlaceRenamed -> R.string.kit_place_renamed
+            Phrase.PlaceTagged -> R.string.kit_place_tagged
             Phrase.PlaceForgotten -> R.string.kit_place_forgotten
             Phrase.PlaceIgnored -> R.string.kit_place_ignored
             Phrase.PlaceIgnoredMore -> R.string.kit_place_ignored_more
@@ -124,7 +127,6 @@ object AppPhrases : Phrasebook {
             Phrase.ProblemYear -> R.string.kit_problem_year
             Phrase.ProblemEnd -> R.string.kit_problem_end
             Phrase.ProblemPlace -> R.string.kit_problem_place
-            Phrase.ProblemTag -> R.string.kit_problem_tag
             Phrase.ProblemReminders -> R.string.kit_problem_reminders
             Phrase.Lived -> R.string.kit_lived
             Phrase.LastedMinutes -> R.string.kit_lasted_minutes
@@ -134,6 +136,12 @@ object AppPhrases : Phrasebook {
             Phrase.StayAt -> R.string.kit_stay_at
             Phrase.StaySince -> R.string.kit_stay_since
             Phrase.StayUntil -> R.string.kit_stay_until
+            Phrase.TagMany -> R.string.kit_tag_many
+            Phrase.TagBreak -> R.string.kit_tag_break
+            Phrase.TagComma -> R.string.kit_tag_comma
+            Phrase.TagLong -> R.string.kit_tag_long
+            Phrase.TagEmpty -> R.string.kit_tag_empty
+            Phrase.TagsNeedWords -> R.string.kit_tags_need_words
         },
         *args.toTypedArray(),
     )
@@ -144,6 +152,7 @@ object AppPhrases : Phrasebook {
             CountPhrase.MemoCount -> R.plurals.kit_memo_count
             CountPhrase.FileCount -> R.plurals.kit_file_count
             CountPhrase.CheckInsWent -> R.plurals.kit_check_ins_went
+            CountPhrase.CheckInsTagged -> R.plurals.kit_check_ins_tagged
         },
         n,
         n,

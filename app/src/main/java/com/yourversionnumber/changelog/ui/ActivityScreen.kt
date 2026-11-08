@@ -39,13 +39,16 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.yourversionnumber.changelog.AppModel
+import com.yourversionnumber.changelog.NoteTarget
 import com.yourversionnumber.changelog.R
+import com.yourversionnumber.changelog.kit.ActivityOpens
 import com.yourversionnumber.changelog.kit.ActivityFilter
 import com.yourversionnumber.changelog.kit.ActivityItem
 import com.yourversionnumber.changelog.kit.ActivityPage
 import com.yourversionnumber.changelog.kit.detail
 import com.yourversionnumber.changelog.kit.headline
 import com.yourversionnumber.changelog.kit.isProblem
+import com.yourversionnumber.changelog.kit.opens
 import com.yourversionnumber.changelog.say
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -57,7 +60,8 @@ import kotlinx.coroutines.launch
 /**
  * The activity log, newest first, from every channel: what came in, what
  * changed, what went out. It never shows what a note said; the server leaves
- * the words out.
+ * the words out. A row about a note opens it, and a filed reply its day in
+ * Notes, where the token may read them.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -75,6 +79,18 @@ fun ActivityScreen(model: AppModel) {
     // Where "Since you last looked" goes: the newest row when Activity was last left.
     val seenAtOpen = remember { model.graph.seenActivity }
     val scope = rememberCoroutineScope()
+    val player = rememberFilePlayer()
+    var opened by remember { mutableStateOf<NoteTarget?>(null) }
+    // The map of check-ins, as the iPhone app's button in Activity.
+    var mapping by rememberSaveable { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val askWhere = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions(),
+    ) { granted -> if (granted.values.any { it }) model.checkInNow() else model.graph.report(say(R.string.changelog_cant_check_in_without)) }
+    fun checkIn() {
+        if (com.yourversionnumber.changelog.Locator.allowed(context)) model.checkInNow()
+        else askWhere.launch(arrayOf(android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION))
+    }
 
     suspend fun load(more: Boolean) {
         if (!model.hasActivity) return
@@ -106,7 +122,21 @@ fun ActivityScreen(model: AppModel) {
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(say(R.string.activity)) })
+            TopAppBar(
+                title = { Text(say(R.string.activity)) },
+                actions = {
+                    // Check in now, as the iPhone app's button in Activity: one fix, sent as a tap.
+                    if (model.canCheckIn) {
+                        QuietButton(
+                            if (model.checkingIn) say(R.string.checking_in) else say(R.string.check_in),
+                            ::checkIn,
+                            Modifier.padding(end = 12.dp),
+                            enabled = !model.checkingIn,
+                        )
+                    }
+                    if (model.hasActivity) QuietButton(say(R.string.map), { mapping = true }, Modifier.padding(end = 8.dp))
+                },
+            )
         },
     ) { padding ->
         val pull = rememberPullToRefreshState()
@@ -156,7 +186,18 @@ fun ActivityScreen(model: AppModel) {
                     if (item.id == seenAtOpen && item.id != items.firstOrNull()?.id) {
                         Caption(say(R.string.since_you_last_looked))
                     }
-                    ActivityRow(item)
+                    val opens = item.opens(model.me?.token)
+                    ActivityRow(item, onOpen = opens?.let { target ->
+                        {
+                            when (target) {
+                                is ActivityOpens.Note -> opened = NoteTarget(target.date, target.id, item.version)
+                                is ActivityOpens.Day -> {
+                                    model.showDay(target.date)
+                                    model.screen = "notes"
+                                }
+                            }
+                        }
+                    })
                 }
                 if (next != null) {
                     item(key = "older") {
@@ -169,6 +210,8 @@ fun ActivityScreen(model: AppModel) {
             }
         }
     }
+    opened?.let { target -> NoteViewer(model, target, player, onClose = { opened = null }) }
+    if (mapping) CheckInMapScreen(model, onClose = { mapping = false })
 }
 
 /** One row of the log: what happened, through what, and when. `onOpen` for a note this token wrote. */

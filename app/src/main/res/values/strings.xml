@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="widget_description">Today\'s version, and a tap to write what changed.</string>
+    <string name="widget_coming_up_label">Changelog: Coming up</string>
+    <string name="widget_coming_up_description">Today\'s version beside the next dates in Upcoming.</string>
+    <string name="coming_up">Coming up</string>
+    <string name="nothing_coming_up">Nothing ahead yet.</string>
     <string name="a_month_before">A month before</string>
     <string name="a_note_holds_up_to">A note holds up to %1$s files.</string>
     <string name="a_tag_is_letters_and">A tag is letters and numbers, with at least one letter.</string>
@@ -105,7 +109,43 @@
     <string name="place_in_the_recording">Place in the recording</string>
     <string name="open">Open</string>
     <string name="back">Back</string>
-    <string name="files_cant_come_off">Files already on this note can’t be taken off here.</string>
+    <string name="files_on_this_note">Files on this note. Remove takes one off now; adding goes with Save.</string>
+    <string name="remove">Remove</string>
+    <string name="take_this_file_off">Take this file off the note?</string>
+    <string name="it_goes_with_its_words">It goes, with its small copy and any transcript or description. The other files stay as they are.</string>
+    <string name="last_file_stays">A note with no words keeps its last file. Delete the note instead.</string>
+    <string name="taking_a_file_off_a_note">Taking a file off a note</string>
+    <string name="this_note_was_deleted_since">This note has been deleted since.</string>
+    <string name="search">Search</string>
+    <string name="search_your_notes">Words, or a #tag</string>
+    <string name="clear">Clear</string>
+    <string name="no_notes_found">No notes found.</string>
+    <string name="on_this_day">On this day</string>
+    <string name="tomorrow">Tomorrow</string>
+    <string name="map">Map</string>
+    <string name="check_ins">Check-ins</string>
+    <string name="map_of_your_check_ins">Map of your check-ins</string>
+    <string name="no_check_ins_yet">Nothing on the map yet. Check in, or turn on Record my stops in Settings.</string>
+    <string name="check_in">Check in</string>
+    <string name="checking_in">Checking in…</string>
+    <string name="checked_in">Checked in.</string>
+    <string name="a_check_in">A check-in</string>
+    <string name="changelog_cant_check_in_without">Changelog can’t check in without your location. Allow it in the phone’s settings.</string>
+    <string name="check_ins_setting">Check-ins</string>
+    <string name="record_my_stops">Record my stops</string>
+    <string name="record_my_stops_about">When this phone stays somewhere ten minutes or more, it checks in there, as Changelog for iPhone does. Each stop goes to Release Notes with its time and spot, and shows on the map and in Activity. It needs location all the time.</string>
+    <string name="allow_all_the_time">Android hasn’t allowed location all the time, so stops aren’t recorded. Choose “Allow all the time” in Changelog’s location settings.</string>
+    <string name="open_location_settings">Open location settings</string>
+    <string name="not_at_home">Not at home</string>
+    <string name="not_at_home_about">Set home from where you are, and no stop within 150 m of it is ever sent. Kept on this phone only. Check in still works there.</string>
+    <string name="not_at_home_set">Home is set. No stop within 150 m of it is sent. Kept on this phone only.</string>
+    <string name="set_home_here">Set home to where I am</string>
+    <string name="move_home_here">Move home to where I am</string>
+    <string name="forget_home">Forget home</string>
+    <string name="finding_where_you_are">Finding where you are…</string>
+    <string name="notes_pick">Notes</string>
+    <string name="try_again">Try again</string>
+    <string name="osm_credit">© OpenMapTiles © OpenStreetMap</string>
     <string name="adding_files_to_a_note">Adding to a note: %1$s</string>
     <string name="close">Close</string>
     <string name="cant_show_this_photo">Can’t show this photo here.</string>
@@ -215,6 +255,26 @@
     <plurals name="notes_count">
         <item quantity="one">%d note</item>
         <item quantity="other">%d notes</item>
+    </plurals>
+    <plurals name="notes_found">
+        <item quantity="one">%d note found</item>
+        <item quantity="other">%d notes found</item>
+    </plurals>
+    <plurals name="more_on_this_day">
+        <item quantity="one">%d more on this day</item>
+        <item quantity="other">%d more on this day</item>
+    </plurals>
+    <plurals name="in_days">
+        <item quantity="one">In %d day</item>
+        <item quantity="other">In %d days</item>
+    </plurals>
+    <plurals name="weeks_count">
+        <item quantity="one">%d week</item>
+        <item quantity="other">%d weeks</item>
+    </plurals>
+    <plurals name="days_count">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
     </plurals>
     <plurals name="files_count">
         <item quantity="one">%d file</item>
@@ -355,6 +415,14 @@
     <string name="kit_problem_place">A trip needs a destination, like Zürich or Paris, Texas.</string>
     <string name="kit_problem_tag">A tag is one word of letters, numbers and hyphens, like family.</string>
     <string name="kit_problem_reminders">Choose from one to six reminders.</string>
+    <string name="kit_lived">Week %1$s — Day %2$s</string>
+    <string name="kit_lasted_minutes">%1$s min</string>
+    <string name="kit_lasted_hours">%1$s hr</string>
+    <string name="kit_lasted_hours_minutes">%1$s hr %2$s min</string>
+    <string name="kit_stay_range">%1$s to %2$s, %3$s</string>
+    <string name="kit_stay_at">At %1$s</string>
+    <string name="kit_stay_since">Since %1$s</string>
+    <string name="kit_stay_until">Until %1$s</string>
     <plurals name="kit_photo_count">
         <item quantity="one">%1$d photo</item>
         <item quantity="other">%1$d photos</item>

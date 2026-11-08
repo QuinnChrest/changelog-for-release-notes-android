@@ -99,10 +99,14 @@ To try it without touching real notes, run the Release Notes dev server
 (details in [AGENTS.md](AGENTS.md#the-dev-server)), choose "Dev server" on the
 sign-in screen of a debug build, and paste the token it prints.
 
-Changelog numbers its builds the way Release Notes does, by Your Version
-Number's arithmetic from its own start on 29 October 2026 to the day a build
-is made, in Chicago: 0.0.0 on the first day, 0.1.0 a year on. The foot of
-Settings shows it with the commit.
+Releases are numbered 1.0.0 onward: the middle number goes up when there's
+something new, the last when a release only fixes things. Each release's notes
+say what changed.
+
+Each build also carries its own number, the way Release Notes numbers days, by
+Your Version Number's arithmetic from Changelog's start on 29 October 2026 to
+the day the build is made, in Chicago: 0.0.0 on the first day, 0.1.0 a year
+on. The foot of Settings shows it with the commit.
 
 ## License
 

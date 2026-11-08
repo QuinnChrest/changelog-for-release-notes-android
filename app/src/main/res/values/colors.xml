@@ -2,6 +2,7 @@
 <!-- Release Notes' colours, for the parts of the app drawn outside Compose
      (the widget). ui/Theme.kt holds the same for the screens. -->
 <resources>
+    <color name="widget_rule">#2214163A</color>
     <color name="ink">#FF14163A</color>
     <color name="cobalt">#FF1A4FE0</color>
     <color name="tangerine">#FFFF5A1F</color>

@@ -97,3 +97,27 @@ enum class ActivityFilter(private val phrase: Phrase, val kinds: List<String>) {
 
     val label: String get() = Words.say(phrase)
 }
+
+/** What tapping an Activity row opens, as the iPhone app: the note it names, or a filed reply's day. */
+sealed interface ActivityOpens {
+    data class Note(val date: String, val id: String) : ActivityOpens
+
+    data class Day(val date: String) : ActivityOpens
+}
+
+private val noteKinds = setOf("note.added", "note.edited", "note.files", "description.added", "transcript.added")
+
+/**
+ * What this row opens for that token, or null. A note row opens its note when the token reads every note, or
+ * wrote it; a filed email reply opens its day, which needs every note read. A deleted note, and every other
+ * row, stays still.
+ */
+fun ActivityItem.opens(by: TokenInfo?): ActivityOpens? {
+    val readsNotes = by?.readsNotes == true
+    return when {
+        kind in noteKinds && note != null && day != null && (readsNotes || (by != null && isFrom(by))) ->
+            ActivityOpens.Note(day, note)
+        kind == "mail" && outcome == "filed" && day != null && readsNotes -> ActivityOpens.Day(day)
+        else -> null
+    }
+}

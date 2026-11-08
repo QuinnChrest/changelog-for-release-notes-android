@@ -1,5 +1,7 @@
 package com.yourversionnumber.changelog.ui
 
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.yourversionnumber.changelog.Stops
 import android.Manifest
 import android.content.Intent
 import android.os.Build
@@ -121,6 +123,26 @@ fun SettingsScreen(model: AppModel) {
         if (granted.values.any { it }) model.addWhereIAm(true)
         else model.graph.report(say(R.string.changelog_cant_add_where_you))
     }
+    // Recording stops: location while using first, then all the time, asked only as the switch goes on.
+    var allowedAllTime by remember { mutableStateOf(Stops.allowedInBackground(context)) }
+    val allTime = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        allowedAllTime = Stops.allowedInBackground(context)
+        if (granted) model.recordStops(true)
+    }
+    val whileUsing = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+        if (granted.values.any { it }) allTime.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        else model.graph.report(say(R.string.changelog_cant_check_in_without))
+    }
+    // Home is set from one fix, so it needs location while using, asked for here if it must be.
+    val homeWhere = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+        if (granted.values.any { it }) model.setHomeHere() else model.graph.report(say(R.string.changelog_cant_check_in_without))
+    }
+    // Back from the phone's settings: what it allows now, and recording started if it may.
+    LifecycleResumeEffect(Unit) {
+        allowedAllTime = Stops.allowedInBackground(context)
+        if (model.recordingStops) Stops.start(context)
+        onPauseOrDispose {}
+    }
     val me = model.me
 
     Scaffold(
@@ -162,6 +184,50 @@ fun SettingsScreen(model: AppModel) {
                     !on -> model.addWhereIAm(false)
                     Locator.allowed(context) -> model.addWhereIAm(true)
                     else -> whereAbouts.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
+                }
+            }
+
+            Heading(say(R.string.check_ins_setting), Modifier.padding(top = 12.dp))
+            Toggle(
+                say(R.string.record_my_stops),
+                say(R.string.record_my_stops_about),
+                checked = model.recordingStops,
+            ) { on ->
+                model.recordStops(on)
+                when {
+                    !on || allowedAllTime -> {}
+                    !Locator.allowed(context) -> whileUsing.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
+                    else -> allTime.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                }
+            }
+            if (model.recordingStops && !allowedAllTime) {
+                Caption(say(R.string.allow_all_the_time), color = paper.orangeInk)
+                QuietButton(say(R.string.open_location_settings), {
+                    context.startActivity(
+                        Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri()),
+                    )
+                })
+            }
+            // Home: never a stop there. Set from where the phone is, so it asks for location the way Here does.
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(say(R.string.not_at_home), style = MaterialTheme.typography.bodyLarge)
+                Caption(say(if (model.home == null) R.string.not_at_home_about else R.string.not_at_home_set))
+                Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                    QuietButton(
+                        say(
+                            when {
+                                model.findingHome -> R.string.finding_where_you_are
+                                model.home == null -> R.string.set_home_here
+                                else -> R.string.move_home_here
+                            },
+                        ),
+                        {
+                            if (Locator.allowed(context)) model.setHomeHere()
+                            else homeWhere.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
+                        },
+                        enabled = !model.findingHome,
+                    )
+                    if (model.home != null) QuietButton(say(R.string.forget_home), model::forgetHome, color = paper.orangeInk)
                 }
             }
 

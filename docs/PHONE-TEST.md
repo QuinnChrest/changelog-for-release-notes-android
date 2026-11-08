@@ -59,6 +59,12 @@ Upcoming and the activity log.
 14. **Prompt and notices.** "Ask me each morning" on: it comes at send
     time. "Notes from elsewhere" on, then a note from the web's agent or
     another token: a notice within the hour. 
-15. **Last, sign out.** Settings, "Sign out", then "Sign out and revoke this
+15. **Check-ins.** Activity, "Check in": "Checked in." comes, and Map
+    shows the stop where you are. Settings, "Record my stops", "Allow all
+    the time"; carry the phone through a day: each place you stay ten
+    minutes or more shows on the map and the web's map, with its times.
+    Turn it off: no more come. Map, "Notes": notes with a place show as
+    rings, and one opens.
+16. **Last, sign out.** Settings, "Sign out", then "Sign out and revoke this
    token". The token shows as revoked on the web, and anything still
    waiting stays on the phone.

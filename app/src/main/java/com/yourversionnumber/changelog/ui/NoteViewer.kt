@@ -51,6 +51,7 @@ import com.yourversionnumber.changelog.NoteTarget
 import com.yourversionnumber.changelog.R
 import com.yourversionnumber.changelog.kit.Hashtags
 import com.yourversionnumber.changelog.kit.NoteDetail
+import com.yourversionnumber.changelog.kit.NoteMedia
 import com.yourversionnumber.changelog.kit.UpcomingDraft
 import com.yourversionnumber.changelog.kit.awaitingWords
 import kotlinx.coroutines.delay
@@ -169,7 +170,8 @@ private fun NoteReader(model: AppModel, note: NoteDetail, player: FilePlayer, on
 
 /**
  * The note as the box on Log is: its words, the tag row, photos, camera and
- * voice memo, and Save where Commit is. Files already on it are shown and stay.
+ * voice memo, and Save where Commit is. Files already on it are listed, each
+ * with a Remove that asks first and goes at once, apart from Save (API 1.17.0).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -178,6 +180,9 @@ private fun NoteEditor(model: AppModel, note: NoteDetail, player: FilePlayer, on
     var fresh by remember(note.id) { mutableStateOf<NoteDetail?>(null) }
     var text by remember(note.id) { mutableStateOf(TextFieldValue("")) }
     var saved by remember(note.id) { mutableStateOf(false) }
+    // The numbers of files taken off while this is open: gone from here at once, whatever list the note is on.
+    var gone by remember(note.id) { mutableStateOf(emptySet<Int>()) }
+    var removing by remember(note.id) { mutableStateOf<NoteMedia?>(null) }
     val box = remember { FocusRequester() }
     LaunchedEffect(note.id) {
         val read = model.load(note.target)
@@ -190,8 +195,11 @@ private fun NoteEditor(model: AppModel, note: NoteDetail, player: FilePlayer, on
     }
     // The box is there once the note is read: then the keyboard comes up.
     LaunchedEffect(fresh != null) { if (fresh != null) runCatching { box.requestFocus() } }
+    val read = fresh ?: note
+    val held = read.copy(media = read.media.filterNot { it.n in gone })
+    LaunchedEffect(held.media.size) { model.editHeld = held.media.size }
     DisposableEffect(note.id) {
-        model.editHeld = note.media.size
+        model.editHeld = held.media.size
         onDispose {
             model.editHeld = 0
             // Left without saving: the files picked for it go.
@@ -243,12 +251,35 @@ private fun NoteEditor(model: AppModel, note: NoteDetail, player: FilePlayer, on
                         }
                     }, enabled = canSave)
                 }
-                if (note.media.isNotEmpty()) {
+                if (held.media.isNotEmpty()) {
                     Rule()
-                    Caption(say(R.string.files_cant_come_off))
-                    NoteFiles(model, note, player)
+                    Caption(say(R.string.files_on_this_note))
+                    val removable = model.canRemoveFile(held)
+                    held.media.forEach { file ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(fileLabel(file), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            if (removable) QuietButton(say(R.string.remove), { removing = file }, color = paper.orangeInk)
+                        }
+                    }
+                    // Why there's no Remove: a note with no words keeps its last file.
+                    if (!removable && model.canChange(held) && model.canAddFiles) Caption(say(R.string.last_file_stays))
                 }
             }
         }
+    }
+    removing?.let { file ->
+        AlertDialog(
+            onDismissRequest = { removing = null },
+            title = { Text(say(R.string.take_this_file_off)) },
+            text = { Text(fileLabel(file) + "\n\n" + say(R.string.it_goes_with_its_words)) },
+            confirmButton = {
+                QuietButton(say(R.string.remove), {
+                    removing = null
+                    model.removeFile(held, file)
+                    gone = gone + file.n
+                }, color = paper.orangeInk)
+            },
+            dismissButton = { QuietButton(say(R.string.keep), { removing = null }) },
+        )
     }
 }

@@ -56,11 +56,14 @@ import com.yourversionnumber.changelog.R
 import com.yourversionnumber.changelog.kit.UpcomingDraft
 import com.yourversionnumber.changelog.kit.UpcomingEntry
 import com.yourversionnumber.changelog.kit.UpcomingKind
+import com.yourversionnumber.changelog.kit.Countdown
+import com.yourversionnumber.changelog.kit.byMonth
 import com.yourversionnumber.changelog.say
 import com.yourversionnumber.changelog.sayCount
 import java.time.Instant
 import java.time.LocalDate
 import java.time.Month
+import java.time.YearMonth
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
@@ -103,17 +106,23 @@ fun UpcomingScreen(model: AppModel) {
                     )
                 }
             }
-            items(list?.entries.orEmpty(), key = { it.id }) { entry ->
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable(role = Role.Button, onClickLabel = say(R.string.edit)) { editing = entry }
-                        .padding(vertical = 10.dp),
-                ) {
-                    Text(entry.line, style = MaterialTheme.typography.bodyLarge)
-                    Caption(listOfNotNull(whenSaid(entry), entry.kind.label, entry.tag?.let { "#$it" }).joinToString(" · "))
+            // Under their months, as the iPhone app: "November", "January 2027" when it isn't this year's.
+            val today = list?.today.orEmpty()
+            val thisYear = UpcomingDraft.parse(today)?.year
+            list?.byMonth().orEmpty().forEach { (month, entries) ->
+                item(key = "month/$month") { Heading(monthLabel(month, thisYear), Modifier.padding(top = 12.dp, bottom = 2.dp)) }
+                items(entries, key = { it.id }) { entry ->
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable(role = Role.Button, onClickLabel = say(R.string.edit)) { editing = entry }
+                            .padding(vertical = 10.dp),
+                    ) {
+                        Text(entry.line, style = MaterialTheme.typography.bodyLarge)
+                        Caption(listOfNotNull(whenSaid(entry, today), entry.kind.label, entry.tag?.let { "#$it" }).joinToString(" · "))
+                    }
+                    Rule()
                 }
-                Rule()
             }
             list?.let {
                 val notes = listOfNotNull(
@@ -132,10 +141,29 @@ fun UpcomingScreen(model: AppModel) {
 
 private val dayFormat = DateTimeFormatter.ofPattern("EEE, MMM d")
 
-private fun whenSaid(e: UpcomingEntry): String = when (e.status) {
+/** When it is, and how far off: "Thu, Nov 12 · In 5 days", "3 weeks 2 days" from two weeks on. */
+private fun whenSaid(e: UpcomingEntry, today: String): String = when (e.status) {
     "today" -> say(R.string.today)
     "ongoing" -> e.through?.let { UpcomingDraft.parse(it) }?.let { say(R.string.on_now_through, it.format(dayFormat)) } ?: say(R.string.on_now)
-    else -> UpcomingDraft.parse(e.next)?.format(dayFormat) ?: e.next
+    else -> {
+        val day = UpcomingDraft.parse(e.next)?.format(dayFormat) ?: e.next
+        Countdown.of(e, today)?.let { "$day · ${countdown(it)}" } ?: day
+    }
+}
+
+private fun countdown(c: Countdown): String {
+    val days = c.days.toInt()
+    return when {
+        days == 1 -> say(R.string.tomorrow)
+        !c.inWeeks -> sayCount(R.plurals.in_days, days, days)
+        c.rest == 0L -> sayCount(R.plurals.weeks_count, c.weeks.toInt(), c.weeks.toInt())
+        else -> sayCount(R.plurals.weeks_count, c.weeks.toInt(), c.weeks.toInt()) + " " + sayCount(R.plurals.days_count, c.rest.toInt(), c.rest.toInt())
+    }
+}
+
+private fun monthLabel(month: YearMonth, thisYear: Int?): String {
+    val name = month.month.getDisplayName(TextStyle.FULL_STANDALONE, java.util.Locale.getDefault())
+    return if (thisYear == null || month.year == thisYear) name else "$name ${month.year}"
 }
 
 /** Adds or changes one date. Save sends it at once; a refusal is shown here, to fix. */

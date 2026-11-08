@@ -50,8 +50,10 @@ yvn-release-notes): type on paper, the email's colours, light and dark as
 the phone is. `ui/Theme.kt` holds it: the site's colours (`paper`), its two
 fonts (Bricolage Grotesque for words, Martian Mono for versions; OFL, see
 `docs/fonts/`), `VersionText` (cobalt, the dots tangerine), `GoButton` (the
-one tangerine button on a screen), `QuietButton` (blue words), `Pick` (the
-site's tag picks: underlined blue, the chosen one in bold ink), `PaperField`
+one tangerine button on a screen), `QuietButton` (blue words), `Pick` (a choice,
+or a thing turned on or off: quiet words, the chosen one in semibold ink
+over a 2dp tangerine rule, as a field being typed in; no underlines, which
+read as links on a phone; Quinn's call, 2026-11-08), `PaperField`
 and `Select` (no box, a 2dp rule that turns tangerine), `Rule` and `Bar`.
 No boxes, no shadows, no Material chips or outlined fields: build new
 screens from these. The one exception is the tab bar along the bottom
@@ -90,12 +92,29 @@ bar, and Commit at the right of the composer's icons.
   backups). Without `notes:all`, the server refuses the rest (`not_yours`).
 - Sign out sends `DELETE /v1/token` when the owner chooses to revoke.
 - A notification never carries a note's words.
-- Location is foreground only, one `getCurrentLocation` when the owner asks,
-  once per draft: each Here costs Release Notes a lookup, 100 a day.
+- Location for a note is foreground only, one `getCurrentLocation` when the
+  owner asks, once per draft: each Here costs Release Notes a lookup, 100 a
+  day. Check in now is the same: one fix when tapped.
+- The one use of background location is Record my stops (check-ins, Quinn's
+  call, 2026-11-07), off until the owner turns it on in Settings, and only
+  then is "Allow all the time" asked for. It's Android's own LocationManager
+  (no Play services), three requests delivered to `StopReceiver`: the fused
+  provider at balanced power every five minutes, the passive provider (fixes
+  other apps got anyway) and GPS every fifteen; `kit`'s `StopDetector` reports only real stops (ten minutes
+  within 100 m), so each costs one of the server's 100 lookups a day. Off,
+  or signed out, the request is taken back. A Play release needs Play's
+  background-location declaration for it.
 - No backups: the token's Keystore key can't leave the phone, and the queue
   holds words.
-- Dependencies are AndroidX and Kotlin's own libraries only. Ask before
-  adding anything else.
+- Dependencies are AndroidX and Kotlin's own libraries only, and MapLibre
+  for the check-in map (Quinn's call, 2026-11-07; it brings OkHttp and
+  Timber). Ask before adding anything else.
+- The check-in map draws OpenFreeMap's vector tiles (OpenStreetMap's data,
+  no key), so OpenFreeMap's servers see which tiles are shown (roughly where
+  the pins are), as any map would. Its credit, "© OpenMapTiles ©
+  OpenStreetMap", stays on screen: both are required (OpenMapTiles' CC BY
+  and OpenStreetMap's ODbL); OpenFreeMap's own name is optional, its README
+  says, so it's left off. Nothing else goes there.
 
 ## Keeping up with the API
 
@@ -111,20 +130,25 @@ moved past the version the app last read (`api_version` in `/v1/me`):
 3. run `DevServerTest` against the current dev server (`git pull`, restart
    it) before anything else.
 
-It was last read against API 1.18.2 (2026-11-06). Every new field is
-optional and `kit` ignores what it doesn't know, so nothing broke. Of what
-1.14.0 to 1.18.2 added, the app reads a recording's `transcript` and
-`writing` (1.14.0), a `note.files` row's `removed` (1.17.0), and the
+It was last read against API 1.18.2 (2026-11-07; the server's own version
+hadn't moved since 2026-11-06). Every new field is optional and `kit`
+ignores what it doesn't know, so nothing broke. Of what 1.13.0 to 1.18.2
+added, the app reads `lived` on `/v1/me` (1.13.0), a recording's
+`transcript` and `writing` (1.14.0), `GET /v1/search` and
+`GET /v1/on-this-day` (1.15.0), listing check-ins for the map
+(`GET /v1/check-ins`, 1.18.0), taking one file off a note (`DELETE
+/v1/notes/{date}/{id}/media/{n}`, 1.17.0), a `note.files` row's `removed`
+(1.17.0), and the
 check-in activity rows (1.18.0: `checkin`, worded with its `label`, which
 is the owner's words and so never goes in a notice; `checkin.named`,
 `checkin.deleted` and `checkin.place`, kinds the ledger doesn't list but
 `packages/domain/activity.ts` does); not yet the rest of a note (`parts`,
 `place`, `markup` and the like), `include=urls`, the archive reads beyond
-`GET /v1/days` and `GET /v1/days/{date}` (search, on this day, releases and
-the rest, 1.15.0), rich notes and place writes (1.16.0), taking one file off
-a note (1.17.0), or sending and listing check-ins (1.18.0; sending them
-from the phone would need background location, which the rules here
-don't allow).
+the days, search and on this day (releases, tags, the map, badges and the
+mail log, 1.15.0), rich notes and place writes (1.16.0), or naming or
+deleting check-ins and remembered places (1.18.0). It sends check-ins
+(`POST /v1/check-ins`: Check in now as a `tap`, Record my stops as
+`visit`s) and reads `GET /v1/map/pins` for the map's notes.
 
 ## Building
 
@@ -146,6 +170,27 @@ Release Notes' and the iPhone app's own. `app/build.gradle.kts` stamps it as
 `versionName`, the commit count as `versionCode`, and the short commit as
 `BuildConfig.COMMIT`, which the foot of Settings shows. Never set them by
 hand.
+
+### Releases
+
+Every push to `main` is a release on GitHub (Quinn's call, 2026-11-08):
+a tag and a release named for it, with notes that say in plain words what
+changed for someone using the app (what's new, what's fixed), no pictures,
+then an Install section and the signed `Changelog-x.y.z.apk` built by
+`assembleRelease`, with the signing certificate's SHA-256 so it can be
+checked. Releases are numbered by semantic versioning from 1.0.0 (the first
+under this rule; 0.0.2 to 0.0.7 before it were named for the build number):
+
+- **Major** (2.0.0) for a break: Quinn and Jamie's call, never assumed.
+- **Minor** (1.1.0) when anything new reaches the person using the app, a
+  feature or a change they see; the patch goes back to 0. A release with
+  features and fixes is a minor.
+- **Patch** (1.0.1) for fixes alone, with no change to what they see or do.
+
+This number is the release's, on the tag and the APK's file name. The
+build's own `versionName` stays Your Version Number's day count, stamped by
+`app/build.gradle.kts` and shown at the foot of Settings; never set it by
+hand to match.
 
 ### Release builds
 
@@ -248,12 +293,18 @@ today's notes), Notes (the days and their notes),
 the Outbox and its sender, Waiting to send (fix, discard), opening a note
 full screen to edit or delete it (`ui/NoteViewer.kt`: Edit is the composer's
 words, tag row, Photos, Camera and Record, with files added after the edit
-as an `OutboxOperation.Attach`; a note's own files can't come off here yet,
-though API 1.17.0 has a way; Delete asks first), Log showing notes only (activity is its own
+as an `OutboxOperation.Attach`; each of a note's own files has a Remove that
+asks first and goes at once as an `OutboxOperation.RemoveFile`, apart from
+Save, except the last file of a note with no words, which the server keeps;
+Delete asks first), Log showing notes only (activity is its own
 tab; offline, today falls back to what this phone sent), the Activity screen
 (filters, "Older" paging, "Since you last looked"; each filter's last rows
 kept in memory in `AppModel.activityShown` so the tab opens on them), Settings and
-sign-out. Activity rows read as in the iPhone app (`kit`'s
+sign-out. A note's Activity rows open the note, and a filed reply its day in
+Notes, where the token may read them (`kit`'s `ActivityItem.opens`). Log
+and the widget say "Week 2,369 — Day 16,583" under the version (`lived`),
+and Upcoming counts down ("In 5 days", "3 weeks 2 days") under month
+headings (`kit`'s `Countdown` and `byMonth`). Activity rows read as in the iPhone app (`kit`'s
 `ActivityText.kt`).
 
 Files on a note: photos from the system photo picker or the camera app
@@ -314,7 +365,9 @@ Pinned tags are set in Settings (`PUT /v1/tags/pinned`, through the
 Outbox) and come first in the tag row.
 
 Notes (`ui/NotesScreen.kt`) is reading, as the iPhone app's tab of the same
-name (Jamie asked for the name): today's notes, then "Earlier", the days
+name (Jamie asked for the name): a search field, today's notes, On this day
+(`GET /v1/on-this-day`: the same day in earlier years, each with its first
+notes and "3 more on this day" to open it), then "Earlier", the days
 before newest first (`GET /v1/days`, API 1.15.0, a page of 30 read as the last
 row shows), each with its version and "3 notes · 1 file · place · Paused". A
 day opens in the tab, Back returning to the list where it was left: its
@@ -322,10 +375,74 @@ version, place, weather (with the credit the API asks for) and every note
 (`GET /v1/days/{date}`, then `/v1/notes` after its `next`). A note opens in
 `NoteViewer`, as from Log, with Edit and Delete where the token may; the open
 day's notes live in `AppModel` (`shownDayNotes`) beside Log's, so an edit or
-delete shows on both at once. It needs `notes:all` or `notes:read`
+delete shows on both at once. Search (`GET /v1/search`) takes words, or a
+`#tag` alone for that tag's page; what it finds stands in for the days,
+newest first and paged, until Clear or Back; its notes, and On this day's,
+live in `AppModel` too (`found`, `onThisDay`), and `changeShown` changes a
+note on every list at once. It needs `notes:all` or `notes:read`
 (`readsNotes`); without, the tab says how to make such a token, and there is
 no in-app upgrade yet (the iPhone app has one, by OAuth). Everything it reads
 is in memory only. No lock on reading yet (the iPhone app's Face ID lock).
+
+The check-in map (`ui/CheckInMap.kt`), as the iPhone app's: Map in
+Activity's top bar (with the `activity` scope, which `GET /v1/check-ins`
+needs) opens it full screen. Every page of check-ins is read and held in
+memory (`AppModel.checkIns`); `kit`'s `CheckInMap.pins` gathers stays into a
+pin per remembered place, or per name within 100 m, as the server and the
+iPhone app do; a pin opens its stops, worded by `CheckInWords` ("Today,
+8:05 AM to 9:15 AM, 70 min"). The map is a MapLibre `MapView` in an
+`AndroidView`. Its base is OpenFreeMap's `positron` style recoloured in the
+app's own palette, light or dark as the phone is (`paperStyle`, by
+OpenMapTiles' layer names): land as the paper, roads as rules, water a wash
+of cobalt, place names in ink and road names in lighter ink on a paper
+halo, route shields left off; each colour is blended into the paper as a solid one, so crossings
+don't darken. Pins are cobalt dots ringed in paper, over everything; the
+chosen one is tangerine. No stop's own
+page yet, and no naming or deleting stops (the iPhone app has both). The
+map also shows notes with a place of their own (`GET /v1/map/pins`, with a
+token that reads every note), as cobalt rings under the stops' dots, picked
+on or off at the top ("Check-ins", "Notes"); a ring opens its notes, each
+opening `NoteViewer`.
+
+Check-ins from this phone (`Stops.kt`), as the iPhone app's: **Check in
+now** (Activity's top bar and the map's) takes one fix and queues a `tap`
+at that moment; **Record my stops** (Settings, off by default) records in
+the background, as the location rule above says. `kit`'s `StopDetector`
+reports a stop's arrival once the phone has stayed ten minutes, and its
+end, with the same `arrived`, once a fix lands more than 100 m away; the
+server takes the two as one stay, so a stop of five hours is one arrival
+and one end, never one every ten minutes (the detector's `reported` holds
+until the phone leaves, and the server merges a stop that starts within 30
+minutes of the last one ending at the same place). Fixes vaguer than 250 m
+are passed over. **Not at home** (Settings, under Record my stops): home is
+set from one fix where the phone is and kept on the phone only
+(`AppGraph.home`, no backups, gone on sign-out); `kit`'s `QuietPlaces` drops
+every stop within 150 m of it, arrival and end, before the Outbox. Check in
+now isn't filtered: a tap is the owner's choice.
+Every report goes through the Outbox (`OutboxOperation.CheckIn`) under its
+own key. The detector's state (one spot) is kept in `noBackupFilesDir`,
+never logged. A restart or an update drops Android's request, so
+`RestoreReceiver` and opening the app ask again.
+
+Two widgets (`VersionWidget.kt`), in the app's own look: **Changelog**
+(3×1, as it has always been: the version in Martian Mono, cobalt with
+tangerine dots, the weeks and days lived, and "What changed?"; a tap opens
+Log to write) and **Changelog: Coming up** (4×2: that same Today, with the
+streak, or "Your email is stopped", under it; beside it as many dates in
+Upcoming as its height holds, up to four, each in the server's line with
+its day and countdown, as the Upcoming tab says them. Today's half opens
+Log, Coming up's Upcoming. Tomorrow's version and On this day were tried
+there and taken off, Quinn's call, 2026-11-08). A widget can't use the app's fonts, so
+`TodayWidgets` draws the words into images, each twice, light and dark; the
+layout shows one by `@integer/widget_light` and `widget_dark`, which the
+home screen reads in the phone's own theme (a visibility given by integer
+is its place in visible, invisible, gone, so gone is 2, not 8). The wide
+one is a single picture, so both halves keep one scale, with clear halves
+over it for the taps. Inside a `TextPaint`'s `apply`, `density` is the
+paint's own (1), not the screen's: name the screen's apart. The next dates
+are kept on the phone (`AppGraph.soon`; a date's line is the owner's words,
+as a reminder's is), refreshed whenever the app reads Upcoming, as it
+opens, and in the 12-hourly refresh; signing out drops them.
 
 Log, Notes, Upcoming, Activity and Settings are the five tabs along the bottom.
 Settings' Appearance (`ThemeMode`: same as the phone, light or dark) is about

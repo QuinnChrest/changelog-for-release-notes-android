@@ -57,6 +57,16 @@ fun sayCount(@PluralsRes id: Int, count: Int, vararg args: Any): String =
 
 val Context.graph: AppGraph get() = (applicationContext as ChangelogApp).graph
 
+/**
+ * One of the next dates in Upcoming, kept for the Coming up widget: its next day, its status and its title. A
+ * title is the owner's words, kept on the phone as a reminder's line is, never logged; signing out drops them.
+ */
+@Serializable
+data class Soon(val date: String, val status: String, val title: String, val line: String = "") {
+    /** The server's own line ("Robin turns 42."), as Upcoming shows it; the title for one kept before lines were. */
+    val words: String get() = line.ifBlank { title }
+}
+
 /** A note this phone filed, kept so Log can show it and take it back. */
 @Serializable
 data class Sent(val note: NoteRef, val text: String)
@@ -146,6 +156,37 @@ class AppGraph(private val context: Context) {
         get() = prefs.getBoolean("here", false)
         set(value) = prefs.edit().putBoolean("here", value).apply()
 
+    /** The next few dates in Upcoming, for the Coming up widget; set whenever the app reads Upcoming. */
+    var soon: List<Soon>
+        get() = runCatching { Api.json.decodeFromString(soonSerializer, prefs.getString("soon", null) ?: "[]") }.getOrDefault(emptyList())
+        set(value) {
+            prefs.edit().putString("soon", Api.json.encodeToString(soonSerializer, value)).apply()
+            VersionWidget.refresh(context)
+        }
+
+    /** Keeps the next dates from a read of Upcoming, for the widget. */
+    fun keepSoon(list: com.yourversionnumber.changelog.kit.UpcomingList) {
+        soon = list.entries.filter { it.status != "past" }.take(4).map { Soon(it.next, it.status, it.title, it.line) }
+    }
+
+    /**
+     * Home, as the owner set it from where the phone was: Record my stops never sends a stop near it. Kept on this
+     * phone only (no backups), never sent or logged; signing out forgets it.
+     */
+    var home: com.yourversionnumber.changelog.kit.Spot?
+        get() = runCatching { Api.json.decodeFromString(com.yourversionnumber.changelog.kit.Spot.serializer(), prefs.getString("home", null)!!) }.getOrNull()
+        set(value) = prefs.edit().putString("home", value?.let { Api.json.encodeToString(com.yourversionnumber.changelog.kit.Spot.serializer(), it) }).apply()
+
+    /** Recording stops in the background (check-ins), off until the owner turns it on in Settings. */
+    var recordingStops: Boolean
+        get() = prefs.getBoolean("stops", false)
+        set(value) = prefs.edit().putBoolean("stops", value).apply()
+
+    /** Says something in Log's ink capsule, as "Filed in 4.5.137." is. */
+    fun tell(text: String) {
+        _toast.value = text
+    }
+
     /** Light, dark or as the phone is: a choice about this phone, so signing out keeps it. */
     var themeMode: String
         get() = prefs.getString("theme", null) ?: ThemeMode.System.name
@@ -199,6 +240,9 @@ class AppGraph(private val context: Context) {
         remindersOn = false
         promptOn = false
         hereByDefault = false
+        recordingStops = false
+        Stops.stop(context)
+        prefs.edit().remove("soon").remove("thisday").remove("home").apply() // "thisday": an earlier build's, for its widget
         noticeKinds = emptySet()
         activityCursor = null
         PhoneNotices.clear(context)
@@ -273,5 +317,6 @@ class AppGraph(private val context: Context) {
 
     private companion object {
         val sentSerializer = ListSerializer(Sent.serializer())
+        val soonSerializer = ListSerializer(Soon.serializer())
     }
 }

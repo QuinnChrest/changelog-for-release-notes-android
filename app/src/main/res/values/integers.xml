@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The widgets' light and dark drawings: which one shows (0 visible, 2 gone: the attribute reads it as its place in visible, invisible, gone), read by the home screen in
+         the phone's own theme. -->
+    <integer name="widget_light">0</integer>
+    <integer name="widget_dark">2</integer>
+</resources>

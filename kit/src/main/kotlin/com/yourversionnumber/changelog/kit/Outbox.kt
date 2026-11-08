@@ -54,6 +54,16 @@ sealed interface OutboxOperation {
         val ready: Boolean get() = files.all { it.upload != null }
     }
 
+    /** One file taken off a note already filed: `n` is its number in the note's `media`, which never comes round again. */
+    @Serializable
+    @SerialName("remove-file")
+    data class RemoveFile(val date: String, val id: String, val n: Int) : OutboxOperation
+
+    /** A stop, a tap or the end of a stop, as the phone was told of it. */
+    @Serializable
+    @SerialName("check-in")
+    data class CheckIn(val report: CheckInReport) : OutboxOperation
+
     @Serializable
     @SerialName("pins")
     data class Pins(val pinned: List<String>) : OutboxOperation
@@ -126,6 +136,8 @@ sealed interface OutboxResult {
     data class Filed(val receipt: NoteReceipt) : OutboxResult
     data class Edited(val note: NoteRef) : OutboxResult
     data class Attached(val note: NoteRef) : OutboxResult
+    data class FileRemoved(val note: NoteRef) : OutboxResult
+    data class CheckedIn(val checkIn: com.yourversionnumber.changelog.kit.CheckIn) : OutboxResult
     data object Deleted : OutboxResult
     data class Pinned(val tags: Tags) : OutboxResult
 }
@@ -370,6 +382,8 @@ suspend fun Api.perform(item: OutboxItem): OutboxResult {
         is OutboxOperation.Edit -> OutboxResult.Edited(editNote(op.date, op.id, op.text, op.revision, key))
         is OutboxOperation.Attach ->
             OutboxResult.Attached(attachFiles(op.date, op.id, op.files.map { UploadRef(it.upload.orEmpty(), it.type, it.name) }, key))
+        is OutboxOperation.CheckIn -> OutboxResult.CheckedIn(addCheckIn(op.report, key))
+        is OutboxOperation.RemoveFile -> OutboxResult.FileRemoved(removeFile(op.date, op.id, op.n, key))
         is OutboxOperation.Delete -> {
             deleteNote(op.date, op.id, key)
             OutboxResult.Deleted

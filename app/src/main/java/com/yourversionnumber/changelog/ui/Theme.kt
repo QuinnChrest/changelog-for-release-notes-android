@@ -55,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -75,7 +76,6 @@ import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -318,8 +318,10 @@ fun QuietButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier
 }
 
 /**
- * A choice among a few, as the site's tag picks are: underlined blue words,
- * and the one chosen in ink, bold, without the line.
+ * A choice among a few, or a thing turned on or off: quiet words, and the one
+ * chosen in ink, semibold, with a 2dp tangerine rule under it, the line a
+ * field gets as it's typed in. No underline on the others, which on a phone
+ * reads as a link and made the unchosen look the louder.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -337,13 +339,19 @@ fun Pick(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifie
             .semantics { toggleableState = ToggleableState(selected) }
             .then(tap)
             .defaultMinSize(minHeight = 48.dp)
-            .padding(vertical = 12.dp),
-        color = if (selected) p.ink else p.blue,
+            .padding(vertical = 12.dp)
+            // The rule sits a little under the words, inside the 48dp a finger has.
+            .drawBehind {
+                if (selected) {
+                    val y = size.height + 4.dp.toPx()
+                    drawLine(p.orange, Offset(0f, y), Offset(size.width, y), 2.dp.toPx())
+                }
+            },
+        color = if (selected) p.ink else p.ink2,
         style = TextStyle(
             fontFamily = Grotesque,
             fontSize = 16.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            textDecoration = if (selected) TextDecoration.None else TextDecoration.Underline,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
         ),
     )
 }

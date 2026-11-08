@@ -421,7 +421,7 @@ private fun clockOf(ms: Int): String {
     return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, s / 60 % 60, s % 60) else "%d:%02d".format(s / 60, s % 60)
 }
 
-private fun fileLabel(file: NoteMedia): String {
+internal fun fileLabel(file: NoteMedia): String {
     val what = file.name?.takeIf { it.isNotBlank() } ?: when (file.kind) {
         "audio" -> say(R.string.voice_memo)
         "image" -> say(R.string.photo)

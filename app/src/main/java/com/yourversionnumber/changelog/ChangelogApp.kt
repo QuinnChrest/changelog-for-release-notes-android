@@ -123,9 +123,9 @@ class AppGraph(private val context: Context) {
 
     var server: String
         // Debug builds start on the dev server: development never touches real notes. A debug build
-        // made with -Pchangelog.production, to be used, starts on Release Notes.
-        get() = if (BuildConfig.DEBUG) {
-            prefs.getString("server", if (BuildConfig.START_ON_PRODUCTION) Api.PRODUCTION else BuildConfig.DEV_SERVER)!!
+        // made with -Pchangelog.production, and every release build, talk only to Release Notes.
+        get() = if (BuildConfig.DEBUG && !BuildConfig.START_ON_PRODUCTION) {
+            prefs.getString("server", BuildConfig.DEV_SERVER)!!
         } else {
             Api.PRODUCTION
         }

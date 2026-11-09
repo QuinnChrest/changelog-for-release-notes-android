@@ -22,8 +22,9 @@ git log --oneline <last>..HEAD                       # what this release holds
 gh release list --limit 3
 ```
 
-If there are no commits since the last tag, there is nothing to release: say so and stop. If `HEAD` is not on
-`origin/main` (unpushed work), push it first, with Quinn's OK.
+If there are no commits since the last tag, there is nothing to release: say so and stop. Release only what is on
+`origin/main`. `main` is protected: work reaches it only by a pull request whose `build` check passes, so
+unmerged work goes through a PR first, never a push. Tags aren't covered by that rule; pushing one is fine.
 
 ## 2. The number
 

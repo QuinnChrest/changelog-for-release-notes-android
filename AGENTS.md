@@ -216,6 +216,13 @@ each action is pinned to a full commit with its tag in a comment. Dependabot
 opens a PR when one has a new release; never move an action back to a bare
 tag.
 
+`main` is protected by a ruleset ("Protect main", Quinn's call,
+2026-11-08): every change goes through a pull request whose `build` check
+passes, with no approval required and no one, admins included, exempt; it
+can't be force-pushed or deleted. Work on a branch, open a PR, merge it
+once CI is green. Tags aren't covered, so a release's tag is pushed as
+before.
+
 ### Releases
 
 Every push to `main` is a release on GitHub (Quinn's call, 2026-11-08):

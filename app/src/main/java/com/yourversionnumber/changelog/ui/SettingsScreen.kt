@@ -44,6 +44,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -58,6 +59,10 @@ import com.yourversionnumber.changelog.kit.DailyPrompt
 import com.yourversionnumber.changelog.kit.Hashtags
 import com.yourversionnumber.changelog.kit.HomeMove
 import com.yourversionnumber.changelog.kit.RememberedPlace
+import com.yourversionnumber.changelog.kit.ApiException
+import com.yourversionnumber.changelog.kit.Tag
+import com.yourversionnumber.changelog.kit.TagRefused
+import com.yourversionnumber.changelog.kit.TagTyping
 import com.yourversionnumber.changelog.say
 import com.yourversionnumber.changelog.sayCount
 import com.yourversionnumber.changelog.ui.ThemeMode
@@ -215,9 +220,9 @@ fun SettingsScreen(model: AppModel) {
 
             Heading(say(R.string.pinned_tags), Modifier.padding(top = 12.dp))
             PinnedTags(model)
-            val sticky = model.sticky
+            val sticky = model.stickyTag
             if (sticky != null) {
-                QuietButton(say(R.string.stop_adding_to_every_note, sticky), { model.stick(null) })
+                QuietButton(say(R.string.stop_adding_to_every_note, sticky.name), { model.stick(null) })
             } else {
                 Caption(say(R.string.touch_and_hold_a_tag))
             }
@@ -323,6 +328,7 @@ private fun RememberedPlaces(model: AppModel) {
                 Caption(if (place.ignored) say(R.string.place_spots_ignored, spots) else spots)
             }
             if (canChange) {
+                PlaceTags(model, place)
                 Pick(say(R.string.ignore_this_location), selected = place.ignored, onClick = { model.setIgnored(place, !place.ignored) })
                 Caption(say(if (place.ignored) R.string.ignore_this_location_on else R.string.ignore_this_location_off))
                 QuietButton(say(R.string.delete_existing_check_ins_here), { count(place) }, enabled = !model.placeBusy, color = paper.orangeInk)
@@ -358,6 +364,102 @@ private fun RememberedPlaces(model: AppModel) {
     }
 }
 
+/** Tag the check-ins already at a place with the tags it gained, for this count. */
+private data class TagAsking(val tags: List<Tag>, val count: Int, /** The count changed since it was read: this is the number now. */ val again: Boolean = false)
+
+/**
+ * A remembered place's tags (call 6), saved as each is added or taken off: each new check-in there gets them. A tag
+ * added offers, once, to tag the check-ins already there too, for the count it shows; one taken off leaves them as
+ * they are. As the web's Settings and the iPhone's.
+ */
+@Composable
+private fun PlaceTags(model: AppModel, place: RememberedPlace) {
+    val scope = rememberCoroutineScope()
+    var asking by remember(place.id) { mutableStateOf<TagAsking?>(null) }
+    var typing by remember(place.id) { mutableStateOf(TagTyping()) }
+    var said by remember(place.id) { mutableStateOf<String?>(null) }
+    var problem by remember(place.id) { mutableStateOf<String?>(null) }
+    var busy by remember(place.id) { mutableStateOf(false) }
+    val tags = place.tagList
+
+    fun send(next: List<Tag>) {
+        if (busy) return
+        busy = true
+        problem = null
+        said = null
+        scope.launch {
+            model.setPlaceTags(place, next).fold(
+                onSuccess = { saved ->
+                    // The tags gained, with any still waiting to be asked about.
+                    val gained = next.filter { tag -> tags.none { it.key == tag.key } }
+                    val still = asking?.tags.orEmpty().filter { tag -> next.any { it.key == tag.key } }
+                    val ask = Hashtags.merge(still, gained)
+                    val count = saved.checkIns ?: asking?.count ?: 0
+                    asking = if (ask.isNotEmpty() && count > 0) TagAsking(ask, count) else null
+                },
+                onFailure = { problem = it.message },
+            )
+            busy = false
+        }
+    }
+
+    // Tagged only for the count shown. Should it have changed since, Release Notes says the count now, and this
+    // asks again with that.
+    fun tagThem(asked: TagAsking) {
+        if (busy) return
+        busy = true
+        problem = null
+        scope.launch {
+            model.tagCheckInsAt(place, asked.tags, asked.count).fold(
+                onSuccess = { tagged ->
+                    asking = null
+                    said = if (tagged > 0) {
+                        sayCount(R.plurals.tagged_check_ins_at, tagged, tagged, place.name)
+                    } else {
+                        say(if (asked.tags.size == 1) R.string.had_that_tag_already else R.string.had_those_tags_already, place.name)
+                    }
+                },
+                onFailure = { e ->
+                    val now = (e as? ApiException)?.takeIf { it.code == "revision_mismatch" }?.count
+                    when {
+                        now == null -> problem = e.message
+                        now == 0 -> { asking = null; said = say(R.string.no_check_ins_at_now, place.name) }
+                        else -> asking = TagAsking(asked.tags, now, again = true)
+                    }
+                },
+            )
+            busy = false
+        }
+    }
+
+    Column(Modifier.padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        TagField(
+            tags,
+            typing,
+            { typing = it },
+            add = { tag -> send(Hashtags.merge(tags, listOf(tag))) },
+            remove = { tag -> send(tags.filter { it.key != tag.key }) },
+            label = say(R.string.tags_for, place.name),
+            hint = say(R.string.tags_hint_place),
+            offer = model.tagRow,
+            busy = busy,
+        )
+        asking?.let { ask ->
+            val line = Hashtags.line(ask.tags)
+            Caption(
+                if (ask.again) sayCount(R.plurals.tag_check_ins_again, ask.count, ask.count, line)
+                else sayCount(R.plurals.tag_check_ins_too, ask.count, ask.count, line),
+                color = paper.ink2,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                QuietButton(say(R.string.tag_them), { tagThem(ask) }, enabled = !busy)
+                QuietButton(say(R.string.not_now), { asking = null }, enabled = !busy, color = paper.ink2)
+            }
+        } ?: said?.let { Caption(it, color = paper.ink2) }
+        problem?.let { Caption(it, color = paper.orangeInk) }
+    }
+}
+
 /**
  * Not at home from an earlier build, still on this phone: what moving it waits for, and Forget home. It moves by
  * itself as the app opens once this sign-in may (HomeMove); nothing here sets a new one.
@@ -382,26 +484,38 @@ private fun HomeNotMoved(model: AppModel) {
     }
 }
 
-/** The pinned tags, first in the tag row: the same here, on the web and on every phone. Up to 12. */
+/**
+ * The pinned tags, first in the tag row: the same here, on the web and on every phone, by name (API 1.21.0). Up to
+ * 12. Each goes in as a tags field takes a tag: spaces and emoji stay, and one already pinned by any spelling stays
+ * as it is.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PinnedTags(model: AppModel) {
-    val pinned = model.tags?.pinned.orEmpty()
+    val pinned = model.tags?.pinnedTags.orEmpty()
     var adding by remember { mutableStateOf("") }
-    val tag = Hashtags.normalize(adding)
-    val canAdd = tag != null && tag !in pinned && pinned.size < MAX_PINS
+    var problem by remember { mutableStateOf<String?>(null) }
+    val canAdd = adding.isNotBlank() && pinned.size < MAX_PINS
 
     fun add() {
-        if (canAdd) model.setPinned(pinned + tag!!)
-        adding = ""
+        if (!canAdd) return
+        Hashtags.adding(adding, pinned).fold(
+            onSuccess = { done ->
+                if (done.added != null) model.setPinned(done.tags)
+                adding = ""
+                problem = null
+            },
+            onFailure = { problem = (it as? TagRefused)?.why?.said ?: it.message },
+        )
     }
 
     if (pinned.isEmpty()) Caption(say(R.string.none_yet_pinned_tags_come))
     // In the order they come in the tag row. Up and Down rather than dragging,
     // so the order can be changed with a screen reader too.
-    pinned.forEachIndexed { i, t ->
+    pinned.forEachIndexed { i, pin ->
+        val t = pin.name
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("#$t", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Text(t, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             // Fixed slots, so the buttons line up from row to row.
             Box(Modifier.width(56.dp)) {
                 if (i > 0) {
@@ -413,22 +527,22 @@ private fun PinnedTags(model: AppModel) {
                     QuietButton(say(R.string.down), { model.setPinned(pinned.moved(i, i + 1)) }, Modifier.semantics { contentDescription = say(R.string.move_down, t) })
                 }
             }
-            QuietButton(say(R.string.unpin), { model.setPinned(pinned - t) }, Modifier.semantics { contentDescription = say(R.string.unpin_2, t) }, color = paper.ink2)
+            QuietButton(say(R.string.unpin), { model.setPinned(pinned - pin) }, Modifier.semantics { contentDescription = say(R.string.unpin_2, t) }, color = paper.ink2)
         }
     }
     if (pinned.size < MAX_PINS) {
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             PaperField(
                 adding,
-                { adding = it },
+                { adding = it; problem = null },
                 Modifier.weight(1f),
                 placeholder = say(R.string.pin_a_tag_like_garden),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done, autoCorrectEnabled = false),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, imeAction = ImeAction.Done, autoCorrectEnabled = false),
                 keyboardActions = KeyboardActions(onDone = { add() }),
             )
             QuietButton(say(R.string.pin), ::add, enabled = canAdd)
         }
-        if (adding.isNotBlank() && tag == null) Caption(say(R.string.a_tag_is_letters_and), color = paper.orangeInk)
+        problem?.let { Caption(it, color = paper.orangeInk) }
     } else {
         Caption(say(R.string.thats_12_the_most_that))
     }

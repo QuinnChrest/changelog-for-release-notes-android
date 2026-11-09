@@ -4,7 +4,7 @@ What Changelog for Android does, what's left, and what's built but not yet
 checked. The iPhone app (`jthingelstad/changelog-ios`) is the reference;
 `AGENTS.md` says how each built piece works.
 
-**At a glance:** 53 built · 4 to do · 2 waiting on someone else · 19 to check
+**At a glance:** 53 built · 4 to do · 2 waiting on someone else · 23 to check
 
 Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 built, not yet checked
 
@@ -37,7 +37,7 @@ These are written and built; something about them couldn't be seen on the emulat
 | 🔍 | A voice memo's transcript under it | API 1.14.0 (jthingelstad/yvn-release-notes#301). Seen on the emulator against the dev server's made-up transcript: "Its words are still being written." on Log, then the words, read again without a refresh, and whole in the open note. Not yet a real transcript on a real account |
 | 🔍 | Check-in rows in Activity, and its Check-ins filter | API 1.18.0. Worded as the iPhone app ("Checked in at …", named, deleted, remembered places) and tested in `ActivityTextTest`; no check-in has been sent to the dev server to see a row on screen. The app sends and lists them now (see below) |
 | 🔍 | Take a file off a note | API 1.17.0 (`DELETE /v1/notes/{date}/{id}/media/{n}`, as `OutboxOperation.RemoveFile`). The editor lists the note's files, each with a Remove that asks first; a note with no words keeps its last file and says so. `DevServerTest` takes one of two off on the dev server and is refused the last (`text_required`); not yet tapped through on the emulator |
-| 🔍 | Search in Notes | API 1.15.0 (`GET /v1/search`): words, or a `#tag` alone for its page, newest first and paged, each note with its day and version; Back or Clear returns to the days. `DevServerTest` finds a note by a word and by its tag with a `notes:all` token; the screen not yet seen on the emulator |
+| 🔍 | Search in Notes | API 1.15.0 (`GET /v1/search`): words, or a `#tag` alone for its notes (read by the server's rules since 1.21.0, so "#lake," is words), newest first and paged, each note with its day and version; Back or Clear returns to the days. `DevServerTest` finds a note by a word and by its tag with a `notes:all` token; the screen not yet seen on the emulator |
 | 🔍 | On this day in Notes | API 1.15.0 (`GET /v1/on-this-day`): under today's notes, each earlier year's day with its first notes and "3 more on this day" to open it. Read on the dev server, whose made-up account has no earlier years to show, so the section has only been empty there |
 | 🔍 | Activity rows open their notes, as the iPhone app's | A note's added, edited, files, transcript and description rows open the note (with `notes:all`/`notes:read`, or a note this token wrote); a filed reply opens its day in Notes; a note deleted since says so. `ArchiveTest` covers which rows open; not yet tapped on the emulator |
 | 🔍 | Week and day lived on Log and the widget, Upcoming's countdowns and months | "Week 2,369 — Day 16,583" from `/v1/me`'s `lived` (API 1.13.0) under the version and on the widget; Upcoming says "Tomorrow", "In 5 days", "3 weeks 2 days" and heads each month ("January 2027" when not this year's). Tested in `ArchiveTest`; not yet seen on screen |
@@ -48,6 +48,10 @@ These are written and built; something about them couldn't be seen on the emulat
 | ✅ | Home-screen widget: today's version (cobalt, tangerine dots), the weeks and days lived, and the prompt, a tap to write |
 | 🔍 | A bigger widget: Today beside Coming up | 4×2: the same Today with the streak, and the next Upcoming dates in the app's own words and look (as many as its height holds, up to four, each line, then its day and countdown). Light and dark drawn apart and switched by the phone's theme. Seen on the Android 17 emulator in light and dark with the dev server's made-up dates. Not yet on a real phone |
 | 🔍 | Ignore this location, on any remembered place; Not at home moved to it | API 1.20.0. Settings, Remembered places: a place ignored keeps no new check-in (`kept: false`, done in the Outbox; a tap says "Not checked in.") and hides its own until unignored; Delete existing check-ins here counts first and asks again if the count changed. A home kept on the phone by an earlier build moves to the remembered place within 100 m of it, ignored, or a new Home there, once signed in with `activity` and `notes:all`; until then stops within 150 m of it stay on the phone, as before. `PlacesTest` and `DevServerTest` (dev server, 1.20.0) cover the calls and the move; the screen not yet seen on the emulator, nor a home moved on a real phone |
+| 🔍 | Tags with spaces and emoji, as the iPhone app's (API 1.21.0) | A tags field on Log, an edit and an Upcoming date: chips with their own remove (a #word's chip takes the word out), Return or leaving the box adds, a tag typed without Return goes with Commit or Save or stops it with the reason; refuses 51 characters, a 21st tag, commas and line breaks. Upcoming takes several tags; a note says the tags its words don't show as "Tags:" links. `HashtagsTest`, `TagVectorTest` (Release Notes' own vectors), `TagsApiTest` and `DevServerTest` (a note's tags by name on the dev server, 1.21.0) pass; the screens not yet seen on the emulator |
+| 🔍 | Tag pages in Notes | Tags under the search field: every tag by its latest name with its days, dates and check-ins (`GET /v1/tags/all`); a tag's page with its notes (paged), its Upcoming dates and every one of its check-ins. `TagsApiTest` pages the check-ins to the last and stops on a repeated cursor; `DevServerTest`'s search-by-tag part needs a `notes:all` token. Not yet seen on the emulator |
+| 🔍 | A remembered place's tags, and a stay's | Settings, Remembered places (with `notes:all`): each place's tags go on its new check-ins, and a tag added asks once to tag the check-ins already there, for the count shown, asking again if it changed. The map's sheet: Tags beside a stay, saved from its revision; a stale one reads the map again and says so. `TagsApiTest` covers the calls and `DevServerTest` a stay's tags on the dev server; the place part needs a `notes:all` token there, and none of it has been seen on the emulator |
+| 🔍 | The map's Tag menu | "Every tag", then each tag on the map's check-ins and notes; a tag keeps the notes and the check-ins with it, and a line says what it kept. `TagsApiTest` covers `MapTags`; not yet seen on the emulator |
 | 🔍 | A photo's small copy on Log, and `notes:all` on a real account | The dev server's fixture photo has no small copy, so the thumbnail path ran only in a unit test; the whole-account list was seen on the dev server with a `notes:all` token, not on production |
 
 ## Built
@@ -64,8 +68,8 @@ These are written and built; something about them couldn't be seen on the emulat
 | | Feature |
 |---|---|
 | ✅ | Today's version, the date and the streak, from the server |
-| ✅ | Tag row: pinned, then recent, then Keep a Changelog's words; tap to add or remove |
-| ✅ | A sticky tag on every note (touch and hold) |
+| ✅ | Tag row: pinned, then recent, then Keep a Changelog's words, each by its name; tap to add or remove |
+| ✅ | A sticky tag on every note (touch and hold), kept by name and sent in the note's tags |
 | ✅ | Commit saves to the phone first, then sends: works offline, never sends twice |
 | ✅ | "Filed in 4.5.137." or "Unlocked: …" after a send |
 | ✅ | Waiting to send, with Fix and Discard for a refused note; a write that sends at once never shows there, one tried, refused or kept over four seconds does |
@@ -108,7 +112,7 @@ These are written and built; something about them couldn't be seen on the emulat
 | | Feature |
 |---|---|
 | ✅ | Token details and the build (version and commit) |
-| ✅ | Pinned tags, shared with the web, in an order you set (Up and Down) |
+| ✅ | Pinned tags, shared with the web, by name ("Road Trip") since API 1.21.0, in an order you set (Up and Down) |
 | ✅ | Links to Release Notes, its settings on the web, the guide, and deleting the account |
 | ✅ | Switches for reminders, the daily prompt and each kind of notice |
 | ✅ | Appearance: same as the phone, light or dark, kept on the phone |

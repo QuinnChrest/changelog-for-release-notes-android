@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="widget_description">Today\'s version, and a tap to write what changed.</string>
     <string name="widget_coming_up_label">Changelog: Coming up</string>
     <string name="widget_coming_up_description">Today\'s version beside the next dates in Upcoming.</string>
@@ -7,7 +7,6 @@
     <string name="nothing_coming_up">Nothing ahead yet.</string>
     <string name="a_month_before">A month before</string>
     <string name="a_note_holds_up_to">A note holds up to %1$s files.</string>
-    <string name="a_tag_is_letters_and">A tag is letters and numbers, with at least one letter.</string>
     <string name="a_week_before">A week before</string>
     <string name="activity">Activity</string>
     <string name="activity_notifications">Activity notifications</string>
@@ -62,7 +61,7 @@
     <string name="fix">Fix</string>
     <string name="fix_and_send_again">Fix and send again</string>
     <string name="found">Found: %1$s</string>
-    <string name="goes_on_every_note_touch">#%1$s goes on every note. Touch and hold it to stop.</string>
+    <string name="goes_on_every_note_touch">%1$s goes on every note. Touch and hold it to stop.</string>
     <string name="here">Here</string>
     <string name="here_again">Here again</string>
     <string name="here_named_as_it_sends">Here, named as it sends</string>
@@ -78,8 +77,8 @@
     <string name="make_a_token_in_release">Make a token in Release Notes under Settings, API tokens, named for this phone, with “Add notes” ticked (and “Read and change every note”, if you want to see notes from the web and email here). Then paste it here.</string>
     <string name="mom">Mom</string>
     <string name="month">Month</string>
-    <string name="move_down">Move #%1$s down</string>
-    <string name="move_up">Move #%1$s up</string>
+    <string name="move_down">Move %1$s down</string>
+    <string name="move_up">Move %1$s up</string>
     <string name="n_3_days_before">3 days before</string>
     <string name="never_expires">Never expires</string>
     <string name="no_changes_yet_in">No changes yet in %1$s.</string>
@@ -187,7 +186,7 @@
     <string name="paste_token">Paste token</string>
     <string name="photos">Photos</string>
     <string name="pin">Pin</string>
-    <string name="pin_a_tag_like_garden">Pin a tag, like #garden</string>
+    <string name="pin_a_tag_like_garden">Pin a tag, like garden or Road Trip</string>
     <string name="pinned_tags">Pinned tags</string>
     <string name="place">Place</string>
     <string name="place_optional">Place (optional)</string>
@@ -218,8 +217,7 @@
     <string name="sign_out_keep_the_token">Sign out, keep the token</string>
     <string name="since_you_last_looked">Since you last looked</string>
     <string name="stop">Stop</string>
-    <string name="stop_adding_to_every_note">Stop adding #%1$s to every note</string>
-    <string name="tag_optional">Tag (optional)</string>
+    <string name="stop_adding_to_every_note">Stop adding %1$s to every note</string>
     <string name="take_off">Take off %1$s</string>
     <string name="that_doesnt_look_like_a">That doesn\'t look like a Release Notes token. It starts with rn_.</string>
     <string name="that_file_couldnt_be_read">That file couldn\'t be read.</string>
@@ -255,7 +253,7 @@
     <string name="two_weeks_before">Two weeks before</string>
     <string name="unlocked">Unlocked: %1$s</string>
     <string name="unpin">Unpin</string>
-    <string name="unpin_2">Unpin #%1$s</string>
+    <string name="unpin_2">Unpin %1$s</string>
     <string name="up">Up</string>
     <string name="upcoming">Upcoming</string>
     <string name="upcoming_reminders">Upcoming reminders</string>
@@ -321,6 +319,67 @@
         <item quantity="one">%1$d day before</item>
         <item quantity="other">%1$d days before</item>
     </plurals>
+    <!-- First-class tags (API 1.21.0), as the web and the iPhone say them. -->
+    <string name="sign_in_again">Sign in again.</string>
+    <string name="tags">Tags</string>
+    <string name="tag">Tag</string>
+    <string name="add_a_tag">Add a tag</string>
+    <string name="add_another">Add another</string>
+    <string name="remove_tag">Remove tag %1$s</string>
+    <string name="add_tag">Add tag %1$s</string>
+    <string name="tag_link">Tag %1$s</string>
+    <string name="tags_colon">Tags:</string>
+    <string name="tags_line">Tags: %1$s</string>
+    <string name="tags_for">Tags for %1$s</string>
+    <string name="no_tags_yet">No tags yet. Add one to a note, an Upcoming date or a check-in.</string>
+    <string name="sentence">%1$s.</string>
+    <string name="and_join">" and "</string>
+    <string name="nothing_has_this_tag">Nothing has this tag now.</string>
+    <string name="tags_hint_note">Tags can have spaces and emoji, like Road Trip. A #word in the note is a tag too.</string>
+    <string name="tags_hint_stay">Tags group it with notes and Upcoming dates, like Road Trip.</string>
+    <string name="tags_hint_upcoming">Tags group it with other dates, notes and check-ins, like family or Road Trip.</string>
+    <string name="tags_hint_place">Each new check-in here gets these. Taking one off leaves the check-ins already here as they are.</string>
+    <string name="check_in_changed_add_again">This check-in changed since it opened. Here it is as it is now: add the tag again.</string>
+    <string name="tag_them">Tag them</string>
+    <string name="not_now">Not now</string>
+    <string name="had_that_tag_already">The check-ins at %1$s had that tag already.</string>
+    <string name="had_those_tags_already">The check-ins at %1$s had those tags already.</string>
+    <string name="no_check_ins_at_now">There are no check-ins at %1$s now.</string>
+    <string name="every_tag">Every tag</string>
+    <string name="map_both_tagged">%1$s and %2$s tagged %3$s.</string>
+    <string name="map_tagged">%1$s tagged %2$s.</string>
+    <string name="map_none_tagged">No check-ins or notes tagged %1$s.</string>
+    <string name="map_no_check_ins_tagged">No check-ins tagged %1$s.</string>
+    <string name="map_no_notes_tagged">No notes tagged %1$s.</string>
+    <string name="map_turn_on">Turn on Check-ins or Notes to see them here.</string>
+    <plurals name="tag_check_ins_too">
+        <item quantity="one">Tag its check-in with %2$s too?</item>
+        <item quantity="other">Tag its %1$d check-ins with %2$s too?</item>
+    </plurals>
+    <plurals name="tag_check_ins_again">
+        <item quantity="one">The check-ins here changed: there is 1 now. Tag it with %2$s too?</item>
+        <item quantity="other">The check-ins here changed: there are %1$d now. Tag them with %2$s too?</item>
+    </plurals>
+    <plurals name="tagged_check_ins_at">
+        <item quantity="one">Tagged %1$d check-in at %2$s.</item>
+        <item quantity="other">Tagged %1$d check-ins at %2$s.</item>
+    </plurals>
+    <plurals name="check_ins_count">
+        <item quantity="one">%d check-in</item>
+        <item quantity="other">%d check-ins</item>
+    </plurals>
+    <plurals name="dates_count">
+        <item quantity="one">%d date</item>
+        <item quantity="other">%d dates</item>
+    </plurals>
+    <plurals name="upcoming_dates_count">
+        <item quantity="one">%d Upcoming date</item>
+        <item quantity="other">%d Upcoming dates</item>
+    </plurals>
+    <plurals name="tag_notes">
+        <item quantity="one">%d note.</item>
+        <item quantity="other">%d notes.</item>
+    </plurals>
     <string name="appearance">Appearance</string>
     <string name="same_as_the_phone">Same as the phone</string>
     <string name="light">Light</string>
@@ -381,6 +440,8 @@
     <string name="kit_checked_in">Checked in at %1$s</string>
     <string name="kit_unnamed_stop">an unnamed stop</string>
     <string name="kit_check_in_named">Named a check-in</string>
+    <string name="kit_check_in_tagged">Changed the tags on a check-in</string>
+    <string name="kit_check_ins_tagged_at_place">Tagged the check-ins at a remembered place</string>
     <string name="kit_check_in_deleted">Deleted a check-in</string>
     <string name="kit_check_ins_deleted_all">Deleted all your check-ins</string>
     <string name="kit_check_ins_deleted_all_count">Deleted all your check-ins, %1$d</string>
@@ -388,6 +449,7 @@
     <string name="kit_place_remembered">Remembered a place</string>
     <string name="kit_place_spot_added">Added a spot to a remembered place</string>
     <string name="kit_place_renamed">Renamed a remembered place</string>
+    <string name="kit_place_tagged">Changed a remembered place’s tags</string>
     <string name="kit_place_forgotten">Forgot a remembered place</string>
     <string name="kit_place_ignored">Ignored a remembered place</string>
     <string name="kit_place_ignored_more">Its check-ins are hidden, and no new ones are kept there.</string>
@@ -444,7 +506,6 @@
     <string name="kit_problem_year">A year goes with a birthday or anniversary, and can\'t be after this year.</string>
     <string name="kit_problem_end">A trip\'s last day can\'t be before its first.</string>
     <string name="kit_problem_place">A trip needs a destination, like Zürich or Paris, Texas.</string>
-    <string name="kit_problem_tag">A tag is one word of letters, numbers and hyphens, like family.</string>
     <string name="kit_problem_reminders">Choose from one to six reminders.</string>
     <string name="kit_lived">Week %1$s — Day %2$s</string>
     <string name="kit_lasted_minutes">%1$s min</string>
@@ -454,6 +515,13 @@
     <string name="kit_stay_at">At %1$s</string>
     <string name="kit_stay_since">Since %1$s</string>
     <string name="kit_stay_until">Until %1$s</string>
+    <!-- Always 20 and 50, Release Notes' limits: never one. -->
+    <string name="kit_tag_many" tools:ignore="PluralsCandidate">That’s %1$d tags, the most one can have. Take one off first.</string>
+    <string name="kit_tag_break">A tag is one line.</string>
+    <string name="kit_tag_comma">A tag has no commas. Add each tag on its own.</string>
+    <string name="kit_tag_long" tools:ignore="PluralsCandidate">A tag is at most %1$d characters.</string>
+    <string name="kit_tag_empty">A tag needs a letter, a number or an emoji.</string>
+    <string name="kit_tags_need_words">Tags go on a note with words. Write some first.</string>
     <plurals name="kit_photo_count">
         <item quantity="one">%1$d photo</item>
         <item quantity="other">%1$d photos</item>
@@ -469,6 +537,10 @@
     <plurals name="kit_check_ins_went">
         <item quantity="one">%1$d check-in went.</item>
         <item quantity="other">%1$d check-ins went.</item>
+    </plurals>
+    <plurals name="kit_check_ins_tagged">
+        <item quantity="one">%1$d check-in tagged.</item>
+        <item quantity="other">%1$d check-ins tagged.</item>
     </plurals>
     <!-- kit:end -->
 </resources>

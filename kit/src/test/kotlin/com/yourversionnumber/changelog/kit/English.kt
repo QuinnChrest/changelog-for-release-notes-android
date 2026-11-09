@@ -56,6 +56,8 @@ object English : Phrasebook {
         Phrase.CheckedIn -> "Checked in at %1\$s"
         Phrase.UnnamedStop -> "an unnamed stop"
         Phrase.CheckInNamed -> "Named a check-in"
+        Phrase.CheckInTagged -> "Changed the tags on a check-in"
+        Phrase.CheckInsTaggedAtPlace -> "Tagged the check-ins at a remembered place"
         Phrase.CheckInDeleted -> "Deleted a check-in"
         Phrase.CheckInsDeletedAll -> "Deleted all your check-ins"
         Phrase.CheckInsDeletedAllCount -> "Deleted all your check-ins, %1\$d"
@@ -63,6 +65,7 @@ object English : Phrasebook {
         Phrase.PlaceRemembered -> "Remembered a place"
         Phrase.PlaceSpotAdded -> "Added a spot to a remembered place"
         Phrase.PlaceRenamed -> "Renamed a remembered place"
+        Phrase.PlaceTagged -> "Changed a remembered place’s tags"
         Phrase.PlaceForgotten -> "Forgot a remembered place"
         Phrase.PlaceIgnored -> "Ignored a remembered place"
         Phrase.PlaceIgnoredMore -> "Its check-ins are hidden, and no new ones are kept there."
@@ -119,7 +122,6 @@ object English : Phrasebook {
         Phrase.ProblemYear -> "A year goes with a birthday or anniversary, and can't be after this year."
         Phrase.ProblemEnd -> "A trip's last day can't be before its first."
         Phrase.ProblemPlace -> "A trip needs a destination, like Zürich or Paris, Texas."
-        Phrase.ProblemTag -> "A tag is one word of letters, numbers and hyphens, like family."
         Phrase.ProblemReminders -> "Choose from one to six reminders."
         Phrase.Lived -> "Week %1\$s — Day %2\$s"
         Phrase.LastedMinutes -> "%1\$s min"
@@ -129,6 +131,12 @@ object English : Phrasebook {
         Phrase.StayAt -> "At %1\$s"
         Phrase.StaySince -> "Since %1\$s"
         Phrase.StayUntil -> "Until %1\$s"
+        Phrase.TagMany -> "That’s %1\$d tags, the most one can have. Take one off first."
+        Phrase.TagBreak -> "A tag is one line."
+        Phrase.TagComma -> "A tag has no commas. Add each tag on its own."
+        Phrase.TagLong -> "A tag is at most %1\$d characters."
+        Phrase.TagEmpty -> "A tag needs a letter, a number or an emoji."
+        Phrase.TagsNeedWords -> "Tags go on a note with words. Write some first."
     }
 
     override fun say(phrase: Phrase, args: List<Any>): String = text(phrase).format(*args.toTypedArray())
@@ -138,6 +146,7 @@ object English : Phrasebook {
         CountPhrase.MemoCount -> if (n == 1) "1 voice memo" else "$n voice memos"
         CountPhrase.FileCount -> if (n == 1) "1 file" else "$n files"
         CountPhrase.CheckInsWent -> if (n == 1) "1 check-in went." else "$n check-ins went."
+        CountPhrase.CheckInsTagged -> if (n == 1) "1 check-in tagged." else "$n check-ins tagged."
     }
 
     /** Makes it the book in use; the kit's tests that read words call it first. */

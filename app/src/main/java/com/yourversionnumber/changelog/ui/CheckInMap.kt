@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -18,6 +19,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,6 +30,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -41,7 +45,14 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -55,12 +66,20 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.yourversionnumber.changelog.AppModel
 import com.yourversionnumber.changelog.R
+import com.yourversionnumber.changelog.kit.ApiException
+import com.yourversionnumber.changelog.kit.CheckIn
 import com.yourversionnumber.changelog.kit.CheckInMap
+import com.yourversionnumber.changelog.kit.Hashtags
+import com.yourversionnumber.changelog.kit.MapTags
+import com.yourversionnumber.changelog.kit.Tag
+import com.yourversionnumber.changelog.kit.TagTyping
+import com.yourversionnumber.changelog.sayCount
 import com.yourversionnumber.changelog.kit.CheckInPin
 import com.yourversionnumber.changelog.kit.NotePin
 import com.yourversionnumber.changelog.NoteTarget
 import com.yourversionnumber.changelog.kit.CheckInWords
 import com.yourversionnumber.changelog.say
+import kotlinx.coroutines.launch
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -98,8 +117,13 @@ internal fun CheckInMapScreen(model: AppModel, onClose: () -> Unit) {
     LaunchedEffect(model.readsNotes) { model.loadNotePins() }
     var showStops by rememberSaveable { mutableStateOf(true) }
     var showNotes by rememberSaveable { mutableStateOf(true) }
-    val stops = remember(model.checkIns) { CheckInMap.pins(model.checkIns.orEmpty()) }
-    val notes = remember(model.notePins) { NotePin.pins(model.notePins.orEmpty()) }
+    // The tag picked (call 8): it keeps the notes and the check-ins with it. Memory only.
+    var tagPicked by remember { mutableStateOf<Tag?>(null) }
+    val key = tagPicked?.key
+    val tagged = remember(model.checkIns, key) { MapTags.stays(model.checkIns.orEmpty(), key) }
+    val taggedNotes = remember(model.notePins, key) { MapTags.notes(model.notePins.orEmpty(), key) }
+    val stops = remember(tagged) { CheckInMap.pins(tagged) }
+    val notes = remember(taggedNotes) { NotePin.pins(taggedNotes) }
     val spots = remember(stops, notes, showStops, showNotes) {
         (if (showStops) stops.map { Spot(STOP + it.id, it.lat, it.lon, note = false) } else emptyList()) +
             (if (showNotes && model.readsNotes) notes.map { Spot(NOTE + it.id, it.lat, it.lon, note = true) } else emptyList())
@@ -137,14 +161,34 @@ internal fun CheckInMapScreen(model: AppModel, onClose: () -> Unit) {
                     )
                 }
             }
-            // What the map shows: the places you stopped, the notes written somewhere, or both.
-            Row(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            // What the map shows: the places you stopped, the notes written somewhere, or both, and the tag.
+            Row(
+                Modifier.padding(start = 24.dp, end = 24.dp, bottom = if (tagPicked == null) 8.dp else 0.dp),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Pick(say(R.string.check_ins), selected = showStops, onClick = { showStops = !showStops; chosen = null })
                 if (model.readsNotes) Pick(say(R.string.notes_pick), selected = showNotes, onClick = { showNotes = !showNotes; chosen = null })
+                val tags = remember(model.checkIns, model.notePins, model.readsNotes) {
+                    MapTags.tags(model.checkIns.orEmpty(), if (model.readsNotes) model.notePins.orEmpty() else emptyList())
+                }
+                TagMenu(tags, tagPicked) { tagPicked = it; chosen = null }
+            }
+            tagPicked?.let { tag ->
+                Caption(
+                    tagSummary(
+                        stays = if (showStops) tagged.size else null,
+                        notes = if (showNotes && model.readsNotes) taggedNotes.size else null,
+                        name = tag.name,
+                    ),
+                    Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp).semantics { liveRegion = LiveRegionMode.Polite },
+                    color = paper.ink2,
+                )
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 PinMap(spots, chosen, paper, onPick = { chosen = it })
-                Status(model, spots.isEmpty(), Modifier.align(Alignment.TopCenter))
+                // With a tag picked, the line above says what it keeps.
+                Status(model, spots.isEmpty() && tagPicked == null, Modifier.align(Alignment.TopCenter))
                 // The credit OpenMapTiles and OpenStreetMap require, small and quiet in a corner; it opens
                 // OpenStreetMap's copyright page. (OpenFreeMap's own name is optional, so it's left off.)
                 val context = LocalContext.current
@@ -169,6 +213,62 @@ internal fun CheckInMapScreen(model: AppModel, onClose: () -> Unit) {
             }
         }
         opened?.let { target -> NoteViewer(model, target, player, onClose = { opened = null }) }
+    }
+}
+
+/**
+ * The Tag menu, beside the filters: Every tag, then each tag on what the map has, by name. A tag picked stays listed
+ * while nothing has it. Hidden until something has a tag.
+ */
+@Composable
+private fun TagMenu(tags: List<Tag>, picked: Tag?, onPick: (Tag?) -> Unit) {
+    val listed = picked?.let { p -> if (tags.any { it.key == p.key }) tags else listOf(p) + tags } ?: tags
+    if (listed.isEmpty()) return
+    var open by remember { mutableStateOf(false) }
+    val on = picked != null
+    val p = paper
+    val every = say(R.string.every_tag)
+    Box {
+        Text(
+            (picked?.name ?: every) + " ▾",
+            Modifier
+                .clickable(role = Role.DropdownList, onClickLabel = say(R.string.change, say(R.string.tag))) { open = true }
+                .semantics { contentDescription = say(R.string.tag) + ", " + (picked?.name ?: every) }
+                .defaultMinSize(minHeight = 48.dp)
+                .padding(vertical = 12.dp)
+                .drawBehind {
+                    if (on) {
+                        val y = size.height + 4.dp.toPx()
+                        drawLine(p.orange, Offset(0f, y), Offset(size.width, y), 2.dp.toPx())
+                    }
+                },
+            color = if (on) p.ink else p.ink2,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = TextStyle(fontFamily = Grotesque, fontSize = 16.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium),
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(text = { Text(every) }, onClick = { onPick(null); open = false })
+            listed.forEach { tag ->
+                DropdownMenuItem(
+                    text = { Text(tag.name, fontWeight = if (tag.key == picked?.key) FontWeight.SemiBold else null) },
+                    onClick = { onPick(tag); open = false },
+                )
+            }
+        }
+    }
+}
+
+/** What a tag keeps on the map, as the iPhone's line: "2 check-ins and 1 note tagged Road Trip." */
+private fun tagSummary(stays: Int?, notes: Int?, name: String): String {
+    fun checkInsSaid(n: Int) = sayCount(R.plurals.check_ins_count, n, n)
+    fun notesSaid(n: Int) = sayCount(R.plurals.notes_count, n, n)
+    return when {
+        stays == null && notes == null -> say(R.string.map_turn_on)
+        notes == null -> if (stays == 0) say(R.string.map_no_check_ins_tagged, name) else say(R.string.map_tagged, checkInsSaid(stays!!), name)
+        stays == null -> if (notes == 0) say(R.string.map_no_notes_tagged, name) else say(R.string.map_tagged, notesSaid(notes), name)
+        stays == 0 && notes == 0 -> say(R.string.map_none_tagged, name)
+        else -> say(R.string.map_both_tagged, checkInsSaid(stays), notesSaid(notes), name)
     }
 }
 
@@ -234,9 +334,14 @@ private fun Status(model: AppModel, empty: Boolean, modifier: Modifier) {
     }
 }
 
-/** A place's stops, newest first: the day, and how long it was. */
+/**
+ * A place's stops, newest first: the day, and how long it was, and each one's tags. With a token that writes notes,
+ * Tags opens a stay's tags field, saved as each is added or taken off (API 1.21.0); the iPhone has this on its
+ * check-in page, which the map here doesn't have.
+ */
 @Composable
 private fun StopsSheet(model: AppModel, pin: CheckInPin, modifier: Modifier, onClose: () -> Unit) {
+    var tagging by remember { mutableStateOf<String?>(null) }
     Column(
         modifier
             .fillMaxWidth()
@@ -253,15 +358,67 @@ private fun StopsSheet(model: AppModel, pin: CheckInPin, modifier: Modifier, onC
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             pin.stays.forEach { stay ->
                 val date = dayLabel(stay.day, model.me?.today)
-                Text(
-                    CheckInWords.stay(stay)?.let { "$date, $it" } ?: date,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = paper.ink,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        CheckInWords.stay(stay)?.let { "$date, $it" } ?: date,
+                        Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = paper.ink,
+                    )
+                    if (model.canCheckIn && tagging != stay.id) QuietButton(say(R.string.tags), { tagging = stay.id })
+                }
+                if (tagging == stay.id) {
+                    StayTags(model, stay)
+                } else {
+                    val tags = stay.tagList
+                    if (tags.isNotEmpty()) Caption(say(R.string.tags_line, Hashtags.line(tags)))
+                }
                 Rule()
             }
         }
     }
+}
+
+/**
+ * One stay's tags, the whole list, saved as each is added or taken off. Should it have changed since it was read, the
+ * map reads again and says so.
+ */
+@Composable
+private fun StayTags(model: AppModel, stay: CheckIn) {
+    val scope = rememberCoroutineScope()
+    var typing by remember(stay.id) { mutableStateOf(TagTyping()) }
+    var busy by remember(stay.id) { mutableStateOf(false) }
+    var problem by remember(stay.id) { mutableStateOf<String?>(null) }
+
+    fun retag(tags: List<Tag>) {
+        if (busy) return
+        busy = true
+        problem = null
+        scope.launch {
+            model.tagStay(stay, tags).onFailure { e ->
+                if ((e as? ApiException)?.code == "revision_mismatch") {
+                    model.loadCheckIns()
+                    problem = say(R.string.check_in_changed_add_again)
+                } else {
+                    problem = e.message
+                }
+            }
+            busy = false
+        }
+    }
+
+    val tags = stay.tagList
+    TagField(
+        tags,
+        typing,
+        { typing = it },
+        add = { tag -> retag(Hashtags.merge(tags, listOf(tag))) },
+        remove = { tag -> retag(tags.filter { it.key != tag.key }) },
+        hint = say(R.string.tags_hint_stay),
+        offer = model.tagRow,
+        busy = busy,
+    )
+    problem?.let { Caption(it, color = paper.orangeInk) }
 }
 
 /** OpenFreeMap's plainest style, the base the app's own colours go over. */

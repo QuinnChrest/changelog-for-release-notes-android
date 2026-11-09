@@ -59,6 +59,8 @@ enum class Phrase {
     CheckedIn,
     UnnamedStop,
     CheckInNamed,
+    CheckInTagged,
+    CheckInsTaggedAtPlace,
     CheckInDeleted,
     CheckInsDeletedAll,
     CheckInsDeletedAllCount,
@@ -66,6 +68,7 @@ enum class Phrase {
     PlaceRemembered,
     PlaceSpotAdded,
     PlaceRenamed,
+    PlaceTagged,
     PlaceForgotten,
     PlaceIgnored,
     PlaceIgnoredMore,
@@ -122,7 +125,6 @@ enum class Phrase {
     ProblemYear,
     ProblemEnd,
     ProblemPlace,
-    ProblemTag,
     ProblemReminders,
     Lived,
     LastedMinutes,
@@ -132,6 +134,12 @@ enum class Phrase {
     StayAt,
     StaySince,
     StayUntil,
+    TagMany,
+    TagBreak,
+    TagComma,
+    TagLong,
+    TagEmpty,
+    TagsNeedWords,
 }
 
 /** The phrases that change with a count: one photo, two photos. */
@@ -140,6 +148,7 @@ enum class CountPhrase {
     MemoCount,
     FileCount,
     CheckInsWent,
+    CheckInsTagged,
 }
 
 /** A language for the kit's phrases. */

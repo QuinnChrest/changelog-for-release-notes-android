@@ -7,6 +7,10 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class HashtagsTest {
+    init {
+        English.use()
+    }
+
     @Test
     fun findsTagsAsTheServerDoes() {
         val cases = listOf(
@@ -56,41 +60,122 @@ class HashtagsTest {
     }
 
     @Test
-    fun namesBecomeTagsAsHashtagsDo() {
-        assertEquals("москва", Hashtags.tagName("Москва"))
-        assertEquals("東京-旅行", Hashtags.tagName("東京 旅行"))
-        assertEquals("maine-2016", Hashtags.tagName("Maine 2016"))
-        assertEquals("東京", Hashtags.normalize("#東京"))
-        assertNull(Hashtags.normalize("2016"))
-        // The tag row's tap works for them too.
-        assertEquals("Lunch #東京", Hashtags.adding("東京", "Lunch"))
+    fun spellsWhatWasTyped() {
+        assertEquals(Tag("maine-2016", "Maine 2016"), Hashtags.spelling("#Maine 2016").getOrThrow())
+        assertEquals("2016", Hashtags.spelling("2016").getOrThrow().key)
+        assertEquals(TagRefusal.Long, refusal(Hashtags.spelling("a".repeat(51))))
+        assertEquals(50, Hashtags.spelling("a".repeat(50)).getOrThrow().name.length)
+        assertEquals(Tag("москва", "Москва"), Hashtags.spelling("#Москва").getOrThrow())
+        assertEquals("🎉", Hashtags.spelling("#🎉").getOrThrow().key)
+        assertEquals(TagRefusal.Empty, refusal(Hashtags.spelling("#")))
+        assertEquals(TagRefusal.Comma, refusal(Hashtags.spelling("Road, Trip")))
+        // 50 is counted in characters, as the server counts them, not UTF-16 units.
+        assertEquals(50, Hashtags.spelling("🚗".repeat(50)).getOrThrow().name.codePointCount(0, 100))
+    }
+
+    @Test
+    fun addsToAField() {
+        val one = Hashtags.adding("Road Trip", emptyList()).getOrThrow()
+        assertEquals(listOf(Tag("road-trip", "Road Trip")), one.tags)
+        assertEquals(Tag("road-trip", "Road Trip"), one.added)
+        // The same tag by another spelling adds nothing.
+        val again = Hashtags.adding("road trip", one.tags).getOrThrow()
+        assertEquals(one.tags, again.tags)
+        assertNull(again.added)
+        val full = (1..20).map { Tag("t$it", "t$it") }
+        assertEquals(TagRefusal.Many, refusal(Hashtags.adding("one more", full)))
+        assertNull(Hashtags.adding("t3", full).getOrThrow().added)
+    }
+
+    /** A tag typed without Return goes with a Save or Commit, or stays in its box saying why (Codex on iPhone #57). */
+    @Test
+    fun aTagTypedWithoutReturnIsTakenOrKept() {
+        val trip = Tag("road-trip", "Road Trip")
+        val (left, added) = TagTyping("  #Lake ").take(listOf(trip))
+        assertEquals(TagTyping.Taken.Added(Tag("lake", "Lake")), added)
+        assertEquals(TagTyping(), left)
+        // Already there by another spelling, or nothing typed: nothing to add, and the save goes ahead.
+        assertEquals(TagTyping() to TagTyping.Taken.None, TagTyping("road trip").take(listOf(trip)))
+        assertEquals(TagTyping(" ") to TagTyping.Taken.None, TagTyping(" ").take(listOf(trip)))
+        // Refused: the box keeps the words, says why, and nothing is saved.
+        val (kept, refused) = TagTyping("Lake, Dock").take(listOf(trip))
+        assertEquals(TagTyping.Taken.Refused, refused)
+        assertEquals("Lake, Dock", kept.text)
+        assertEquals("A tag has no commas. Add each tag on its own.", kept.problem)
+        val full = (1..20).map { Tag("t$it", "t$it") }
+        assertEquals("That’s 20 tags, the most one can have. Take one off first.", TagTyping("one more").take(full).first.problem)
+    }
+
+    @Test
+    fun aNoteHasItsFieldTagsThenItsWords() {
+        val lake = Tag("lake", "Lake")
+        val trip = Tag("road-trip", "Road Trip")
+        assertEquals(listOf(trip, Tag("lake", "lake")), Hashtags.chips("At the #lake", listOf(trip)))
+        assertEquals(listOf(lake), Hashtags.chips("At the #lake", listOf(lake)))
+        assertEquals(listOf(trip), Hashtags.fieldOnly("At the #lake", listOf(trip, lake)))
+        assertEquals("Road Trip, Lake", Hashtags.line(listOf(trip, lake)))
+        assertEquals(listOf(trip, Tag("lake", "lake")), Hashtags.named(listOf("road-trip", "lake"), listOf("Road Trip")))
+        assertTrue(Hashtags.named(null, null).isEmpty())
+        // Twenty is a field's most; many lists together keep every tag.
+        val many = (1..15).map { Tag("a$it", "a$it") } to (1..15).map { Tag("b$it", "b$it") }
+        assertEquals(20, Hashtags.merge(many.first, many.second).size)
+        assertEquals(30, Hashtags.mergeAll(listOf(many.first, many.second)).size)
+    }
+
+    @Test
+    fun findsAKeyInWords() {
+        assertTrue(Hashtags.contains("москва", "Snow in #Москва"))
+        assertTrue(Hashtags.contains("house", "Fixed the #House faucet"))
+        assertFalse(Hashtags.contains("house", "Fixed the house faucet"))
+    }
+
+    /** As `removingTag` in Release Notes' `packages/domain/tags.ts`: the space before a tag goes with it, or for a tag leading the text, the one after. */
+    @Test
+    fun takesATagOffWithTheSpaceBesideIt() {
+        val cases = listOf(
+            "#fixed the bug" to "the bug",
+            "#fixed" to "",
+            "#fixed " to "",
+            "Fixed the bug #fixed" to "Fixed the bug",
+            "the #fixed bug" to "the bug",
+            "#fixed the bug #fixed" to "the bug",
+            "#fixed #fixed" to "",
+            "one\n#fixed two" to "one\ntwo",
+            "#fixed  two" to " two",
+        )
+        for ((text, left) in cases) assertEquals(left, Hashtags.removing("fixed", text), text)
+        // Any spelling of the tag goes: its key is what matches.
         assertEquals("Lunch #cabin", Hashtags.removing("東京", "Lunch #東京 #cabin"))
+        assertEquals("Snow", Hashtags.removing("москва", "Snow #Москва"))
     }
 
     @Test
-    fun normalizesWhatWasTyped() {
-        assertEquals("maine-2016", Hashtags.normalize("#Maine 2016"))
-        assertNull(Hashtags.normalize("2016"))
-        assertEquals(50, Hashtags.normalize("a".repeat(60))?.length)
-    }
-
-    @Test
-    fun togglesATag() {
-        assertEquals("Fixed the faucet #house", Hashtags.toggling("house", "Fixed the faucet"))
-        assertEquals("Fixed the faucet", Hashtags.toggling("house", "Fixed the faucet #house"))
-        assertEquals("#house ", Hashtags.toggling("house", ""))
-        assertEquals("Fixed the #House faucet", Hashtags.adding("house", "Fixed the #House faucet"))
+    fun aSearchForOneTagIsATagSearch() {
+        assertNull(NoteSearch.of("  "))
+        assertEquals(NoteSearch.Tagged("lake"), NoteSearch.of("#Lake"))
+        assertEquals(NoteSearch.Tagged("東京"), NoteSearch.of(" #東京 "))
+        assertEquals(NoteSearch.Tagged("cafe-東京"), NoteSearch.of("#café-東京"))
+        // Anything more than the one tag searches the words, as the server reads them.
+        assertEquals(NoteSearch.Worded("#lake #cabin"), NoteSearch.of("#lake #cabin"))
+        assertEquals(NoteSearch.Worded("#lake, dock"), NoteSearch.of("#lake, dock"))
+        assertEquals(NoteSearch.Worded("#lake,"), NoteSearch.of("#lake,"))
+        assertEquals(NoteSearch.Worded("#2026"), NoteSearch.of("#2026"))
+        assertEquals(NoteSearch.Worded("cabin \"first snow\""), NoteSearch.of("cabin \"first snow\""))
     }
 
     @Test
     fun theRowIsPinnedThenRecentThenQuick() {
         val tags = Tags(
-            pinned = listOf("house", "work"),
-            recent = listOf(RecentTag("running", 6), RecentTag("work", 3)),
+            pinned = listOf("house", "road-trip"),
+            pinnedNames = listOf("House", "Road Trip"),
+            recent = listOf(RecentTag("running", 6, name = "Running"), RecentTag("road-trip", 3, name = "road trip")),
             windowDays = 30,
         )
-        assertEquals(listOf("house", "work", "running", "added", "changed"), TagRow.tags(tags, limit = 5))
-        assertEquals(TagRow.quick, TagRow.tags(null))
+        assertEquals(listOf("House", "Road Trip", "Running", "added", "changed"), TagRow.tags(tags, limit = 5).map { it.name })
+        assertEquals(TagRow.quick, TagRow.tags(null).map { it.key })
+        // An older server sends keys alone: each is its own name.
+        val older = Tags(pinned = listOf("house"), recent = listOf(RecentTag("work", 1)), windowDays = 30)
+        assertEquals(listOf("house", "work"), TagRow.tags(older, limit = 2).map { it.name })
     }
 
     @Test
@@ -102,3 +187,5 @@ class HashtagsTest {
         assertFalse(TokenFormat.looksValid("rn_" + "x".repeat(44)))
     }
 }
+
+private fun refusal(r: Result<*>): TagRefusal? = (r.exceptionOrNull() as? TagRefused)?.why

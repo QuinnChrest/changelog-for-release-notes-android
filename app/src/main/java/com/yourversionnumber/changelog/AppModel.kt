@@ -20,6 +20,7 @@ import com.yourversionnumber.changelog.kit.Hashtags
 import com.yourversionnumber.changelog.kit.Here
 import com.yourversionnumber.changelog.kit.HomeMove
 import com.yourversionnumber.changelog.kit.MediaType
+import com.yourversionnumber.changelog.kit.NoteSearch
 import com.yourversionnumber.changelog.kit.NoteDetail
 import com.yourversionnumber.changelog.kit.NoteMedia
 import com.yourversionnumber.changelog.kit.OnThisDay
@@ -29,7 +30,11 @@ import com.yourversionnumber.changelog.kit.QueuedFile
 import com.yourversionnumber.changelog.kit.RememberedPlace
 import com.yourversionnumber.changelog.kit.RequestKey
 import com.yourversionnumber.changelog.kit.Spot
+import com.yourversionnumber.changelog.kit.Tag
+import com.yourversionnumber.changelog.kit.TagRefusal
 import com.yourversionnumber.changelog.kit.TagRow
+import com.yourversionnumber.changelog.kit.TagTotals
+import com.yourversionnumber.changelog.kit.TagTyping
 import com.yourversionnumber.changelog.kit.TokenFormat
 import com.yourversionnumber.changelog.kit.UpcomingBatch
 import com.yourversionnumber.changelog.kit.UpcomingDraft
@@ -43,6 +48,7 @@ import java.io.File
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -66,9 +72,25 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         private set
     var tags by mutableStateOf(graph.tags)
         private set
+    /**
+     * A tag, by name, that rides on every note until stopped (a trip, a project), in its tags field, so "Road Trip"
+     * stays one tag. Kept on this phone only; one kept before tags had names is its key, which reads as a name.
+     */
     var sticky by mutableStateOf(graph.sticky)
         private set
     var draft by mutableStateOf("")
+
+    /** The tags added in the box's tags field, by name (API 1.21.0). Its #words are tags too, after these. */
+    val draftTags = mutableStateListOf<Tag>()
+
+    /** What is typed in the tags field and isn't a chip yet: Commit takes it, or stops to say why (Codex on iPhone #57). */
+    var draftTyping by mutableStateOf(TagTyping())
+
+    /** The draft's tags as chips: its field's, then its #words. */
+    val draftChips: List<Tag> get() = Hashtags.chips(draft, draftTags)
+
+    /** The sticky tag as a tag; null for none. */
+    val stickyTag: Tag? get() = sticky?.let { Hashtags.spelling(it).getOrNull() }
 
     /** Opened from the widget or the tile: the note box takes the keyboard. */
     var writeNow by mutableStateOf(false)
@@ -171,7 +193,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     /** Where a file is read from outside the app, or the server's base for a path. */
     fun absolute(address: String): String = if (address.startsWith("/")) graph.server.trimEnd('/') + address else address
 
-    val tagRow: List<String> get() = TagRow.tags(tags)
+    val tagRow: List<Tag> get() = TagRow.tags(tags)
     val canCommit: Boolean get() = draft.isNotBlank() || draftFiles.isNotEmpty()
     /** Checks a pasted token against the server, then keeps it. Answers a problem, or null. */
     suspend fun signIn(pasted: String): String? {
@@ -211,20 +233,38 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun toggle(tag: String) {
-        draft = Hashtags.toggling(tag, draft)
+    /** A tag from the row: on the draft, it comes off, its #words too (call 1); off, it goes in the tags field. */
+    fun toggle(tag: Tag) {
+        if (draftChips.any { it.key == tag.key }) removeTag(tag) else addTag(tag)
+    }
+
+    /** A tag in the draft's tags field. A 21st is refused, saying why; one the draft has already, by any spelling, stays. */
+    fun addTag(tag: Tag) {
+        val chips = draftChips
+        if (chips.any { it.key == tag.key }) return
+        if (chips.size >= Hashtags.MAX_TAGS) {
+            draftTyping = draftTyping.copy(problem = TagRefusal.Many.said)
+            return
+        }
+        draftTags += tag
+    }
+
+    /** Takes a tag off the draft: out of its field, and its #words out of the words, with the space beside each (call 1). */
+    fun removeTag(tag: Tag) {
+        draftTags.removeAll { it.key == tag.key }
+        if (Hashtags.contains(tag.key, draft)) draft = Hashtags.removing(tag.key, draft)
     }
 
     /**
-     * Pinned tags, the same here, on the web and on every phone. Shown at
+     * Pinned tags, the same here, on the web and on every phone, by name since API 1.21.0. Shown at
      * once, queued through the Outbox, and Release Notes' answer replaces them.
      */
-    fun setPinned(pinned: List<String>) {
+    fun setPinned(pinned: List<Tag>) {
         val before = tags
-        tags = (tags ?: com.yourversionnumber.changelog.kit.Tags()).copy(pinned = pinned)
+        tags = (tags ?: com.yourversionnumber.changelog.kit.Tags()).copy(pinned = pinned.map { it.key }, pinnedNames = pinned.map { it.name })
         viewModelScope.launch {
             try {
-                graph.outbox.enqueue(OutboxOperation.Pins(pinned))
+                graph.outbox.enqueue(OutboxOperation.Pins(pinned.map { it.name }))
                 graph.send()
             } catch (e: OutboxNotKept) {
                 tags = before
@@ -238,25 +278,158 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         graph.tags?.let { tags = it }
     }
 
-    /** Touch and hold: this tag goes on every note until stopped in Settings. */
-    fun stick(tag: String?) {
-        graph.sticky = tag
-        sticky = tag
+    /** Touch and hold: this tag goes on every note until stopped in Settings. Kept by name. */
+    fun stick(tag: Tag?) {
+        graph.sticky = tag?.name
+        sticky = tag?.name
     }
 
-    /** Save first, then send: the note, and its files, are on the phone before anything goes. */
+    /** Every tag, by its latest name, with how many notes, Upcoming dates and check-ins have it. */
+    suspend fun allTags(): Result<TagTotals> = reading { it.allTags() }
+
+    /** A read for a screen of its own: the answer, or the server's sentence; a lost token signs out. */
+    private suspend fun <T> reading(read: suspend (com.yourversionnumber.changelog.kit.Api) -> T): Result<T> {
+        val api = graph.api() ?: return Result.failure(ApiException(401, "signed_out", say(R.string.sign_in_again)))
+        return try {
+            Result.success(read(api))
+        } catch (e: ApiException) {
+            if (e.signedOut) graph.tokenLost(e.message)
+            Result.failure(e)
+        }
+    }
+
+    // A tag's page, in Notes (call 5): every tag's list, and one tag's notes, Upcoming dates and check-ins. Opened
+    // from Notes, or from a note's tags. Memory only, as the rest of Notes; its notes change with an edit or a
+    // delete wherever they show (changeShown).
+
+    /** Every tag's list is open in Notes. */
+    var tagsOpen by mutableStateOf(false)
+
+    /** The tag whose page is open in Notes; null for none. */
+    var shownTag by mutableStateOf<Tag?>(null)
+        private set
+
+    /** Its notes, newest first, a page at a time; null until the first page is read. */
+    var tagNotes by mutableStateOf<List<NoteDetail>?>(null)
+        private set
+    var tagNotesTotal by mutableIntStateOf(0)
+        private set
+    private var tagNotesNext by mutableStateOf<String?>(null)
+    val moreTagNotes: Boolean get() = tagNotesNext != null
+
+    /** Its Upcoming dates (with `upcoming`) and its check-ins, every one (with `activity`); empty without. */
+    var tagDates by mutableStateOf<List<UpcomingEntry>>(emptyList())
+        private set
+    var tagStays by mutableStateOf<List<com.yourversionnumber.changelog.kit.CheckIn>>(emptyList())
+        private set
+    var tagLoading by mutableStateOf(false)
+        private set
+    var tagProblem by mutableStateOf<String?>(null)
+        private set
+    private var tagJob: Job? = null
+
+    /** Opens a tag's page, in Notes, from wherever its name was tapped. */
+    fun openTag(tag: Tag) {
+        if (shownTag?.key != tag.key) {
+            tagNotes = null
+            tagNotesNext = null
+            tagNotesTotal = 0
+            tagDates = emptyList()
+            tagStays = emptyList()
+            tagProblem = null
+        }
+        shownTag = tag
+        screen = "notes"
+        readTag()
+    }
+
+    fun closeTag() {
+        tagJob?.cancel()
+        tagLoading = false
+        shownTag = null
+        tagNotes = null
+        tagNotesNext = null
+        tagNotesTotal = 0
+        tagDates = emptyList()
+        tagStays = emptyList()
+        tagProblem = null
+    }
+
+    /**
+     * Reads the open tag's page: its notes' first page beside its dates and every page of its check-ins (Codex on
+     * iPhone #57: the page and its lede count them all), or with `more` the next page of notes. A date or check-in
+     * that can't be read leaves its section out, as the notes are what the page is.
+     */
+    fun readTag(more: Boolean = false) {
+        val tag = shownTag ?: return
+        val api = graph.api() ?: return
+        if (more && (tagNotesNext == null || tagLoading)) return
+        tagJob?.cancel()
+        tagJob = viewModelScope.launch {
+            tagLoading = true
+            try {
+                if (more) {
+                    val page = api.search(tag = tag.key, after = tagNotesNext)
+                    if (shownTag?.key == tag.key) {
+                        tagNotes = tagNotes.orEmpty() + page.items
+                        tagNotesNext = page.next
+                    }
+                } else {
+                    val dates = async {
+                        if (!hasUpcoming) emptyList()
+                        else try { api.upcoming().entries.filter { e -> e.tagList.any { it.key == tag.key } } } catch (_: ApiException) { null }
+                    }
+                    val stays = async {
+                        if (!hasActivity) emptyList()
+                        else try { api.checkInsTagged(tag.key) } catch (_: ApiException) { null }
+                    }
+                    val page = api.search(tag = tag.key)
+                    val datesRead = dates.await()
+                    val staysRead = stays.await()
+                    if (shownTag?.key == tag.key) {
+                        datesRead?.let { tagDates = it }
+                        staysRead?.let { tagStays = it }
+                        tagNotes = page.items
+                        tagNotesNext = page.next
+                        tagNotesTotal = page.total
+                        tagProblem = null
+                    }
+                }
+            } catch (e: ApiException) {
+                if (shownTag?.key == tag.key && tagNotes == null) tagProblem = e.message
+                if (e.signedOut) handle(e)
+            } finally {
+                if (tagJob == coroutineContext[Job]) tagLoading = false
+            }
+        }
+    }
+
+    /**
+     * Save first, then send: the note, and its files, are on the phone before anything goes. Its tags go by name:
+     * the field's, then the sticky one; its #words come after them (API 1.21.0).
+     */
     fun commit() {
+        // A tag typed without Return goes with the note, or stays in its box saying why, and nothing is committed yet.
+        val (left, taken) = draftTyping.take(draftChips)
+        draftTyping = left
+        when (taken) {
+            TagTyping.Taken.Refused -> return
+            is TagTyping.Taken.Added -> addTag(taken.tag)
+            TagTyping.Taken.None -> {}
+        }
         val files = draftFiles.toList()
         val typed = draft.trim()
         if (typed.isEmpty() && files.isEmpty()) return
-        val words = sticky?.let { Hashtags.adding(it, typed) } ?: typed
+        val field = draftTags.toList()
+        val tags = Hashtags.merge(field, listOfNotNull(stickyTag))
         // Named by Here already, with the business picked; or a spot still to name as it sends.
         val place = here?.place?.copy(venue = venue)
         val unnamed = if (place == null) spot else null
         viewModelScope.launch {
             try {
-                graph.outbox.enqueueNote(words, files = files, spot = unnamed, place = place)
+                graph.outbox.enqueueNote(typed, files = files, spot = unnamed, place = place, tags = tags)
                 draft = ""
+                draftTags.clear()
                 draftFiles.clear()
                 files.forEach { thumbnails.remove(it.id) }
                 // With "Add where I am" on, the next note within ten minutes takes the
@@ -471,13 +644,25 @@ class AppModel(application: Application) : AndroidViewModel(application) {
      * The day shows the new words at once; a refusal (changed since) shows
      * under Waiting to send.
      */
-    fun saveEdit(note: NoteDetail, text: String, files: List<QueuedFile>) {
-        val changed = text != note.text
-        if (changed) changeShown(note.id) { it.copy(text = text) }
+    /**
+     * Saves an edit: new words, the tags field's whole new list (`tags`, the ones its words don't carry, or null to
+     * leave them as they are; API 1.21.0), and files to add.
+     */
+    fun saveEdit(note: NoteDetail, text: String, files: List<QueuedFile>, tags: List<String>? = null) {
+        val changed = text != note.text || tags != null
+        if (changed) {
+            // Shown at once as Release Notes will keep it: the field's tags (the new list, or the ones it had),
+            // then the new words' #words.
+            changeShown(note.id) { shown ->
+                val field = tags?.mapNotNull { Hashtags.spelling(it).getOrNull() } ?: shown.fieldTags
+                val now = Hashtags.merge(field, Hashtags.textTags(text))
+                shown.copy(text = text, tags = now.map { it.key }, tagNames = now.map { it.name })
+            }
+        }
         editFiles.clear()
         viewModelScope.launch {
             try {
-                if (changed) graph.outbox.enqueue(OutboxOperation.Edit(note.date, note.id, text, note.revision))
+                if (changed) graph.outbox.enqueue(OutboxOperation.Edit(note.date, note.id, text, note.revision, tags))
                 if (files.isNotEmpty()) graph.outbox.enqueue(OutboxOperation.Attach(note.date, note.id, files))
                 graph.send()
             } catch (e: OutboxNotKept) {
@@ -506,13 +691,14 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         queue(OutboxOperation.RemoveFile(note.date, note.id, file.n))
     }
 
-    /** Changes a note wherever it shows (Log, the open day, a search, On this day), or with null takes it off them. */
+    /** Changes a note wherever it shows (Log, the open day, a search, On this day, a tag's page), or with null takes it off them. */
     private fun changeShown(id: String, change: (NoteDetail) -> NoteDetail?) {
         fun List<NoteDetail>.changed() = mapNotNull { if (it.id == id) change(it) else it }
         dayNotes = dayNotes?.changed()
         shownDayNotes = shownDayNotes.changed()
         found = found?.changed()
         onThisDay = onThisDay?.let { o -> o.copy(days = o.days.map { d -> d.copy(notes = d.notes.changed()) }) }
+        tagNotes = tagNotes?.changed()
     }
 
     private fun queue(operation: OutboxOperation) = viewModelScope.launch {
@@ -636,6 +822,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
             ?: shownDayNotes.firstOrNull { it.id == id }
             ?: found?.firstOrNull { it.id == id }
             ?: onThisDay?.days?.firstNotNullOfOrNull { d -> d.notes.firstOrNull { it.id == id } }
+            ?: tagNotes?.firstOrNull { it.id == id }
 
     // Search (API 1.15.0): every word in a note's words, places, link names, transcripts and descriptions, or a
     // tag's page; newest first, a page at a time. Memory only, as everything Notes reads.
@@ -668,7 +855,8 @@ class AppModel(application: Application) : AndroidViewModel(application) {
             foundNext = null
             searchProblem = null
         }
-        val tag = Regex("""^#(\S+)$""").find(query)?.groupValues?.get(1)
+        // A hashtag alone is that tag's notes, read by the server's own rules, so "#lake," or "#Road Trip" are words.
+        val tag = (NoteSearch.of(query) as? NoteSearch.Tagged)?.key
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
             searching = true
@@ -921,6 +1109,63 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Tags on remembered places and stays (API 1.21.0, call 6). Each is saved as it's added or taken off, at once
+    // rather than through the Outbox, as Ignore this location is: a stay's is made from its revision, and a refusal
+    // is for the owner to answer there and then.
+
+    private val placeTagsKey = RequestKey<String>()
+    private val tagAtKey = RequestKey<String>()
+    private val stayTagsKey = RequestKey<String>()
+
+    private fun List<Tag>.names() = joinToString("\n") { it.name }
+
+    /**
+     * A place's whole list of tags: every new check-in there gets them. The answer replaces it in the list, and
+     * counts the check-ins already there (`checkIns`) when it gained one. Needs `notes:all`.
+     */
+    suspend fun setPlaceTags(place: RememberedPlace, tags: List<Tag>): Result<RememberedPlace> = reading { api ->
+        try {
+            val saved = api.changePlace(place.id, tags = tags, idempotencyKey = placeTagsKey.key("${place.id}=" + tags.names()))
+            placeTagsKey.reset()
+            places = places?.map { if (it.id == saved.id) saved else it }
+            placesProblem = null
+            saved
+        } catch (e: ApiException) {
+            if (!e.retryable) placeTagsKey.reset()
+            throw e
+        }
+    }
+
+    /**
+     * Tags the check-ins already at a place, for the count shown: how many it tagged. A count that changed since
+     * comes back as `revision_mismatch` with the count now, to ask again with.
+     */
+    suspend fun tagCheckInsAt(place: RememberedPlace, tags: List<Tag>, count: Int): Result<Int> = reading { api ->
+        try {
+            val tagged = api.tagCheckInsAt(place.id, tags, count, tagAtKey.key("${place.id} count=$count " + tags.names()))
+            tagAtKey.reset()
+            if (checkIns != null) loadCheckIns()
+            tagged
+        } catch (e: ApiException) {
+            if (!e.retryable) tagAtKey.reset()
+            throw e
+        }
+    }
+
+    /** A stay's whole list of tags, from the revision read. The map's stays take the answer. Needs `notes:write`. */
+    suspend fun tagStay(stay: com.yourversionnumber.changelog.kit.CheckIn, tags: List<Tag>): Result<com.yourversionnumber.changelog.kit.CheckIn> =
+        reading { api ->
+            try {
+                val changed = api.tagCheckIn(stay.id, tags, stay.revision, stayTagsKey.key("${stay.id}@${stay.revision}=" + tags.names()))
+                stayTagsKey.reset()
+                checkIns = checkIns?.map { if (it.id == changed.id) changed else it }
+                changed
+            } catch (e: ApiException) {
+                if (!e.retryable) stayTagsKey.reset()
+                throw e
+            }
+        }
+
     /** Recording stops in the background, as this phone's switch says. */
     var recordingStops by mutableStateOf(graph.recordingStops)
         private set
@@ -1015,6 +1260,10 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         placesProblem = null
         tags = null
         sticky = null
+        draftTags.clear()
+        draftTyping = TagTyping()
+        tagsOpen = false
+        closeTag()
         activityShown.clear()
     }
 

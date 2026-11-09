@@ -20,9 +20,15 @@ Upcoming and the activity log.
 2. **A note.** A line with a #tag, then Commit. It shows under Today and
    on the web. Tap it to open it. Edit it (change a word, add a photo,
    Save), then Delete it (it asks first).
-3. **Tags.** Tap a tag in the row to add it, tap again to take it off.
-   Touch and hold one: it goes on every note until Settings (the tab at the right), "Stop adding
-   #… to every note".
+3. **Tags.** Tap a tag in the row to add it as a chip, tap again to take
+   it off. Type "Road Trip" in Add a tag, then Done: a chip with the space.
+   A #word typed in the note is a chip too; take its chip off and the word
+   goes from the note. A 51-letter tag, a comma or a 21st tag says why it
+   can't be one. Type a tag and Commit without Done: the note has it. Touch
+   and hold a tag in the row: it goes on every note until Settings (the tab
+   at the right), "Stop adding … to every note". Edit a note: its tags are
+   chips, a typed tag alone turns Save on, and Save keeps the changed list.
+   Opened, a note's "Tags:" line opens each tag's page.
 4. **Photos.** "Photos" (two or three) and "Camera" on one note, then
    Commit. The web note has every photo. A HEIC from the library arrives
    as a JPEG.
@@ -45,17 +51,21 @@ Upcoming and the activity log.
    **Notes.** Today's notes, then Earlier: scroll far back (more days come),
    open a day (version, place, weather, its notes), open a note, edit it,
    Back: the day shows the edit, and the list is where it was left.
+   "Tags" under the search lists every tag; one opens its notes, Upcoming
+   dates and check-ins, and Back goes back. `#lake` alone in the search
+   finds the notes tagged lake; `#Road Trip` searches the words.
 10. **Upcoming.** "Add a date" (a birthday), Save, then edit it and delete
-    it. A trip: "Find the city" names it. The web's Upcoming agrees at each
-    step.
+    it. A trip: "Find the city" names it. Give one two tags (one typed and
+    left without Done): Save keeps both, and its row says "Tags: …". The
+    web's Upcoming agrees at each step.
 11. **Reminders.** Settings, "Remind me on this phone", allow
     notifications. A reminder comes when the morning's email is due, in
     its words; tapping it opens Upcoming. Restart the phone: it still
     comes.
 12. **Here.** "Here", allow While using; the place shows: pick a business
     nearby or "Leave the place off". The web note names it.
-13. **Pinned tags.** Settings, pin a tag: it leads the tag row, and the
-    web's Today agrees.
+13. **Pinned tags.** Settings, pin "🚗 Lake": it leads the tag row as
+    typed, and the web's Today agrees.
 14. **Prompt and notices.** "Ask me each morning" on: it comes at send
     time. "Notes from elsewhere" on, then a note from the web's agent or
     another token: a notice within the hour. 
@@ -68,7 +78,13 @@ Upcoming and the activity log.
     notes, Settings, Remembered places (name a check-in for a place on the
     web first): "Ignore this location" on, then "Check in" there: "Not
     checked in." comes, and that place's stops leave the map; off, and they
-    come back. "Delete existing check-ins here" says how many first.
+    come back. "Delete existing check-ins here" says how many first. Give
+    that place a tag: it asks once to tag its check-ins too, and "Tag them"
+    says how many; check in there again first and it asks again with the
+    new count. Taking the tag off leaves the check-ins as they are. Map,
+    the Tag menu: a tag keeps the check-ins and the notes with it, and the
+    line under it says how many of each. A stop's "Tags" (in the list of
+    stops) changes that check-in's tags.
 16. **Last, sign out.** Settings, "Sign out", then "Sign out and revoke this
    token". The token shows as revoked on the web, and anything still
    waiting stays on the phone.

@@ -53,6 +53,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.yourversionnumber.changelog.AppModel
 import com.yourversionnumber.changelog.R
+import com.yourversionnumber.changelog.kit.Hashtags
+import com.yourversionnumber.changelog.kit.TagTyping
 import com.yourversionnumber.changelog.kit.UpcomingDraft
 import com.yourversionnumber.changelog.kit.UpcomingEntry
 import com.yourversionnumber.changelog.kit.UpcomingKind
@@ -119,7 +121,9 @@ fun UpcomingScreen(model: AppModel) {
                             .padding(vertical = 10.dp),
                     ) {
                         Text(entry.line, style = MaterialTheme.typography.bodyLarge)
-                        Caption(listOfNotNull(whenSaid(entry, today), entry.kind.label, entry.tag?.let { "#$it" }).joinToString(" · "))
+                        Caption(listOfNotNull(whenSaid(entry, today), entry.kind.label).joinToString(" · "))
+                        val tags = entry.tagList
+                        if (tags.isNotEmpty()) Caption(say(R.string.tags_line, Hashtags.line(tags)))
                     }
                     Rule()
                 }
@@ -176,10 +180,20 @@ private fun UpcomingEditor(model: AppModel, editing: UpcomingEntry?, onDone: () 
     var found by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var removing by remember { mutableStateOf(false) }
+    var typing by remember { mutableStateOf(TagTyping()) }
     val scope = rememberCoroutineScope()
     val locale = LocalConfiguration.current.locales[0]
 
     fun save() {
+        if (busy) return
+        // A tag typed without Return is saved too, or stays in its box saying why, and nothing is saved yet.
+        val (left, taken) = typing.take(draft.tags)
+        typing = left
+        when (taken) {
+            TagTyping.Taken.Refused -> return
+            is TagTyping.Taken.Added -> draft = draft.copy(tags = draft.tags + taken.tag)
+            TagTyping.Taken.None -> {}
+        }
         busy = true
         scope.launch {
             problem = model.save(draft, editing)
@@ -270,7 +284,16 @@ private fun UpcomingEditor(model: AppModel, editing: UpcomingEntry?, onDone: () 
                     }
                 }
 
-                PaperField(draft.tag, { draft = draft.copy(tag = it) }, Modifier.fillMaxWidth(), label = say(R.string.tag_optional), placeholder = "family")
+                TagField(
+                    draft.tags,
+                    typing,
+                    { typing = it },
+                    add = { tag -> draft = draft.copy(tags = draft.tags + tag) },
+                    remove = { tag -> draft = draft.copy(tags = draft.tags.filter { it.key != tag.key }) },
+                    heading = say(R.string.tags),
+                    hint = say(R.string.tags_hint_upcoming),
+                    offer = model.tagRow,
+                )
 
                 Heading(say(R.string.remind_me))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {

@@ -45,7 +45,13 @@ data class CheckIn(
     val name: String? = null,
     val district: String? = null,
     val revision: Int = 0,
-)
+    /** The keys of the tags of every check-in in it, and their names (API 1.21.0); null or empty for none. */
+    val tags: List<String>? = null,
+    val tagNames: List<String>? = null,
+) {
+    /** Its tags by name. */
+    val tagList: List<Tag> get() = Hashtags.named(tags, tagNames)
+}
 
 /** `GET /v1/check-ins`: newest first; `next` is the `before` of the next older page. */
 @Serializable
@@ -175,9 +181,18 @@ data class RememberedPlace(
      */
     val ignored: Boolean = false,
     val revision: Int = 0,
-    /** How many stays are at it, hidden ones too: only `GET /v1/check-ins/places/{id}` says (API 1.20.0). */
+    /**
+     * How many stays are at it, hidden ones too. A read of the one place (`GET /v1/check-ins/places/{id}`, API 1.20.0)
+     * says, and a change that gave it a tag (API 1.21.0), to offer tagging them.
+     */
     val checkIns: Int? = null,
+    /** The keys of the tags every new stop here gets, and their names (API 1.21.0). */
+    val tags: List<String>? = null,
+    val tagNames: List<String>? = null,
 ) {
+    /** Its tags by name. */
+    val tagList: List<Tag> get() = Hashtags.named(tags, tagNames)
+
     /** Metres from a spot to the nearest of this place's spots. */
     fun metresTo(lat: Double, lon: Double): Double =
         spots.minOfOrNull { CheckInMap.metres(it.lat, it.lon, lat, lon) } ?: Double.POSITIVE_INFINITY
@@ -290,7 +305,12 @@ data class MapPin(
     val exact: Boolean = true,
     val version: String? = null,
     val text: String = "",
-)
+    /** Its tags' keys, and their names beside them (API 1.21.0). */
+    val tags: List<String> = emptyList(),
+    val tagNames: List<String>? = null,
+) {
+    val tagList: List<Tag> get() = Hashtags.named(tags, tagNames)
+}
 
 /** `GET /v1/map/pins`: oldest first; `next` is the `after` of the next page. */
 @Serializable
@@ -316,6 +336,25 @@ data class NotePin(val notes: List<MapPin>) {
             return pins.map { NotePin(it.toList()) }
         }
     }
+}
+
+/**
+ * The map's Tag menu (call 8): a tag keeps the notes and the check-ins with it, by key, so "Road Trip" and
+ * "road trip" are one. With no tag chosen, everything shows.
+ */
+object MapTags {
+    /** The tags on what the map has, each once, by name, for its menu: a tag with a space or an emoji can't be typed as one #tag. */
+    fun tags(stays: List<CheckIn>, notes: List<MapPin>): List<Tag> =
+        Hashtags.mergeAll(stays.map { it.tagList } + notes.map { it.tagList })
+            .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+
+    /** The stays with the tag (its key), or every one with none chosen. */
+    fun stays(stays: List<CheckIn>, key: String?): List<CheckIn> =
+        if (key == null) stays else stays.filter { key in it.tags.orEmpty() }
+
+    /** The notes with the tag (its key), or every one with none chosen. */
+    fun notes(notes: List<MapPin>, key: String?): List<MapPin> =
+        if (key == null) notes else notes.filter { key in it.tags }
 }
 
 /**

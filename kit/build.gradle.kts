@@ -26,6 +26,9 @@ dependencies {
 
 tasks.test {
     useJUnit()
+    // Java's own HttpURLConnection refuses PATCH, which Android's sends; Api
+    // sets it past that check, and the tests' JVM must let it.
+    jvmArgs("--add-opens=java.base/java.net=ALL-UNNAMED")
     // DevServerTest runs only with a dev server token: a run with one and a
     // run without aren't the same, so neither is taken from the other's cache.
     inputs.property("devServer", providers.environmentVariable("CHANGELOG_DEV_TOKEN").map { it.isNotEmpty() }.orElse(false))

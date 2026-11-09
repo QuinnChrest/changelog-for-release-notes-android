@@ -64,7 +64,11 @@ Upcoming and the activity log.
     the time"; carry the phone through a day: each place you stay ten
     minutes or more shows on the map and the web's map, with its times.
     Turn it off: no more come. Map, "Notes": notes with a place show as
-    rings, and one opens.
+    rings, and one opens. With a token that reads and changes all your
+    notes, Settings, Remembered places (name a check-in for a place on the
+    web first): "Ignore this location" on, then "Check in" there: "Not
+    checked in." comes, and that place's stops leave the map; off, and they
+    come back. "Delete existing check-ins here" says how many first.
 16. **Last, sign out.** Settings, "Sign out", then "Sign out and revoke this
    token". The token shows as revoked on the web, and anything still
    waiting stays on the phone.

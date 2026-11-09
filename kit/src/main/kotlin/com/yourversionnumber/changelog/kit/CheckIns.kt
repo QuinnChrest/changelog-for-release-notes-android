@@ -151,9 +151,59 @@ data class CheckInReport(
     val source: String,
 )
 
-/** `POST /v1/check-ins`'s answer. */
+/**
+ * `POST /v1/check-ins`'s answer. `kept` false (API 1.20.0): the stop was at a place the owner ignores and nothing
+ * was stored, so `checkIn` is only what it would have been and its `id` names nothing; never keep it. Older servers,
+ * and answers replayed from before 1.20.0, leave `kept` out, which means true.
+ */
 @Serializable
-data class CheckInWritten(val checkIn: CheckIn)
+data class CheckInWritten(val checkIn: CheckIn, val kept: Boolean = true)
+
+/**
+ * A remembered place (API 1.18.0): a name with its spots, the nearest within 100 m of a stop naming it. They live on
+ * the account, so the web, the iPhone app and this one see the same. A name is the owner's words: never logged,
+ * never in a notice.
+ */
+@Serializable
+data class RememberedPlace(
+    val id: String,
+    val name: String,
+    val spots: List<Spot> = emptyList(),
+    /**
+     * Ignore this location (API 1.20.0): no new stop there is kept, and the stays there already are hidden, not
+     * deleted, until it's unignored. Servers before 1.20.0 leave it out: false.
+     */
+    val ignored: Boolean = false,
+    val revision: Int = 0,
+    /** How many stays are at it, hidden ones too: only `GET /v1/check-ins/places/{id}` says (API 1.20.0). */
+    val checkIns: Int? = null,
+) {
+    /** Metres from a spot to the nearest of this place's spots. */
+    fun metresTo(lat: Double, lon: Double): Double =
+        spots.minOfOrNull { CheckInMap.metres(it.lat, it.lon, lat, lon) } ?: Double.POSITIVE_INFINITY
+}
+
+/** `GET /v1/check-ins/places`. */
+@Serializable
+data class RememberedPlaces(val places: List<RememberedPlace> = emptyList())
+
+/** One place, as `POST`, `PATCH` and `GET /v1/check-ins/places/{id}` answer it. */
+@Serializable
+data class RememberedPlaceAnswer(val place: RememberedPlace)
+
+/** `DELETE /v1/check-ins/places/{id}/check-ins`: how many stays went. */
+@Serializable
+data class CheckInsDeleted(val deleted: Int = 0)
+
+/**
+ * The remembered place a spot is at: the nearest within 100 m, as the server names a stop (`nearestPlace`,
+ * packages/domain/check-ins.ts). A stop there is kept out when that place is ignored.
+ */
+fun List<RememberedPlace>.nearest(lat: Double, lon: Double): RememberedPlace? =
+    map { it to it.metresTo(lat, lon) }
+        .filter { (_, metres) -> metres <= CheckInMap.SAME_PLACE_METRES }
+        .minByOrNull { (_, metres) -> metres }
+        ?.first
 
 /** One location fix, as the phone's location service reports it in the background. */
 data class Fix(val lat: Double, val lon: Double, val accuracyM: Double?, val at: java.time.Instant)
@@ -269,14 +319,78 @@ data class NotePin(val notes: List<MapPin>) {
 }
 
 /**
- * Spots the owner keeps out of Record my stops (home): a stop found within [METRES] of one is never sent, its
- * arrival or its end. Wider than a stop's own 100 m, so drift inside a house doesn't leak out as a stop next door.
- * Check in now isn't filtered: a tap is the owner's own choice.
+ * Not at home, moved to Release Notes (API 1.20.0). Builds before kept home on the phone alone and held back every
+ * stop within 150 m of it. Release Notes now ignores any remembered place (Ignore this location, on the web, the
+ * iPhone and here), so a home kept on the phone becomes one: the remembered place within 100 m of it, ignored, or a
+ * new "Home" there, ignored. Only once the server answers that the place is ignored does the phone forget home;
+ * until then [keep] still holds stops near it back, as before. No new home is set on the phone.
  */
-object QuietPlaces {
+object HomeMove {
+    /** The name a home becomes when nothing remembered is near it. */
+    const val NAME = "Home"
+
+    /** The old filter's reach, wider than the server's 100 m, kept for a home not moved yet. */
     const val METRES = 150.0
 
-    /** The reports to send: those not near any quiet spot. */
-    fun keep(reports: List<CheckInReport>, quiet: List<Spot>): List<CheckInReport> =
-        reports.filter { r -> quiet.none { CheckInMap.metres(it.lat, it.lon, r.lat, r.lon) <= METRES } }
+    /** What moving home asks of the server. */
+    sealed interface Plan {
+        /** A remembered place within 100 m of home, so it is home: ignore it (nothing to do if it is already). */
+        data class Ignore(val place: RememberedPlace) : Plan
+
+        /**
+         * Nothing remembered near: remember "Home" at home's spot, ignored. A place already named Home somewhere else
+         * gains this spot and is ignored, every spot of it: that is meant, it is home.
+         */
+        data object Remember : Plan
+    }
+
+    /** The API that first ignores a remembered place. */
+    const val API = "1.20.0"
+
+    /** What a sign-in lacks to move home: nothing, the scopes, or a server new enough. */
+    enum class Lack { Nothing, Scopes, Server }
+
+    /** Moving reads the remembered places (`activity`) and changes them (`notes:all`), on API 1.20.0 or later. */
+    fun lack(me: Me): Lack = when {
+        !me.token.readsAll || "activity" !in me.token.scopes -> Lack.Scopes
+        !atLeast(me.apiVersion, API) -> Lack.Server
+        else -> Lack.Nothing
+    }
+
+    /** Whether [version] is [wanted] or later, by its numbers; one it can't read counts as later, and [move] still checks. */
+    fun atLeast(version: String, wanted: String): Boolean {
+        fun parts(v: String): List<Int>? = v.split('.').map { p -> p.takeWhile { it.isDigit() }.toIntOrNull() ?: return null }
+        val have = parts(version) ?: return true
+        val want = parts(wanted) ?: return true
+        for (i in 0 until maxOf(have.size, want.size)) {
+            val a = have.getOrElse(i) { 0 }
+            val b = want.getOrElse(i) { 0 }
+            if (a != b) return a > b
+        }
+        return true
+    }
+
+    fun plan(home: Spot, places: List<RememberedPlace>): Plan =
+        places.nearest(home.lat, home.lon)?.let { Plan.Ignore(it) } ?: Plan.Remember
+
+    /**
+     * Moves home: reads the remembered places (`activity`), then ignores the one at home or remembers Home there
+     * (`notes:all`). Answers the place once the server says it is ignored. No connection, a refusal, or an answer
+     * that doesn't say ignored (a server before 1.20.0) throws [ApiException], and home stays on the phone.
+     */
+    suspend fun move(api: Api, home: Spot, key: () -> String = { java.util.UUID.randomUUID().toString() }): RememberedPlace {
+        val place = when (val plan = plan(home, api.rememberedPlaces())) {
+            is Plan.Ignore -> if (plan.place.ignored) plan.place else api.changePlace(plan.place.id, ignored = true, idempotencyKey = key())
+            Plan.Remember -> api.rememberPlace(NAME, home.lat, home.lon, ignored = true, idempotencyKey = key())
+        }
+        if (!place.ignored) throw ApiException(200, "not_ignored", Words.say(Phrase.HomeNotIgnored))
+        return place
+    }
+
+    /**
+     * Until home has moved: the reports Record my stops sends, none within [METRES] of it, arrival or end. Check in
+     * now isn't held back: a tap is the owner's own choice.
+     */
+    fun keep(reports: List<CheckInReport>, home: Spot?): List<CheckInReport> =
+        if (home == null) reports else reports.filter { CheckInMap.metres(home.lat, home.lon, it.lat, it.lon) > METRES }
 }

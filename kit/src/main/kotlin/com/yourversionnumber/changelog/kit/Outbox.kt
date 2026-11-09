@@ -138,6 +138,13 @@ sealed interface OutboxResult {
     data class Attached(val note: NoteRef) : OutboxResult
     data class FileRemoved(val note: NoteRef) : OutboxResult
     data class CheckedIn(val checkIn: com.yourversionnumber.changelog.kit.CheckIn) : OutboxResult
+
+    /**
+     * A stop at a place the owner ignores (API 1.20.0, `kept` false): nothing was stored, and the check-in the
+     * answer showed names nothing, so it isn't kept here either. Done all the same. [place] is the ignored place's
+     * name, when it named the stop, for a tap's "Not checked in".
+     */
+    data class CheckInNotKept(val place: String?) : OutboxResult
     data object Deleted : OutboxResult
     data class Pinned(val tags: Tags) : OutboxResult
 }
@@ -382,7 +389,11 @@ suspend fun Api.perform(item: OutboxItem): OutboxResult {
         is OutboxOperation.Edit -> OutboxResult.Edited(editNote(op.date, op.id, op.text, op.revision, key))
         is OutboxOperation.Attach ->
             OutboxResult.Attached(attachFiles(op.date, op.id, op.files.map { UploadRef(it.upload.orEmpty(), it.type, it.name) }, key))
-        is OutboxOperation.CheckIn -> OutboxResult.CheckedIn(addCheckIn(op.report, key))
+        is OutboxOperation.CheckIn -> {
+            val written = addCheckIn(op.report, key)
+            if (written.kept) OutboxResult.CheckedIn(written.checkIn)
+            else OutboxResult.CheckInNotKept(written.checkIn.label.takeIf { written.checkIn.namedBy == "place" })
+        }
         is OutboxOperation.RemoveFile -> OutboxResult.FileRemoved(removeFile(op.date, op.id, op.n, key))
         is OutboxOperation.Delete -> {
             deleteNote(op.date, op.id, key)

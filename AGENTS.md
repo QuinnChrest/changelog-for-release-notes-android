@@ -130,25 +130,39 @@ moved past the version the app last read (`api_version` in `/v1/me`):
 3. run `DevServerTest` against the current dev server (`git pull`, restart
    it) before anything else.
 
-It was last read against API 1.18.2 (2026-11-07; the server's own version
-hadn't moved since 2026-11-06). Every new field is optional and `kit`
-ignores what it doesn't know, so nothing broke. Of what 1.13.0 to 1.18.2
-added, the app reads `lived` on `/v1/me` (1.13.0), a recording's
-`transcript` and `writing` (1.14.0), `GET /v1/search` and
+It was last read against API 1.20.0 (2026-11-08). Every new field is
+optional and `kit` ignores what it doesn't know, so nothing broke. Of what
+1.13.0 to 1.20.0 added, the app reads `lived` on `/v1/me` (1.13.0), a
+recording's `transcript` and `writing` (1.14.0), `GET /v1/search` and
 `GET /v1/on-this-day` (1.15.0), listing check-ins for the map
 (`GET /v1/check-ins`, 1.18.0), taking one file off a note (`DELETE
 /v1/notes/{date}/{id}/media/{n}`, 1.17.0), a `note.files` row's `removed`
-(1.17.0), and the
+(1.17.0), the
 check-in activity rows (1.18.0: `checkin`, worded with its `label`, which
 is the owner's words and so never goes in a notice; `checkin.named`,
 `checkin.deleted` and `checkin.place`, kinds the ledger doesn't list but
-`packages/domain/activity.ts` does); not yet the rest of a note (`parts`,
+`packages/domain/activity.ts` does; 1.20.0: `checkin.ignored`,
+`checkin.unignored`, and a `checkin.deleted` at one place, with `place`
+and `count`, each with a second line, `ActivityItem.more`), and remembered
+places with Ignore this location (1.18.0 and 1.20.0: `GET
+/v1/check-ins/places`, `GET /v1/check-ins/places/{id}` with its
+`check_ins`, `PATCH` with `ignored`, `DELETE
+/v1/check-ins/places/{id}/check-ins?count=`, and `POST
+/v1/check-ins/places` only to move Not at home), with `kept` on `POST
+/v1/check-ins`'s answer (1.20.0). Not yet the rest of a note (`parts`,
 `place`, `markup` and the like), `include=urls`, the archive reads beyond
 the days, search and on this day (releases, tags, the map, badges and the
-mail log, 1.15.0), rich notes and place writes (1.16.0), or naming or
-deleting check-ins and remembered places (1.18.0). It sends check-ins
-(`POST /v1/check-ins`: Check in now as a `tap`, Record my stops as
-`visit`s) and reads `GET /v1/map/pins` for the map's notes.
+mail log, 1.15.0), rich notes and place writes (1.16.0), the map's search
+(`q` and `tag` on `GET /v1/map/pins`, and a pin's `written_at`, 1.19.0), or
+naming or deleting a check-in, and renaming or forgetting a remembered
+place (1.18.0). It sends check-ins (`POST /v1/check-ins`: Check in now as
+a `tap`, Record my stops as `visit`s) and reads `GET /v1/map/pins` for the
+map's notes.
+
+`PATCH` (places, 1.20.0) goes through `HttpURLConnection` like every call.
+Android's sends it; Java's own refuses it, so `Api` sets it beneath that
+check on a JVM, which needs `--add-opens java.base/java.net=ALL-UNNAMED`
+(`kit/build.gradle.kts` gives the tests that).
 
 ## Building
 
@@ -240,7 +254,8 @@ built, and the dev server runs fine.
 `kit`'s `DevServerTest` runs the client against it (a note sent twice
 under one key, an edit from a stale revision, a note with a file and a
 place through the Outbox, Upcoming and its reminders, activity without
-words, pins). It skips unless a token is set, and runs only on localhost:
+words, pins, check-ins, an ignored place and its count, and Not at home
+moving to one). It skips unless a token is set, and runs only on localhost:
 
 ```sh
 CHANGELOG_DEV_TOKEN=rn_... ./gradlew :kit:test --tests '*DevServerTest'
@@ -414,11 +429,32 @@ server takes the two as one stay, so a stop of five hours is one arrival
 and one end, never one every ten minutes (the detector's `reported` holds
 until the phone leaves, and the server merges a stop that starts within 30
 minutes of the last one ending at the same place). Fixes vaguer than 250 m
-are passed over. **Not at home** (Settings, under Record my stops): home is
-set from one fix where the phone is and kept on the phone only
-(`AppGraph.home`, no backups, gone on sign-out); `kit`'s `QuietPlaces` drops
-every stop within 150 m of it, arrival and end, before the Outbox. Check in
-now isn't filtered: a tap is the owner's choice.
+are passed over. Check in now isn't filtered: a tap is the owner's choice.
+
+**Remembered places** (Settings, under Record my stops, with `activity`;
+API 1.18.0 and 1.20.0), as the web and the iPhone app have them: each
+place, its spots, and with `notes:all` an **Ignore this location** `Pick`
+and **Delete existing check-ins here** (`AppModel.places`, in memory
+only). An ignored place keeps no new check-in: `POST /v1/check-ins`
+answers `kept: false` with a check-in whose id names nothing, which the
+Outbox takes as done (`OutboxResult.CheckInNotKept`, never kept), and a tap
+there says "Not checked in." Its stays hide from the map and Activity
+until it's unignored, when they come back; nothing is deleted. Deleting
+counts first (`GET /v1/check-ins/places/{id}`), says "There are no
+check-ins at …" for none, asks with the count, and sends it; a count that
+changed comes back as `revision_mismatch` with the count now
+(`ApiException.count`), and the app asks again with that number, under a
+new key. **Not at home**, from builds before it, kept one home on the
+phone (`AppGraph.home`, no backups, gone on sign-out) and dropped every
+stop within 150 m of it. Nothing sets one now: `kit`'s `HomeMove` moves it
+as the app opens, with a token that has `activity` and `notes:all`, on API
+1.20.0 or later (`HomeMove.lack`). It ignores the remembered place nearest
+home within 100 m (the server's reach, not the old 150 m), or remembers
+"Home" there, ignored; a Home elsewhere gains the spot and is ignored
+whole, which is meant. Only once the server answers that the place is
+ignored is home forgotten on the phone. Until then `HomeMove.keep` still
+drops the stops near it, as before, and Settings says what moving waits
+for (the scopes, the server, or a connection), with Forget home.
 Every report goes through the Outbox (`OutboxOperation.CheckIn`) under its
 own key. The detector's state (one spot) is kept in `noBackupFilesDir`,
 never logged. A restart or an update drops Android's request, so

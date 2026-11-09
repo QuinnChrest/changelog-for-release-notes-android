@@ -51,6 +51,24 @@ class ActivityTextTest {
     }
 
     @Test
+    fun anIgnoredPlaceSaysWhatItDid() {
+        val ignored = row("checkin.ignored").copy(place = "plc_1", count = 3)
+        assertEquals("Ignored a remembered place", ignored.headline)
+        assertEquals("Its check-ins are hidden, and no new ones are kept there.", ignored.more)
+        val back = row("checkin.unignored").copy(place = "plc_1", count = 3)
+        assertEquals("Stopped ignoring a remembered place", back.headline)
+        assertEquals("Its check-ins show again.", back.more)
+        val went = row("checkin.deleted").copy(place = "plc_1", count = 4)
+        assertEquals("Deleted the check-ins at a remembered place", went.headline)
+        assertEquals("4 check-ins went.", went.more)
+        assertEquals("1 check-in went.", went.copy(count = 1).more)
+        // One check-in, or all of them, keep their one line.
+        assertNull(row("checkin.deleted").more)
+        assertNull(row("checkin.deleted").copy(all = true, count = 12).more)
+        assertNull(row("checkin").more)
+    }
+
+    @Test
     fun aCheckInNeverNotifies() {
         val stop = row("checkin", via = "token", token = "Another phone").copy(label = "Home")
         assertNull(ActivityNotices.kind(stop, pixel))

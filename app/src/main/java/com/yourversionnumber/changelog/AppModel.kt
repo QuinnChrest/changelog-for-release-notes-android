@@ -18,6 +18,7 @@ import com.yourversionnumber.changelog.kit.DayDetail
 import com.yourversionnumber.changelog.kit.DaySummary
 import com.yourversionnumber.changelog.kit.Hashtags
 import com.yourversionnumber.changelog.kit.Here
+import com.yourversionnumber.changelog.kit.HomeMove
 import com.yourversionnumber.changelog.kit.MediaType
 import com.yourversionnumber.changelog.kit.NoteDetail
 import com.yourversionnumber.changelog.kit.NoteMedia
@@ -25,6 +26,7 @@ import com.yourversionnumber.changelog.kit.OnThisDay
 import com.yourversionnumber.changelog.kit.OutboxNotKept
 import com.yourversionnumber.changelog.kit.OutboxOperation
 import com.yourversionnumber.changelog.kit.QueuedFile
+import com.yourversionnumber.changelog.kit.RememberedPlace
 import com.yourversionnumber.changelog.kit.RequestKey
 import com.yourversionnumber.changelog.kit.Spot
 import com.yourversionnumber.changelog.kit.TagRow
@@ -197,6 +199,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
                 graph.tags = tags
                 this@AppModel.tags = tags
                 if ("upcoming" in me.token.scopes) runCatching { api.upcoming() }.getOrNull()?.let(graph::keepSoon)
+                moveHome(api, me)
             } catch (e: ApiException) {
                 if (e.signedOut) graph.tokenLost(e.message)
             }
@@ -774,32 +777,148 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Home, where Record my stops never checks in; null until set. */
+    // Not at home, from builds before API 1.20.0: a home kept on this phone alone, which Record my stops held
+    // back. It moves to Release Notes as a remembered place the owner ignores (HomeMove), and only once the server
+    // says so is it forgotten here. No new home is set on the phone: any remembered place can be ignored instead.
+
+    /** A home kept on this phone and not moved yet; null once moved, or when there never was one. */
     var home by mutableStateOf(graph.home)
         private set
-    var findingHome by mutableStateOf(false)
+
+    /** Why the last try to move home didn't, in the server's words; null offline or untried. */
+    var homeProblem by mutableStateOf<String?>(null)
+        private set
+    private var movingHome = false
+
+    /**
+     * Moves a home kept on the phone to the server, when this sign-in may (HomeMove.lack). Tried on each refresh
+     * until it lands; asking again is safe, since an ignored place at home asks nothing more.
+     */
+    private suspend fun moveHome(api: com.yourversionnumber.changelog.kit.Api, me: com.yourversionnumber.changelog.kit.Me) {
+        val kept = graph.home ?: return
+        if (movingHome || HomeMove.lack(me) != HomeMove.Lack.Nothing) return
+        movingHome = true
+        try {
+            val place = HomeMove.move(api, kept)
+            graph.home = null
+            home = null
+            homeProblem = null
+            graph.tell(say(R.string.home_moved, place.name))
+            if (places != null) loadPlaces()
+            if (checkIns != null) loadCheckIns()
+        } catch (e: ApiException) {
+            if (e.signedOut) graph.tokenLost(e.message)
+            homeProblem = e.message.takeUnless { e.status == 0 }
+        } finally {
+            movingHome = false
+        }
+    }
+
+    /** Forgets a home kept on the phone without moving it: stops near it go to the server from now on. */
+    fun forgetHome() {
+        graph.home = null
+        home = null
+        homeProblem = null
+    }
+
+    // Remembered places (API 1.18.0), each of which can be ignored (API 1.20.0): read with `activity`; ignoring
+    // one, or deleting the check-ins at one, needs `notes:all`. In memory only.
+
+    /** The account's remembered places, by name; null until read. */
+    var places by mutableStateOf<List<RememberedPlace>?>(null)
         private set
 
-    /** Sets home to where the phone is now: one fix, kept on the phone. */
-    fun setHomeHere() {
-        if (findingHome) return
+    /** What went wrong with the places last, said under them. */
+    var placesProblem by mutableStateOf<String?>(null)
+        private set
+
+    /** A place is being ignored, unignored, counted or emptied: its buttons wait. */
+    var placeBusy by mutableStateOf(false)
+        private set
+    private val ignoreKey = RequestKey<Pair<String, Boolean>>()
+    private val deleteAtKey = RequestKey<Pair<String, Int>>()
+
+    private fun List<RememberedPlace>.byName() = sortedBy { it.name.lowercase() }
+
+    fun loadPlaces() {
+        val api = graph.api() ?: return
+        if (!hasActivity) return
         viewModelScope.launch {
-            findingHome = true
-            val spot = Locator.fix(getApplication())
-            findingHome = false
-            if (spot == null) {
-                graph.report(say(R.string.this_phone_couldnt_say_where))
-            } else {
-                val kept = Spot(spot.lat, spot.lon)
-                graph.home = kept
-                home = kept
+            try {
+                places = api.rememberedPlaces().byName()
+                placesProblem = null
+            } catch (e: ApiException) {
+                placeProblem(e)
             }
         }
     }
 
-    fun forgetHome() {
-        graph.home = null
-        home = null
+    private fun placeProblem(e: ApiException) {
+        if (e.signedOut) graph.tokenLost(e.message)
+        placesProblem = e.message
+    }
+
+    /** Ignore this location, on or off: the box moves at once and goes back if the server says no. */
+    fun setIgnored(place: RememberedPlace, on: Boolean) {
+        val api = graph.api() ?: return
+        if (placeBusy) return
+        fun shown(ignored: Boolean) {
+            places = places?.map { if (it.id == place.id) it.copy(ignored = ignored) else it }
+        }
+        shown(on)
+        viewModelScope.launch {
+            placeBusy = true
+            try {
+                val changed = api.changePlace(place.id, ignored = on, idempotencyKey = ignoreKey.key(place.id to on))
+                ignoreKey.reset()
+                places = places?.map { if (it.id == changed.id) changed else it }
+                placesProblem = null
+                // Its check-ins hide, or come back: the map reads again.
+                if (checkIns != null) loadCheckIns()
+            } catch (e: ApiException) {
+                shown(!on)
+                placeProblem(e)
+            } finally {
+                placeBusy = false
+            }
+        }
+    }
+
+    /** How many check-ins a place holds now, read just before asking to delete them; null when it couldn't be read. */
+    suspend fun checkInsAt(place: RememberedPlace): Int? {
+        val api = graph.api() ?: return null
+        placeBusy = true
+        return try {
+            api.rememberedPlace(place.id).checkIns ?: 0
+        } catch (e: ApiException) {
+            placeProblem(e)
+            null
+        } finally {
+            placeBusy = false
+        }
+    }
+
+    /**
+     * Delete existing check-ins here, as many as were counted. Answers null once they've gone (or it couldn't be
+     * done, said under the places), or the count there now when it changed since: ask again with that.
+     */
+    suspend fun deleteCheckInsAt(place: RememberedPlace, count: Int): Int? {
+        val api = graph.api() ?: return null
+        placeBusy = true
+        return try {
+            val gone = api.deleteCheckInsAt(place.id, count, deleteAtKey.key(place.id to count))
+            deleteAtKey.reset()
+            placesProblem = null
+            graph.tell(sayCount(R.plurals.deleted_check_ins_at, gone, gone, place.name))
+            if (checkIns != null) loadCheckIns()
+            null
+        } catch (e: ApiException) {
+            if (e.code == "revision_mismatch" && e.count != null) return e.count
+            placeProblem(e)
+            null
+        } finally {
+            placeBusy = false
+        }
     }
 
     /** Recording stops in the background, as this phone's switch says. */
@@ -891,6 +1010,9 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         notePins = null
         recordingStops = false
         home = null
+        homeProblem = null
+        places = null
+        placesProblem = null
         tags = null
         sticky = null
         activityShown.clear()

@@ -136,13 +136,38 @@
     <string name="record_my_stops_about">When this phone stays somewhere ten minutes or more, it checks in there, as Changelog for iPhone does. Each stop goes to Release Notes with its time and spot, and shows on the map and in Activity. It needs location all the time.</string>
     <string name="allow_all_the_time">Android hasn’t allowed location all the time, so stops aren’t recorded. Choose “Allow all the time” in Changelog’s location settings.</string>
     <string name="open_location_settings">Open location settings</string>
+    <string name="not_checked_in_at">Not checked in. You ignore %1$s, so no check-ins are kept there.</string>
+    <string name="not_checked_in_here">Not checked in. You ignore this place, so no check-ins are kept there.</string>
+    <string name="remembered_places">Remembered places</string>
+    <string name="no_remembered_places">None yet. A place is remembered when a check-in is named for it, on the web or on an iPhone.</string>
+    <plurals name="place_spots">
+        <item quantity="one">%1$d spot</item>
+        <item quantity="other">%1$d spots</item>
+    </plurals>
+    <string name="place_spots_ignored">%1$s, ignored</string>
+    <string name="ignore_this_location">Ignore this location</string>
+    <string name="ignore_this_location_on">No new check-ins are kept here, and the ones already here are hidden. Uncheck it to bring them back.</string>
+    <string name="ignore_this_location_off">Stop keeping check-ins here, and hide the ones already here. Nothing is deleted.</string>
+    <string name="delete_existing_check_ins_here">Delete existing check-ins here</string>
+    <string name="no_check_ins_at">There are no check-ins at %1$s.</string>
+    <plurals name="delete_check_ins_at">
+        <item quantity="one">Delete %1$d check-in at %2$s?</item>
+        <item quantity="other">Delete %1$d check-ins at %2$s?</item>
+    </plurals>
+    <string name="delete_check_ins_at_about">They can’t be brought back. %1$s stays remembered.</string>
+    <string name="delete_check_ins_at_changed">The check-ins there changed since they were counted. They can’t be brought back. %1$s stays remembered.</string>
+    <plurals name="deleted_check_ins_at">
+        <item quantity="one">Deleted %1$d check-in at %2$s.</item>
+        <item quantity="other">Deleted %1$d check-ins at %2$s.</item>
+    </plurals>
+    <string name="to_ignore_a_place_sign_in">To ignore a place or delete its check-ins from here, sign in with a token that may read and change all your notes.</string>
     <string name="not_at_home">Not at home</string>
-    <string name="not_at_home_about">Set home from where you are, and no stop within 150 m of it is ever sent. Kept on this phone only. Check in still works there.</string>
-    <string name="not_at_home_set">Home is set. No stop within 150 m of it is sent. Kept on this phone only.</string>
-    <string name="set_home_here">Set home to where I am</string>
-    <string name="move_home_here">Move home to where I am</string>
+    <string name="home_still_on_this_phone">Home is still kept on this phone from an earlier Changelog, and no stop within 150 m of it is sent. It moves to Release Notes as a remembered place you ignore.</string>
+    <string name="home_waits_for_scopes">To move it, sign in with a token that may read your activity and read and change all your notes.</string>
+    <string name="home_waits_for_server">It moves once Release Notes has API 1.20.0.</string>
+    <string name="home_waits_for_connection">It moves the next time Changelog reaches Release Notes.</string>
+    <string name="home_moved">Not at home moved to Release Notes: %1$s is ignored, so no check-ins are kept there.</string>
     <string name="forget_home">Forget home</string>
-    <string name="finding_where_you_are">Finding where you are…</string>
     <string name="notes_pick">Notes</string>
     <string name="try_again">Try again</string>
     <string name="osm_credit">© OpenMapTiles © OpenStreetMap</string>
@@ -359,10 +384,16 @@
     <string name="kit_check_in_deleted">Deleted a check-in</string>
     <string name="kit_check_ins_deleted_all">Deleted all your check-ins</string>
     <string name="kit_check_ins_deleted_all_count">Deleted all your check-ins, %1$d</string>
+    <string name="kit_check_ins_deleted_at_place">Deleted the check-ins at a remembered place</string>
     <string name="kit_place_remembered">Remembered a place</string>
     <string name="kit_place_spot_added">Added a spot to a remembered place</string>
     <string name="kit_place_renamed">Renamed a remembered place</string>
     <string name="kit_place_forgotten">Forgot a remembered place</string>
+    <string name="kit_place_ignored">Ignored a remembered place</string>
+    <string name="kit_place_ignored_more">Its check-ins are hidden, and no new ones are kept there.</string>
+    <string name="kit_place_unignored">Stopped ignoring a remembered place</string>
+    <string name="kit_place_unignored_more">Its check-ins show again.</string>
+    <string name="kit_home_not_ignored">The server didn\'t ignore the place, so home stays on this phone for now.</string>
     <string name="kit_filter_all">All</string>
     <string name="kit_filter_notes">Notes</string>
     <string name="kit_filter_check_ins">Check-ins</string>
@@ -434,6 +465,10 @@
     <plurals name="kit_file_count">
         <item quantity="one">%1$d file</item>
         <item quantity="other">%1$d files</item>
+    </plurals>
+    <plurals name="kit_check_ins_went">
+        <item quantity="one">%1$d check-in went.</item>
+        <item quantity="other">%1$d check-ins went.</item>
     </plurals>
     <!-- kit:end -->
 </resources>

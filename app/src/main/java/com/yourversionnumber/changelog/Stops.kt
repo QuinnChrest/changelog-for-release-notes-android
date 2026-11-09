@@ -14,9 +14,9 @@ import androidx.core.content.ContextCompat
 import com.yourversionnumber.changelog.kit.Api
 import com.yourversionnumber.changelog.kit.CheckInReport
 import com.yourversionnumber.changelog.kit.Fix
+import com.yourversionnumber.changelog.kit.HomeMove
 import com.yourversionnumber.changelog.kit.OutboxNotKept
 import com.yourversionnumber.changelog.kit.OutboxOperation
-import com.yourversionnumber.changelog.kit.QuietPlaces
 import com.yourversionnumber.changelog.kit.StopDetector
 import com.yourversionnumber.changelog.kit.Timestamp
 import java.io.File
@@ -114,8 +114,9 @@ object Stops {
         for (l in locations.sortedBy { it.time }) {
             val (next, found) = detector.next(Fix(l.latitude, l.longitude, if (l.hasAccuracy()) l.accuracy.toDouble() else null, Instant.ofEpochMilli(l.time)), zone)
             detector = next
-            // Never a stop at home: its arrival and its end both stay on the phone.
-            reports += QuietPlaces.keep(found, listOfNotNull(graph.home))
+            // Never a stop at a home kept on the phone from before API 1.20.0 and not moved yet: its arrival
+            // and its end both stay here. Once it has moved, the server is what keeps nothing there.
+            reports += HomeMove.keep(found, graph.home)
         }
         save(context, detector)
         if (reports.isEmpty()) return@withLock

@@ -170,8 +170,9 @@ class AppGraph(private val context: Context) {
     }
 
     /**
-     * Home, as the owner set it from where the phone was: Record my stops never sends a stop near it. Kept on this
-     * phone only (no backups), never sent or logged; signing out forgets it.
+     * Not at home from a build before API 1.20.0, set from where the phone was: Record my stops sends no stop near
+     * it until it has moved to the server (HomeMove), when it is set to null. Nothing sets a new one. Kept on this
+     * phone only (no backups), never logged; signing out forgets it.
      */
     var home: com.yourversionnumber.changelog.kit.Spot?
         get() = runCatching { Api.json.decodeFromString(com.yourversionnumber.changelog.kit.Spot.serializer(), prefs.getString("home", null)!!) }.getOrNull()
@@ -271,6 +272,12 @@ class AppGraph(private val context: Context) {
             val receipt = (last.result as OutboxResult.Filed).receipt
             val badges = report.sent.flatMap { (it.result as? OutboxResult.Filed)?.receipt?.unlocked.orEmpty() }
             _toast.value = if (badges.isEmpty()) say(R.string.filed_in, receipt.note.version) else say(R.string.unlocked, badges.joinToString { it.name })
+        }
+        // Check in now at a place the owner ignores: nothing was kept, so "Checked in." would be wrong.
+        report.sent.lastOrNull { (it.item.operation as? OutboxOperation.CheckIn)?.report?.source == "tap" }?.let { tap ->
+            (tap.result as? OutboxResult.CheckInNotKept)?.let { notKept ->
+                _toast.value = notKept.place?.let { say(R.string.not_checked_in_at, it) } ?: say(R.string.not_checked_in_here)
+            }
         }
         // Written today: today's prompt has nothing left to ask.
         me?.let { me ->

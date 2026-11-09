@@ -13,6 +13,8 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -304,5 +306,84 @@ class DevServerTest {
         val last = assertFailsWith<ApiException> { api.removeFile(note.date, note.id, after.media.single().n, key()) }
         assertEquals("text_required", last.code)
         api.deleteNote(note.date, note.id, key())
+    }
+
+    @Test
+    fun anIgnoredPlaceKeepsNoCheckInAndHidesItsOwnUntilUnignored() = runTest {
+        // API 1.20.0: Ignore this location, and Delete existing check-ins here. Places change with notes:all.
+        val me = api.me()
+        if (!HomeMove.atLeast(me.apiVersion, HomeMove.API) || !me.token.readsAll || "activity" !in me.token.scopes) return@runTest
+        // A spot of its own each run, far from the other tests' and the account's own.
+        val lat = 45.5600 + Math.random() / 100
+        val lon = -94.1600
+        val name = "DevServerTest " + UUID.randomUUID().toString().take(8)
+        fun tap() = CheckInReport(arrived = Timestamp.now(), lat = lat, lon = lon, accuracyM = 10.0, timeZone = "America/Chicago", source = "tap")
+        val before = api.addCheckIn(tap(), key())
+        assertTrue(before.kept)
+        val place = api.rememberPlace(name, lat, lon, idempotencyKey = key())
+        try {
+            assertFalse(place.ignored)
+            assertEquals(1, api.rememberedPlace(place.id).checkIns)
+            suspend fun shown() = api.checkIns(limit = 100).items.any { before.checkIn.id == it.id || before.checkIn.id in it.ids }
+
+            // Ignored: nothing new is kept, and the stay there hides, still counted.
+            assertTrue(api.changePlace(place.id, ignored = true, idempotencyKey = key()).ignored)
+            assertTrue(api.rememberedPlaces().single { it.id == place.id }.ignored)
+            val after = api.addCheckIn(tap(), key())
+            assertFalse(after.kept)
+            assertFalse(shown())
+            assertEquals(1, api.rememberedPlace(place.id).checkIns)
+            // Through the Outbox, a stop not kept is done, not kept or retried.
+            val outbox = Outbox(null)
+            outbox.enqueue(OutboxOperation.CheckIn(tap()))
+            val sent = outbox.flush { api.perform(it) }
+            assertIs<OutboxResult.CheckInNotKept>(sent.sent.single().result)
+            assertTrue(outbox.items.value.isEmpty())
+
+            // Unignored: it shows again.
+            assertFalse(api.changePlace(place.id, ignored = false, idempotencyKey = key()).ignored)
+            assertTrue(shown())
+
+            // Deleting asks for the count read; another is refused with the count now.
+            val stale = assertFailsWith<ApiException> { api.deleteCheckInsAt(place.id, 5, key()) }
+            assertEquals("revision_mismatch", stale.code)
+            assertEquals(1, stale.count)
+            assertEquals(1, api.deleteCheckInsAt(place.id, 1, key()))
+            assertEquals(0, api.rememberedPlace(place.id).checkIns)
+            assertFalse(shown())
+            // The place stays.
+            assertTrue(api.rememberedPlaces().any { it.id == place.id })
+        } finally {
+            raw("DELETE", "v1/check-ins/places/${place.id}", null)
+        }
+    }
+
+    @Test
+    fun aHomeOnThePhoneMovesToARememberedPlaceIgnored() = runTest {
+        // Not at home from before API 1.20.0: the place within 100 m of home is ignored; with none, Home is
+        // remembered there, ignored.
+        val me = api.me()
+        if (HomeMove.lack(me) != HomeMove.Lack.Nothing) return@runTest
+        val lat = 45.5900 + Math.random() / 100
+        val lon = -94.2000
+        val near = api.rememberPlace("DevServerTest " + UUID.randomUUID().toString().take(8), lat + 0.0004, lon, idempotencyKey = key())
+        try {
+            val moved = HomeMove.move(api, Spot(lat, lon))
+            assertEquals(near.id, moved.id)
+            assertTrue(moved.ignored)
+            // Asked again, as a lost answer would be: nothing more to do.
+            assertEquals(near.id, HomeMove.move(api, Spot(lat, lon)).id)
+        } finally {
+            raw("DELETE", "v1/check-ins/places/${near.id}", null)
+        }
+        // Nothing near: Home is remembered, unless the account has a Home already, which this would join and ignore.
+        if (api.rememberedPlaces().any { it.name.equals(HomeMove.NAME, ignoreCase = true) }) return@runTest
+        val home = HomeMove.move(api, Spot(lat, lon))
+        try {
+            assertEquals(HomeMove.NAME, home.name)
+            assertTrue(home.ignored)
+        } finally {
+            raw("DELETE", "v1/check-ins/places/${home.id}", null)
+        }
     }
 }

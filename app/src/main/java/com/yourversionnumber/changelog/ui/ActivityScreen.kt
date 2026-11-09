@@ -48,6 +48,7 @@ import com.yourversionnumber.changelog.kit.ActivityPage
 import com.yourversionnumber.changelog.kit.detail
 import com.yourversionnumber.changelog.kit.headline
 import com.yourversionnumber.changelog.kit.isProblem
+import com.yourversionnumber.changelog.kit.more
 import com.yourversionnumber.changelog.kit.opens
 import com.yourversionnumber.changelog.say
 import java.time.LocalDate
@@ -229,6 +230,8 @@ internal fun ActivityRow(item: ActivityItem, onOpen: (() -> Unit)? = null) {
             )
             Caption(time(item.at))
         }
+        // What ignoring a place did, or how many check-ins went from one (API 1.20.0).
+        item.more?.let { Caption(it, color = paper.ink2) }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Caption(detail.orEmpty(), Modifier.weight(1f))
         }

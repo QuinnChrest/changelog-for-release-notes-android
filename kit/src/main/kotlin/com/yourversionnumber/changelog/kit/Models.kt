@@ -282,6 +282,11 @@ data class ActivityItem(
     /** checkin.deleted: every check-in at once, and how many went. */
     val all: Boolean? = null,
     val count: Int? = null,
+    /**
+     * checkin.place, checkin.ignored, checkin.unignored, and checkin.deleted at one place (API 1.20.0): the
+     * remembered place's id, never its name. note.edited: `set` or `removed`, never the place.
+     */
+    val place: String? = null,
 ) {
     val family: String get() = kind.substringBefore('.')
 
@@ -299,5 +304,7 @@ internal data class ErrorBody(val error: Detail) {
         val message: String,
         val field: String? = null,
         val revision: String? = null,
+        /** Deleting a place's check-ins for a count no longer right: the count now (API 1.20.0). */
+        val count: Int? = null,
     )
 }

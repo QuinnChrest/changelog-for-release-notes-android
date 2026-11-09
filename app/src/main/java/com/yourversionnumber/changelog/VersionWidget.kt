@@ -1,5 +1,6 @@
 package com.yourversionnumber.changelog
 
+import android.app.AlarmManager
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
@@ -20,13 +21,20 @@ import com.yourversionnumber.changelog.kit.Countdown
 import com.yourversionnumber.changelog.kit.UpcomingDraft
 import com.yourversionnumber.changelog.kit.UpcomingEntry
 import com.yourversionnumber.changelog.kit.UpcomingKind
+import com.yourversionnumber.changelog.kit.dateAt
+import com.yourversionnumber.changelog.kit.shownAt
+import com.yourversionnumber.changelog.kit.upcomingStatusOn
+import java.time.Instant
 import java.time.format.DateTimeFormatter
 
 /**
  * Today's version on the home screen, as the site writes it (cobalt, the dots tangerine), the weeks and days
  * lived under it, and "What changed?"; a tap opens Log ready to write. The version is the server's, from the last
- * `/v1/me` the app read, never worked out here. Updated whenever the app reads it, and by Android twice a day
- * (`updatePeriodMillis`), which is enough to turn the day over.
+ * `/v1/me` the app read, never worked out here: each drawing picks the day it is now, in the account's time zone,
+ * from the days `/v1/me` listed ahead (`shownAt`), and past the last of them asks for the app to be opened. Drawn
+ * again whenever the app reads `/v1/me`, at the account's midnight (`TodayWidgets.redrawAtMidnight`), and by
+ * Android twice a day (`updatePeriodMillis`). None of these reads `/v1/me` itself: the app does, and so does the
+ * background refresh while reminders or the daily prompt are on.
  *
  * A widget can't use the app's fonts, so the words are drawn into images in them, and said aloud from each
  * image's description. Each is drawn twice, light and dark: the layout shows one or the other by resources the
@@ -35,16 +43,25 @@ import java.time.format.DateTimeFormatter
 class VersionWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         for (id in ids) manager.updateAppWidget(id, TodayWidgets.small(context))
+        TodayWidgets.redrawAtMidnight(context)
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == MIDNIGHT) refresh(context) else super.onReceive(context, intent)
     }
 
     companion object {
-        /** Redraws every Changelog widget, after the app reads a new version or new dates. */
+        /** The midnight alarm's action: a new day, so a new version to show. */
+        const val MIDNIGHT = "com.yourversionnumber.changelog.widget.MIDNIGHT"
+
+        /** Redraws every Changelog widget, after the app reads a new version or new dates, or at midnight. */
         fun refresh(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
             manager.getAppWidgetIds(ComponentName(context, VersionWidget::class.java))
                 .forEach { manager.updateAppWidget(it, TodayWidgets.small(context)) }
             manager.getAppWidgetIds(ComponentName(context, ComingUpWidget::class.java))
                 .forEach { manager.updateAppWidget(it, TodayWidgets.wide(context, manager, it)) }
+            TodayWidgets.redrawAtMidnight(context)
         }
     }
 }
@@ -57,6 +74,7 @@ class VersionWidget : AppWidgetProvider() {
 class ComingUpWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         for (id in ids) manager.updateAppWidget(id, TodayWidgets.wide(context, manager, id))
+        TodayWidgets.redrawAtMidnight(context)
     }
 
     /** Resized: as many dates as now fit. */
@@ -83,7 +101,8 @@ internal object TodayWidgets {
         val me = graph.me
         val views = RemoteViews(context.packageName, R.layout.widget_coming_up)
         val t = Today.of(context)
-        val day = me?.today
+        // The day it is now, not the day /v1/me was read: past midnight, yesterday's notes and dates are over.
+        val day = me?.dateAt(Instant.now())?.toString()
         val standing = when {
             me == null || !graph.signedIn.value -> null
             me.status == "stopped" -> say(R.string.your_email_is_stopped)
@@ -96,7 +115,8 @@ internal object TodayWidgets {
         // As many dates as the widget's height holds: its height on a phone held upright, in dp.
         val tall = manager.getAppWidgetOptions(id).getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT).takeIf { it > 0 } ?: 180
         val room = tall - 32 - 28
-        val soon = graph.soon.take((room / 46).coerceIn(1, 4))
+        val soon = graph.soon.mapNotNull { s -> if (day == null) s else upcomingStatusOn(s.date, s.through, s.status, day)?.let { s.copy(status = it) } }
+            .take((room / 46).coerceIn(1, 4))
         val said = listOfNotNull(
             t.said,
             standing,
@@ -140,13 +160,16 @@ internal object TodayWidgets {
         companion object {
             fun of(context: Context): Today {
                 val me = context.graph.me
+                val shown = me?.shownAt(Instant.now())
                 val prompt = when {
                     !context.graph.signedIn.value -> say(R.string.sign_in_to_changelog)
-                    me?.wroteToday == true -> say(R.string.written_today_anything_else)
+                    // Past the last day /v1/me listed: only the app can say today's version.
+                    me != null && shown == null -> say(R.string.widget_catch_up)
+                    shown?.wrote == true -> say(R.string.written_today_anything_else)
                     else -> say(R.string.what_changed)
                 }
                 // "Week 2,369 — Day 16,577" under the version, as the site and the email have it (API 1.13.0).
-                return Today(me?.version ?: "?.?.???", me?.lived?.text, prompt)
+                return Today(shown?.version ?: "?.?.???", shown?.lived?.text, prompt)
             }
         }
     }
@@ -158,6 +181,28 @@ internal object TodayWidgets {
             views.setImageViewBitmap(id, Draw(context, night).words(t.version, t.lived, t.prompt))
             views.setContentDescription(id, t.said)
         }
+    }
+
+    /**
+     * Draws the widgets again at the account's next midnight, when the version changes: `updatePeriodMillis` comes
+     * twice a day at best. An inexact alarm that doesn't wake the phone (`RTC`, so no exact-alarm permission):
+     * asleep, it goes off as the phone next wakes, before anyone looks at the home screen. Each drawing sets the
+     * next. With no widget, signed out, or past the days `/v1/me` listed, nothing changes at midnight, so none is set.
+     */
+    fun redrawAtMidnight(context: Context) {
+        val alarms = context.getSystemService(AlarmManager::class.java) ?: return
+        val manager = AppWidgetManager.getInstance(context)
+        val intent = PendingIntent.getBroadcast(
+            context,
+            0,
+            Intent(context, VersionWidget::class.java).setAction(VersionWidget.MIDNIGHT),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val shown = listOf(VersionWidget::class.java, ComingUpWidget::class.java)
+            .any { manager.getAppWidgetIds(ComponentName(context, it)).isNotEmpty() }
+        val graph = context.graph
+        val ends = graph.me?.takeIf { graph.signedIn.value }?.shownAt(Instant.now())?.ends
+        if (!shown || ends == null) alarms.cancel(intent) else alarms.set(AlarmManager.RTC, ends.toEpochMilli() + 1_000, intent)
     }
 
     private fun open(context: Context, screen: String, write: Boolean): PendingIntent {

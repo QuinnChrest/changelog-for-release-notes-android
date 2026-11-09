@@ -195,9 +195,12 @@ JDK 17 or later, Android SDK 37.
 ./gradlew :app:installDebug    # onto a running emulator or phone
 ```
 
-A debug build starts on the dev server. One made to be used, not developed
-(`-Pchangelog.production`, as the README says for anyone building it themselves)
-starts on Release Notes; release builds only ever talk to Release Notes.
+A debug build starts on the dev server. With `-Pchangelog.production` a debug
+build talks only to Release Notes and its sign-in screen has no Dev server.
+Release builds only ever talk to Release Notes. Anyone building the app to use
+it makes `selfBuilt`, as the README says (`./gradlew :app:assembleSelfBuilt`):
+a release build signed with their computer's debug key, so it can't be
+debugged and needs no key of its own. Never point the README at a debug build.
 
 Versions count from Changelog for Android's first day, 2026-10-29, by Your
 Version Number's arithmetic (decades.years.days, the day in Chicago), like
@@ -230,7 +233,7 @@ hand to match.
 ### Release builds
 
 `./gradlew :app:bundleRelease` makes the Play bundle; `assembleRelease` an
-APK. R8 shrinks them. To check what R8 does without a real account, the
+APK. R8 shrinks them, and `selfBuilt` (release, with the debug key) too. To check what R8 does without a real account, the
 `shrunk` build is shrunk as release is but signs in to the dev server as
 debug does; TestCycle runs on it:
 

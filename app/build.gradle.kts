@@ -59,8 +59,8 @@ android {
         // `adb reverse tcp:8790 tcp:8790` and http://localhost:8790.
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "DEV_SERVER", "\"${providers.gradleProperty("changelog.devServer").getOrElse("http://10.0.2.2:8790")}\"")
-        // A debug build starts on the dev server, so development never touches real notes; with
-        // -Pchangelog.production a debug build made to be used starts on Release Notes instead.
+        // A debug build starts on the dev server, so development never touches real notes. With
+        // -Pchangelog.production it talks only to Release Notes and offers no Dev server.
         buildConfigField("boolean", "START_ON_PRODUCTION", providers.gradleProperty("changelog.production").isPresent.toString())
     }
 
@@ -86,6 +86,14 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+        // For anyone building the app to use it (the README's Option 2): a release build, so it
+        // can't be debugged and talks only to Release Notes, signed with the debug key Android's
+        // tools make on the builder's own computer. ./gradlew :app:assembleSelfBuilt
+        create("selfBuilt") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += "release"
         }
         // Shrunk as release is, but signing in to the dev server as debug does,
         // so what R8 does to the app can be tested without touching a real

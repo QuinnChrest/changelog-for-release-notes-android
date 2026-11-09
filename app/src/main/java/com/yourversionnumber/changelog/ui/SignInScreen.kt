@@ -134,7 +134,7 @@ fun SignInScreen(model: AppModel) {
                 context.startActivity(Intent(Intent.ACTION_VIEW, "${Api.PRODUCTION}/settings/".toUri()))
             })
 
-            if (BuildConfig.DEBUG) {
+            if (BuildConfig.DEBUG && !BuildConfig.START_ON_PRODUCTION) {
                 Rule(Modifier.padding(top = 12.dp))
                 Heading(say(R.string.development))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {

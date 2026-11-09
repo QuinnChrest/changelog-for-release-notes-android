@@ -232,6 +232,14 @@ under this rule; 0.0.2 to 0.0.7 before it were named for the build number):
   features and fixes is a minor.
 - **Patch** (1.0.1) for fixes alone, with no change to what they see or do.
 
+The `release` skill (`.claude/skills/release/SKILL.md`) does every step:
+the number, the tests and the signed build with its certificate checked,
+notes Quinn approves before anything is published, the tag on the commit
+built, and the release. Only the newest release offers an APK: the one
+before keeps its tag and notes, loses its APK, and gains a line pointing to
+the latest. The tags are the history (`git log v1.0.0..v1.1.0`, and each
+release's notes end with GitHub's compare link).
+
 This number is the release's, on the tag and the APK's file name. The
 build's own `versionName` stays Your Version Number's day count, stamped by
 `app/build.gradle.kts` and shown at the foot of Settings; never set it by

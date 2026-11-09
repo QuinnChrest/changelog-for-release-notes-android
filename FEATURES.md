@@ -4,7 +4,7 @@ What Changelog for Android does, what's left, and what's built but not yet
 checked. The iPhone app (`jthingelstad/changelog-ios`) is the reference;
 `AGENTS.md` says how each built piece works.
 
-**At a glance:** 53 built · 4 to do · 2 waiting on someone else · 23 to check
+**At a glance:** 53 built · 4 to do · 2 waiting on someone else · 24 to check
 
 Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 built, not yet checked
 
@@ -53,6 +53,7 @@ These are written and built; something about them couldn't be seen on the emulat
 | 🔍 | A remembered place's tags, and a stay's | Settings, Remembered places (with `notes:all`): each place's tags go on its new check-ins, and a tag added asks once to tag the check-ins already there, for the count shown, asking again if it changed. The map's sheet: Tags beside a stay, saved from its revision; a stale one reads the map again and says so. `TagsApiTest` covers the calls and `DevServerTest` a stay's tags on the dev server; the place part needs a `notes:all` token there, and none of it has been seen on the emulator |
 | 🔍 | The map's Tag menu | "Every tag", then each tag on the map's check-ins and notes; a tag keeps the notes and the check-ins with it, and a line says what it kept. `TagsApiTest` covers `MapTags`; not yet seen on the emulator |
 | 🔍 | A photo's small copy on Log, and `notes:all` on a real account | The dev server's fixture photo has no small copy, so the thumbnail path ran only in a unit test; the whole-account list was seen on the dev server with a `notes:all` token, not on production |
+| 🔍 | Waiting writes go only to their own account, as the iPhone app's | Each write is stamped with `/v1/me`'s `account`; one from another account (or queued by an earlier build with no token signed in) waits on Log with "Send to this account" and Discard; signing in to another account than the last one forgets the last one's home, sent words, tags and next dates. `OutboxTest` covers the queue; not yet signed in to a second account on the emulator |
 
 ## Built
 

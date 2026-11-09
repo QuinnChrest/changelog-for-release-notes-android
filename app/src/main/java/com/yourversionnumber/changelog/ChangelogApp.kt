@@ -20,6 +20,7 @@ import com.yourversionnumber.changelog.kit.Me
 import com.yourversionnumber.changelog.kit.NoteRef
 import com.yourversionnumber.changelog.kit.Outbox
 import com.yourversionnumber.changelog.kit.OutboxOperation
+import com.yourversionnumber.changelog.kit.OutboxRecipient
 import com.yourversionnumber.changelog.kit.OutboxResult
 import com.yourversionnumber.changelog.kit.Tags
 import com.yourversionnumber.changelog.kit.Words
@@ -79,9 +80,24 @@ class AppGraph(private val context: Context) {
     private val prefs = context.getSharedPreferences("changelog", Context.MODE_PRIVATE)
     private val tokens = TokenStore(context)
 
-    // noBackupFilesDir: the queue holds words and never goes to a backup.
-    val outbox = Outbox(File(context.noBackupFilesDir, "outbox.json"))
+    // noBackupFilesDir: the queue holds words and never goes to a backup. Each write is stamped with the
+    // account signed in, and goes only to it.
+    val outbox = Outbox(File(context.noBackupFilesDir, "outbox.json")) { account }
     private val sentFile = File(context.noBackupFilesDir, "sent.json")
+
+    /**
+     * The account the token signed in opens (`/v1/me`'s `account`), set as it signs in. It stays through a sign-out
+     * or a lost token, so the next sign-in knows whether it's another account. Kept on this phone only, never logged.
+     */
+    var account: String?
+        get() = prefs.getString("account", null)
+        private set(value) = prefs.edit().putString("account", value).apply()
+
+    /**
+     * Whose waiting writes go now: this account's, or everyone's from a server before API 1.4.0, which names no
+     * account. A write from another account waits on Log for the owner to send it here or discard it.
+     */
+    val recipient: OutboxRecipient get() = account?.let { OutboxRecipient.Account(it) } ?: OutboxRecipient.Anyone
 
     init {
         // A new process has no draft: files only a draft held when it last
@@ -92,6 +108,24 @@ class AppGraph(private val context: Context) {
         WorkManager.getInstance(context).cancelAllWorkByTag("upcoming-reminder")
         // Scratch copies from the picker, the camera and the recorder are only ever mid-way.
         File(context.cacheDir, "picked").deleteRecursively()
+        stampEarlierQueue()
+    }
+
+    /**
+     * Once, after an update from a build that didn't stamp accounts: the writes it queued carry none. With its token
+     * still signed in they were written under it, so they take its account, from the `/v1/me` it last read. With no
+     * token signed in nothing says whose they are, so they stay unstamped and wait on Log for the owner to send each
+     * to an account or discard it. As the iPhone app does.
+     */
+    private fun stampEarlierQueue() {
+        if (prefs.getBoolean("outbox.accounts", false)) return
+        val known = if (tokens.read() != null) me?.account else null
+        if (known != null) {
+            // Unsaved, they stay held, and the next start tries again.
+            if (runBlocking { runCatching { outbox.stamp(known) } }.isFailure) return
+            if (account == null) account = known
+        }
+        prefs.edit().putBoolean("outbox.accounts", true).apply()
     }
 
     private val _signedIn = MutableStateFlow(tokens.read() != null)
@@ -216,9 +250,15 @@ class AppGraph(private val context: Context) {
     fun api(): Api? = tokens.read()?.let { api(it) }
 
     fun signIn(token: String, server: String, me: Me) {
+        // Another account than the last one (after a lost token, say): nothing the last one left here is this one's.
+        val last = account ?: this.me?.account
+        if (me.account != null && last != null && me.account != last) forgetAccount()
+        // The account before the token: SendWorker reads the token first, so once it sees this token it sends
+        // only this account's writes.
+        account = me.account
+        this.me = me
         this.server = server
         tokens.write(token)
-        this.me = me
         _signedIn.value = true
         _problem.value = null
         send()
@@ -231,25 +271,35 @@ class AppGraph(private val context: Context) {
         _problem.value = message
     }
 
-    /** Signing out keeps whatever is still waiting, for the next sign-in. */
+    /** Signing out keeps whatever is still waiting: it goes when this account signs in again, and is held for any other. */
     fun signOut() {
         tokens.clear()
         me = null
-        tags = null
-        sticky = null
-        seenActivity = null
+        forgetAccount()
         remindersOn = false
         promptOn = false
         hereByDefault = false
         recordingStops = false
         Stops.stop(context)
-        prefs.edit().remove("soon").remove("thisday").remove("home").apply() // "thisday": an earlier build's, for its widget
         noticeKinds = emptySet()
-        activityCursor = null
         PhoneNotices.clear(context)
+        _signedIn.value = false
+        VersionWidget.refresh(context)
+    }
+
+    /**
+     * What an account left on this phone, forgotten as it signs out, or as another account signs in after its token
+     * stopped working: its tags and sticky tag, its old home, the next dates for the widget, where Activity was
+     * read to, and the words of the notes this phone filed for it. Its writes still waiting stay, held for it.
+     */
+    private fun forgetAccount() {
+        tags = null
+        sticky = null
+        seenActivity = null
+        activityCursor = null
+        prefs.edit().remove("soon").remove("thisday").remove("home").apply() // "thisday": an earlier build's, for its widget
         _sent.value = emptyList()
         sentFile.delete()
-        _signedIn.value = false
         VersionWidget.refresh(context)
     }
 

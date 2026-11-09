@@ -254,7 +254,7 @@ internal fun NoteFiles(model: AppModel, note: NoteDetail, player: FilePlayer, wh
     ) {
         others.forEach { file ->
             when {
-                file.kind == "image" && file.thumb != null -> Thumbnail(model, note, file) { viewing = file }
+                file.kind == "image" && file.thumb != null -> Thumbnail(model, note, file, onClick = { viewing = file })
                 file.kind == "image" -> Row(verticalAlignment = Alignment.CenterVertically) {
                     QuietButton(say(R.string.open), { viewing = file })
                     Caption(fileLabel(file))
@@ -435,9 +435,12 @@ internal fun fileLabel(file: NoteMedia): String {
     return if (size == null) what else "$what · $size"
 }
 
-/** A photo's small copy, read when it scrolls in and kept for the session; tap for the photo itself. */
+/**
+ * A photo's small copy, read when it scrolls in and kept for the session; tap for the photo itself, or, with no
+ * [onClick], whatever holds it (the map's list of notes opens the note).
+ */
 @Composable
-private fun Thumbnail(model: AppModel, note: NoteDetail, file: NoteMedia, onClick: () -> Unit) {
+internal fun Thumbnail(model: AppModel, note: NoteDetail, file: NoteMedia, height: Int = 112, onClick: (() -> Unit)?) {
     val key = "${note.id}/${file.n}"
     val bitmap by produceState(Thumbs[key], key) {
         if (value == null) {
@@ -450,9 +453,10 @@ private fun Thumbnail(model: AppModel, note: NoteDetail, file: NoteMedia, onClic
     }
     val shape = RoundedCornerShape(6.dp)
     val description = say(R.string.photo)
-    // As wide as the photo is, within reason, 112dp tall; a square while it loads.
+    // As wide as the photo is, within reason, [height] tall (112dp); a square while it loads.
     val ratio = ((file.thumb?.width ?: 1).toFloat() / (file.thumb?.height ?: 1).coerceAtLeast(1)).coerceIn(0.5f, 2f)
-    val modifier = Modifier.size(width = (112f * ratio).dp, height = 112.dp).clip(shape).clickable(onClick = onClick)
+    val sized = Modifier.size(width = (height * ratio).dp, height = height.dp).clip(shape)
+    val modifier = (if (onClick != null) sized.clickable(onClick = onClick) else sized)
         .semantics { contentDescription = description }
     bitmap?.let { Image(it, null, modifier, contentScale = ContentScale.Crop) } ?: Box(modifier)
 }

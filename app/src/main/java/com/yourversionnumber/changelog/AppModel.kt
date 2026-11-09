@@ -137,6 +137,8 @@ class AppModel(application: Application) : AndroidViewModel(application) {
                 dayNotes = if (more) dayNotes.orEmpty() + page.items else page.items
                 dayNext = page.next
                 dayRead = shown
+                // The widget's line about today: numbers only, never the words.
+                dayNotes?.let { graph.todayNotes = TodayNotes.of(shown, it, more = page.next != null) }
             } catch (e: ApiException) {
                 if (!more) dayNotes = null
                 dayRead = shown
@@ -164,6 +166,13 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     /** A note read again, quietly; null when it can't be had. */
     suspend fun reread(note: NoteDetail): NoteDetail? = try {
         graph.api()?.note(note.date, note.id)
+    } catch (e: ApiException) {
+        null
+    }
+
+    /** One note, as the server has it now (for its files, where only its words came with it); null when it can't be read. */
+    suspend fun readNote(date: String, id: String): NoteDetail? = try {
+        graph.api()?.note(date, id)
     } catch (e: ApiException) {
         null
     }

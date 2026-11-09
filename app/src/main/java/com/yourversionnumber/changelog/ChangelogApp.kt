@@ -68,6 +68,38 @@ data class Soon(val date: String, val status: String, val title: String, val lin
     val words: String get() = line.ifBlank { title }
 }
 
+/**
+ * Today's notes in numbers, for the Coming up widget: never their words. `more` when Log read only the first page.
+ * `lastAt` is the newest note's `written_at`.
+ */
+@Serializable
+data class TodayNotes(
+    val date: String,
+    val count: Int,
+    val more: Boolean = false,
+    val lastAt: String? = null,
+    val photos: Int = 0,
+    val memos: Int = 0,
+    val files: Int = 0,
+) {
+    companion object {
+        fun of(date: String, notes: List<com.yourversionnumber.changelog.kit.NoteDetail>, more: Boolean): TodayNotes {
+            val media = notes.flatMap { it.media }
+            val photos = media.count { it.kind == "image" }
+            val memos = media.count { it.kind == "audio" }
+            return TodayNotes(
+                date = date,
+                count = notes.size,
+                more = more,
+                lastAt = notes.mapNotNull { it.writtenAt }.maxByOrNull { runCatching { java.time.OffsetDateTime.parse(it).toInstant() }.getOrNull() ?: java.time.Instant.MIN },
+                photos = photos,
+                memos = memos,
+                files = media.size - photos - memos,
+            )
+        }
+    }
+}
+
 /** A note this phone filed, kept so Log can show it and take it back. */
 @Serializable
 data class Sent(val note: NoteRef, val text: String)
@@ -198,6 +230,17 @@ class AppGraph(private val context: Context) {
             VersionWidget.refresh(context)
         }
 
+    /**
+     * Today's notes as Log last read them, for the Coming up widget: how many, when the last was written, and what
+     * files they hold. Never a note's words (Quinn's call, 2026-11-08). Set whenever Log reads today.
+     */
+    var todayNotes: TodayNotes?
+        get() = runCatching { Api.json.decodeFromString(TodayNotes.serializer(), prefs.getString("today.notes", null)!!) }.getOrNull()
+        set(value) {
+            prefs.edit().putString("today.notes", value?.let { Api.json.encodeToString(TodayNotes.serializer(), it) }).apply()
+            VersionWidget.refresh(context)
+        }
+
     /** Keeps the next dates from a read of Upcoming, for the widget. */
     fun keepSoon(list: com.yourversionnumber.changelog.kit.UpcomingList) {
         soon = list.entries.filter { it.status != "past" }.take(4).map { Soon(it.next, it.status, it.title, it.line) }
@@ -297,7 +340,7 @@ class AppGraph(private val context: Context) {
         sticky = null
         seenActivity = null
         activityCursor = null
-        prefs.edit().remove("soon").remove("thisday").remove("home").apply() // "thisday": an earlier build's, for its widget
+        prefs.edit().remove("soon").remove("today.notes").remove("thisday").remove("home").apply() // "thisday": an earlier build's, for its widget
         _sent.value = emptyList()
         sentFile.delete()
         VersionWidget.refresh(context)

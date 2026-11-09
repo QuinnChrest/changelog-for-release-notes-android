@@ -498,7 +498,9 @@ map also shows notes with a place of their own (`GET /v1/map/pins`, with a
 token that reads every note), as cobalt rings under the stops' dots, picked
 on or off at the top ("Check-ins", "Notes"), with the Tag menu beside them
 (call 8 above, `kit`'s `MapTags`); a ring opens its notes, each
-opening `NoteViewer`.
+opening `NoteViewer`. A pin carries only a note's words, so the list reads
+each note as it opens (in memory only) to show its photos' small copies,
+or what it holds when it has no words, with Open beside each day.
 
 Check-ins from this phone (`Stops.kt`), as the iPhone app's: **Check in
 now** (Activity's top bar and the map's) takes one fix and queues a `tap`
@@ -545,7 +547,10 @@ Two widgets (`VersionWidget.kt`), in the app's own look: **Changelog**
 (3×1, as it has always been: the version in Martian Mono, cobalt with
 tangerine dots, the weeks and days lived, and "What changed?"; a tap opens
 Log to write) and **Changelog: Coming up** (4×2: that same Today, with the
-streak, or "Your email is stopped", under it; beside it as many dates in
+streak, or "Your email is stopped", under it, then today's notes in
+numbers as Log last read them ("2 notes today · last at 11:20 AM", "3
+photos": `AppGraph.todayNotes`), never a note's words, Quinn's call,
+2026-11-08; beside it as many dates in
 Upcoming as its height holds, up to four, each in the server's line with
 its day and countdown, as the Upcoming tab says them. Today's half opens
 Log, Coming up's Upcoming. Tomorrow's version and On this day were tried

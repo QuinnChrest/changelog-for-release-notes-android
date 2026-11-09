@@ -28,6 +28,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -76,6 +77,10 @@ import com.yourversionnumber.changelog.kit.TagTyping
 import com.yourversionnumber.changelog.sayCount
 import com.yourversionnumber.changelog.kit.CheckInPin
 import com.yourversionnumber.changelog.kit.NotePin
+import com.yourversionnumber.changelog.kit.CountPhrase
+import com.yourversionnumber.changelog.kit.NoteDetail
+import com.yourversionnumber.changelog.kit.NoteMedia
+import com.yourversionnumber.changelog.kit.Words
 import com.yourversionnumber.changelog.NoteTarget
 import com.yourversionnumber.changelog.kit.CheckInWords
 import com.yourversionnumber.changelog.say
@@ -278,9 +283,17 @@ private data class Spot(val id: String, val lat: Double, val lon: Double, val no
 private const val STOP = "stop:"
 private const val NOTE = "note:"
 
-/** The notes written at one place, newest first: the day and the opening words; each opens its note. */
+/**
+ * The notes written at one place, newest first: the day, the opening words, and its photos' small copies, with Open
+ * in blue so each row reads as one to tap. A pin carries only the words, so each note is read as the sheet opens
+ * (in memory only, for this sheet), for its files; a note with no words and no photo says what it holds instead.
+ */
 @Composable
 private fun NotesSheet(model: AppModel, pin: NotePin, modifier: Modifier, onOpen: (NoteTarget) -> Unit, onClose: () -> Unit) {
+    val details = remember(pin.id) { mutableStateMapOf<String, NoteDetail>() }
+    LaunchedEffect(pin.id) {
+        pin.notes.forEach { note -> model.readNote(note.date, note.id)?.let { details[note.id] = it } }
+    }
     Column(
         modifier
             .fillMaxWidth()
@@ -296,20 +309,39 @@ private fun NotesSheet(model: AppModel, pin: NotePin, modifier: Modifier, onOpen
         }
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             pin.notes.forEach { note ->
-                Column(
-                    Modifier.fillMaxWidth().clickable(onClickLabel = say(R.string.open), role = Role.Button) {
-                        onOpen(NoteTarget(note.date, note.id, note.version))
-                    },
-                ) {
-                    Caption(dayLabel(note.date, model.me?.today))
+                val open = { onOpen(NoteTarget(note.date, note.id, note.version)) }
+                val detail = details[note.id]
+                val photos = detail?.media.orEmpty().filter { it.kind == "image" && it.thumb != null }
+                Column(Modifier.fillMaxWidth().clickable(onClickLabel = say(R.string.open), role = Role.Button, onClick = open)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Caption(dayLabel(note.date, model.me?.today), Modifier.weight(1f))
+                        QuietButton(say(R.string.open), open)
+                    }
                     if (note.text.isNotBlank()) {
                         Text(note.text, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, color = paper.ink)
+                    }
+                    if (photos.isNotEmpty() && detail != null) {
+                        Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            photos.take(3).forEach { Thumbnail(model, detail, it, height = 72, onClick = null) }
+                        }
+                    } else if (note.text.isBlank() && detail != null && detail.media.isNotEmpty()) {
+                        Text(filesSaid(detail.media), style = MaterialTheme.typography.bodyMedium, color = paper.ink2)
                     }
                     Rule(Modifier.padding(top = 6.dp))
                 }
             }
         }
     }
+}
+
+/** "1 photo, 1 voice memo": what a note with no words holds. */
+private fun filesSaid(media: List<NoteMedia>): String {
+    val photos = media.count { it.kind == "image" }
+    val memos = media.count { it.kind == "audio" }
+    val others = media.size - photos - memos
+    fun said(n: Int, phrase: CountPhrase) = if (n == 0) null else Words.count(phrase, n)
+    return listOfNotNull(said(photos, CountPhrase.PhotoCount), said(memos, CountPhrase.MemoCount), said(others, CountPhrase.FileCount))
+        .joinToString(", ")
 }
 
 /** Reading, a problem with Try again, or no check-ins at all, over the top of the map. */

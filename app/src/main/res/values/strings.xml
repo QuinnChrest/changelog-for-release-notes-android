@@ -275,6 +275,7 @@
     <string name="with_a_year_the_line">With a year, the line says which one it is.</string>
     <string name="written_today">Written today</string>
     <string name="written_today_anything_else">Written today. Anything else?</string>
+    <string name="widget_last_at">last at %1$s</string>
     <string name="year_born_optional">Year born (optional)</string>
     <string name="year_it_began_optional">Year it began (optional)</string>
     <string name="your_email_is_stopped">Your email is stopped.</string>
@@ -306,6 +307,14 @@
     <plurals name="files_count">
         <item quantity="one">%d file</item>
         <item quantity="other">%d files</item>
+    </plurals>
+    <plurals name="widget_notes_today">
+        <item quantity="one">%1$d note today</item>
+        <item quantity="other">%1$d notes today</item>
+    </plurals>
+    <plurals name="widget_notes_today_more">
+        <item quantity="one">%1$d+ notes today</item>
+        <item quantity="other">%1$d+ notes today</item>
     </plurals>
     <plurals name="streak">
         <item quantity="one">%1$d day in a row</item>

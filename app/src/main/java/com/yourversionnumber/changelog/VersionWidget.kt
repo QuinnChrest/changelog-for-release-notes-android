@@ -90,6 +90,9 @@ internal object TodayWidgets {
             me.streak > 1 -> sayCount(R.plurals.streak, me.streak, me.streak)
             else -> null
         }
+        // Under it, today's notes in numbers, as Log last read them: never their words.
+        val notesLines = graph.todayNotes?.takeIf { graph.signedIn.value && it.date == day && it.count > 0 }?.let(::notesSaid).orEmpty()
+        val below = listOfNotNull(standing) + notesLines
         // As many dates as the widget's height holds: its height on a phone held upright, in dp.
         val tall = manager.getAppWidgetOptions(id).getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT).takeIf { it > 0 } ?: 180
         val room = tall - 32 - 28
@@ -97,17 +100,37 @@ internal object TodayWidgets {
         val said = listOfNotNull(
             t.said,
             standing,
+            notesLines.joinToString(". ").ifEmpty { null },
             if (soon.isEmpty()) say(R.string.nothing_coming_up) else say(R.string.coming_up) + ". " + soon.joinToString(". ") { "${it.words}, ${whenSaid(it, day)}" },
         ).joinToString(". ")
         for ((view, night) in listOf(R.id.widget_words to false, R.id.widget_words_dark to true)) {
             val draw = Draw(context, night)
-            views.setImageViewBitmap(view, draw.beside(draw.words(t.version, t.lived, t.prompt, standing), draw.comingUp(soon, day)))
+            views.setImageViewBitmap(view, draw.beside(draw.words(t.version, t.lived, t.prompt, below), draw.comingUp(soon, day)))
             views.setContentDescription(view, said)
         }
         views.setOnClickPendingIntent(R.id.widget_root, open(context, "log", write = true))
         views.setOnClickPendingIntent(R.id.widget_tap_today, open(context, "log", write = true))
         views.setOnClickPendingIntent(R.id.widget_tap_soon, open(context, "upcoming", write = false))
         return views
+    }
+
+    /** "3 notes today · last at 2:14 PM", then "1 photo · 1 voice memo": how many, when the last was, what they hold. */
+    private fun notesSaid(n: TodayNotes): List<String> {
+        val count = sayCount(if (n.more) R.plurals.widget_notes_today_more else R.plurals.widget_notes_today, n.count, n.count)
+        val last = n.lastAt?.let { at ->
+            runCatching {
+                java.time.OffsetDateTime.parse(at).atZoneSameInstant(java.time.ZoneId.systemDefault())
+                    .format(DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT))
+            }.getOrNull()
+        }?.let { say(R.string.widget_last_at, it) }
+        fun files(k: Int, id: Int) = if (k == 0) null else sayCount(id, k, k)
+        val held = listOfNotNull(
+            files(n.photos, R.plurals.kit_photo_count),
+            files(n.memos, R.plurals.kit_memo_count),
+            files(n.files, R.plurals.kit_file_count),
+        ).joinToString(" · ").ifEmpty { null }
+        // Two short lines, so the left half stays as narrow as the prompt.
+        return listOfNotNull(listOfNotNull(count, last).joinToString(" · "), held)
     }
 
     /** What Today says: the version, the weeks and days lived, and the prompt. */
@@ -183,7 +206,7 @@ internal object TodayWidgets {
         private fun height(p: Paint) = -p.fontMetrics.ascent + p.fontMetrics.descent
 
         /** The version in Martian Mono (cobalt, dots tangerine), the weeks and days lived, and the prompt, in Bricolage Grotesque. */
-        fun words(version: String, lived: String?, prompt: String, standing: String? = null): Bitmap {
+        fun words(version: String, lived: String?, prompt: String, below: List<String> = emptyList()): Bitmap {
             val big = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 typeface = font(R.font.martian_mono, 700)
                 textSize = 26 * density
@@ -200,9 +223,11 @@ internal object TodayWidgets {
                 alpha = 170
             }
             val gap = 8 * density
-            // The streak, or the email stopped, quietly under the prompt.
-            val extraHeight = if (standing == null) 0f else 10 * density + height(hint)
-            val width = maxOf(big.measureText(version), small.measureText(prompt), lived?.let(hint::measureText) ?: 0f, standing?.let(hint::measureText) ?: 0f).toInt() + 2
+            // The streak or the email stopped, and today's notes in numbers, quietly under the prompt.
+            val lineGap = 3 * density
+            val extraHeight = if (below.isEmpty()) 0f else 10 * density + below.size * height(hint) + (below.size - 1) * lineGap
+            val width = (listOf(big.measureText(version), small.measureText(prompt), lived?.let(hint::measureText) ?: 0f) + below.map(hint::measureText))
+                .max().toInt() + 2
             val bigHeight = height(big)
             val hintHeight = if (lived == null) 0f else height(hint) + 2 * density
             val bitmap = Bitmap.createBitmap(width, (bigHeight + hintHeight + gap + height(small) + extraHeight).toInt() + 2, Bitmap.Config.ARGB_8888)
@@ -217,8 +242,11 @@ internal object TodayWidgets {
             }
             lived?.let { canvas.drawText(it, 0f, bigHeight + 2 * density - hint.fontMetrics.ascent, hint) }
             canvas.drawText(prompt, 0f, bigHeight + hintHeight + gap - small.fontMetrics.ascent, small)
-            val y = bigHeight + hintHeight + gap + height(small) + 10 * density
-            standing?.let { canvas.drawText(it, 0f, y - hint.fontMetrics.ascent, hint) }
+            var y = bigHeight + hintHeight + gap + height(small) + 10 * density
+            for (line in below) {
+                canvas.drawText(line, 0f, y - hint.fontMetrics.ascent, hint)
+                y += height(hint) + lineGap
+            }
             return bitmap
         }
 

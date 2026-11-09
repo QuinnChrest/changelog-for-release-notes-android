@@ -5,16 +5,22 @@ on:
   push:
     branches: [main]
 
+# The build only reads the repo.
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      # Each action is pinned to a commit, its tag beside it; Dependabot offers updates.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0 # versionCode is the commit count
-      - uses: actions/setup-java@v5
+          persist-credentials: false # nothing after checkout needs the token
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: 17
-      - uses: gradle/actions/setup-gradle@v5
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
       - run: ./gradlew :kit:test :app:assembleDebug :app:lintDebug --console=plain

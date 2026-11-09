@@ -171,6 +171,13 @@ Release Notes' and the iPhone app's own. `app/build.gradle.kts` stamps it as
 `BuildConfig.COMMIT`, which the foot of Settings shows. Never set them by
 hand.
 
+CI (`.github/workflows/build.yml`) runs `./gradlew :kit:test
+:app:assembleDebug :app:lintDebug` on every pull request and push to `main`.
+It only reads the repo (`contents: read`, and checkout keeps no token), and
+each action is pinned to a full commit with its tag in a comment. Dependabot
+opens a PR when one has a new release; never move an action back to a bare
+tag.
+
 ### Releases
 
 Every push to `main` is a release on GitHub (Quinn's call, 2026-11-08):

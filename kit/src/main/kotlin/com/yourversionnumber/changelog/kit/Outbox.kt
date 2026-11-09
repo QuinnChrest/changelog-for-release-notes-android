@@ -110,6 +110,12 @@ data class OutboxItem(
     val attempts: Int = 0,
     /** Set when Release Notes refused it for good. It stays for the owner to fix or discard. */
     val refusal: String? = null,
+    /**
+     * The account it was written under (`/v1/me`'s `account`, API 1.4.0). It goes only to that account
+     * ([isHeld]). Null for one an earlier build queued, until that build's token, still signed in, stamps it
+     * (`Outbox.stamp`), or for one written with no account known.
+     */
+    val account: String? = null,
 ) {
     val idempotencyKey: String get() = id
 
@@ -129,6 +135,33 @@ data class OutboxItem(
             is OutboxOperation.Attach -> operation.files
             else -> emptyList()
         }
+
+    /**
+     * Written under another account than the one [recipient] sends for, or under none known, which may be
+     * another's. It never goes until the owner sends it to this account (`Outbox.move`) or discards it. Signed in
+     * to its own account again, it goes as any other. As the iPhone app's `OutboxItem.isHeld`.
+     */
+    fun isHeld(recipient: OutboxRecipient): Boolean = recipient is OutboxRecipient.Account && account != recipient.id
+
+    /**
+     * Whether it can go to another account than the one it was written under: a new note, pins or a check-in
+     * can; an edit, a delete or a change to a note's files changes a note that account holds, which no other
+     * account's token may change.
+     */
+    val canMove: Boolean
+        get() = when (operation) {
+            is OutboxOperation.Note, is OutboxOperation.Post, is OutboxOperation.Pins, is OutboxOperation.CheckIn -> true
+            is OutboxOperation.Edit, is OutboxOperation.Delete, is OutboxOperation.Attach, is OutboxOperation.RemoveFile -> false
+        }
+}
+
+/** Whose waiting writes a run of the Outbox sends. */
+sealed interface OutboxRecipient {
+    /** The account the token signed in now opens (`/v1/me`'s `account`). Items written under any other, or under none known, are held. */
+    data class Account(val id: String) : OutboxRecipient
+
+    /** Every item: a server from before API 1.4.0, which names no account. */
+    data object Anyone : OutboxRecipient
 }
 
 /** What Release Notes answered for each kind of write. */
@@ -158,9 +191,11 @@ class OutboxNotKept : Exception(Words.say(Phrase.NoteNotKept))
  * Every write goes through here, online or not ("never lose a note"). Items
  * are kept as one JSON file in the app's own storage, oldest first, and a
  * note's files in `outbox-files` beside it. `file` null keeps everything in
- * memory (tests, previews), with files in `files` if given.
+ * memory (tests, previews), with files in `files` if given. `account` says
+ * which account a write is written under as it is queued: the one the token
+ * signed in opens, or null when none is known.
  */
-class Outbox(private val file: File?, files: File? = null) {
+class Outbox(private val file: File?, files: File? = null, private val account: () -> String? = { null }) {
     /** Where a queued note's files wait. */
     val filesFolder: File? = files ?: file?.parentFile?.let { File(it, "outbox-files") }
 
@@ -170,11 +205,14 @@ class Outbox(private val file: File?, files: File? = null) {
 
     val items: StateFlow<List<OutboxItem>> = _items.asStateFlow()
 
-    /** Queues a write, answering only once it is on disk. */
-    suspend fun enqueue(operation: OutboxOperation, now: OffsetDateTime = OffsetDateTime.now()): OutboxItem = mutex.withLock {
-        val item = OutboxItem(UUID.randomUUID().toString(), operation, Timestamp.format(now))
-        commit(_items.value + item)
-        item
+    /** Queues a write under the account signed in, answering only once it is on disk. */
+    suspend fun enqueue(operation: OutboxOperation, now: OffsetDateTime = OffsetDateTime.now()): OutboxItem {
+        val writer = account()
+        return mutex.withLock {
+            val item = OutboxItem(UUID.randomUUID().toString(), operation, Timestamp.format(now), account = writer)
+            commit(_items.value + item)
+            item
+        }
     }
 
     /** Queues a new note, stamped with the moment it was typed; with files or a place, a Post. */
@@ -230,6 +268,37 @@ class Outbox(private val file: File?, files: File? = null) {
     }
 
     /**
+     * Stamps every item with no account with [account]: items an earlier build queued, which were written under
+     * the token still signed in. Answers how many, once they are on disk; throws [OutboxNotKept] if they couldn't
+     * be, leaving them as they were.
+     */
+    suspend fun stamp(account: String): Int = mutex.withLock {
+        val list = _items.value
+        val unknown = list.count { it.account == null }
+        if (unknown > 0) commit(list.map { if (it.account == null) it.copy(account = account) else it })
+        unknown
+    }
+
+    /**
+     * "Send to this account": a held item, at the owner's word, becomes [account]'s and goes in line where it
+     * was. Its key is one that account has never seen (a receipt is the account's own). Its files are posted
+     * again, since an upload is the account's own; its place (the names and the spot, as Here gave them) stays.
+     * A refusal the other account gave is that account's: this one is asked afresh. An edit, a delete or a change
+     * to a note's files can't move ([OutboxItem.canMove]). Throws [OutboxNotKept] if it couldn't be saved.
+     */
+    suspend fun move(id: String, account: String) = mutex.withLock {
+        val list = _items.value
+        val i = list.indexOfFirst { it.id == id }
+        if (i < 0 || list[i].account == account || !list[i].canMove) return@withLock
+        val item = list[i]
+        val op = when (val old = item.operation) {
+            is OutboxOperation.Post -> old.copy(files = old.files.map { it.copy(upload = null) }, reuploads = 0)
+            else -> old
+        }
+        commit(list.toMutableList().also { it[i] = item.copy(operation = op, account = account, attempts = 0, refusal = null) })
+    }
+
+    /**
      * A refused note, edited by the owner, goes back in line under a new key:
      * the old key's receipt belongs to the request that was refused.
      */
@@ -252,15 +321,17 @@ class Outbox(private val file: File?, files: File? = null) {
     }
 
     /**
-     * Sends what is waiting, oldest first. A note with files is first made
-     * ready by `prepare` (its files posted) and saved, so a resend carries
-     * the same uploads under the same key. A refusal sets that item aside
-     * and carries on; anything worth retrying stops the run so order is
+     * Sends what is waiting for [recipient], oldest first; an item held for
+     * another account is passed over and left as it is. A note with files is
+     * first made ready by `prepare` (its files posted) and saved, so a resend
+     * carries the same uploads under the same key. A refusal sets that item
+     * aside and carries on; anything worth retrying stops the run so order is
      * kept. Items queued while a run is sending join that run. One run at a time.
      */
     suspend fun flush(
         prepare: (suspend (OutboxOperation.Post) -> OutboxOperation.Post)? = null,
         prepareAttach: (suspend (OutboxOperation.Attach) -> OutboxOperation.Attach)? = null,
+        recipient: OutboxRecipient = OutboxRecipient.Anyone,
         send: suspend (OutboxItem) -> OutboxResult,
     ): FlushReport {
         if (!flushing.compareAndSet(false, true)) return FlushReport()
@@ -269,7 +340,7 @@ class Outbox(private val file: File?, files: File? = null) {
             val refused = mutableListOf<OutboxItem>()
             val tried = mutableSetOf<String>()
             while (true) {
-                var item = _items.value.firstOrNull { it.refusal == null && it.id !in tried } ?: break
+                var item = _items.value.firstOrNull { it.refusal == null && it.id !in tried && !it.isHeld(recipient) } ?: break
                 tried += item.id
                 try {
                     val post = item.operation as? OutboxOperation.Post

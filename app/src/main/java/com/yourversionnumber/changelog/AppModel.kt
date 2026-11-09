@@ -22,6 +22,7 @@ import com.yourversionnumber.changelog.kit.MediaType
 import com.yourversionnumber.changelog.kit.NoteDetail
 import com.yourversionnumber.changelog.kit.NoteMedia
 import com.yourversionnumber.changelog.kit.OnThisDay
+import com.yourversionnumber.changelog.kit.OutboxItem
 import com.yourversionnumber.changelog.kit.OutboxNotKept
 import com.yourversionnumber.changelog.kit.OutboxOperation
 import com.yourversionnumber.changelog.kit.QueuedFile
@@ -446,6 +447,20 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun discard(id: String) = viewModelScope.launch { graph.outbox.discard(id) }
+
+    /** Written while signed in to another account, or before this one signed in: Log asks before it goes. */
+    fun isHeld(item: OutboxItem): Boolean = item.isHeld(graph.recipient)
+
+    /** "Send to this account": a held write goes here at the owner's word, under a key this account hasn't seen, its files posted again. */
+    fun sendHere(item: OutboxItem) = viewModelScope.launch {
+        val account = graph.account ?: return@launch
+        try {
+            graph.outbox.move(item.id, account)
+            graph.send()
+        } catch (e: OutboxNotKept) {
+            graph.report(e.message)
+        }
+    }
 
     fun fix(id: String, text: String) = viewModelScope.launch {
         graph.outbox.retry(id, text)

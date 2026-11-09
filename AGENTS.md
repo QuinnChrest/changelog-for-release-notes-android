@@ -84,6 +84,16 @@ bar, and Commit at the right of the composer's icons.
   `GET /v1/upcoming/reminders`), never worked out on the phone.
 - Act on an error's `code`, show its `message`. On a 401, stop sending,
   keep the queue and ask for a new token.
+- Every write in the Outbox carries the account it was written under
+  (`/v1/me`'s `account`, kept as `AppGraph.account`) and goes only to that
+  account, as in the iPhone app. One written under another account, or queued
+  by an earlier build with no token signed in, waits on Log until the owner
+  sends it to this account ("Send to this account", for a new note, pins or
+  a check-in) or discards it; an edit, a delete or a change to a note's files
+  can go only from its own account. Signing in to another account than the
+  last one forgets what the last one left on the phone (its tags and sticky
+  tag, the old home, `soon`, the Activity cursor and `sent.json`), as signing
+  out does.
 - The app reads back the notes this token wrote and the activity log. With
   `notes:all` on the token (the owner ticks it when making the token: "Read
   and change every note", API 1.10.0) it reads, edits and deletes every note
@@ -290,7 +300,8 @@ dev server is a path: put the server's address in front of it.
 
 Done: sign-in by token, Log (version, tag row with a sticky tag, Commit,
 today's notes), Notes (the days and their notes),
-the Outbox and its sender, Waiting to send (fix, discard), opening a note
+the Outbox and its sender, Waiting to send (fix, discard; another
+account's writes held for Send to this account or discard), opening a note
 full screen to edit or delete it (`ui/NoteViewer.kt`: Edit is the composer's
 words, tag row, Photos, Camera and Record, with files added after the edit
 as an `OutboxOperation.Attach`; each of a note's own files has a Remove that

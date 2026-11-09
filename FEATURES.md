@@ -4,7 +4,7 @@ What Changelog for Android does, what's left, and what's built but not yet
 checked. The iPhone app (`jthingelstad/changelog-ios`) is the reference;
 `AGENTS.md` says how each built piece works.
 
-**At a glance:** 53 built · 4 to do · 2 waiting on someone else · 19 to check
+**At a glance:** 53 built · 4 to do · 2 waiting on someone else · 20 to check
 
 Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 built, not yet checked
 
@@ -49,6 +49,7 @@ These are written and built; something about them couldn't be seen on the emulat
 | 🔍 | A bigger widget: Today beside Coming up | 4×2: the same Today with the streak, and the next Upcoming dates in the app's own words and look (as many as its height holds, up to four, each line, then its day and countdown). Light and dark drawn apart and switched by the phone's theme. Seen on the Android 17 emulator in light and dark with the dev server's made-up dates. Not yet on a real phone |
 | 🔍 | Not at home: no stops recorded near home | Settings, under Record my stops: set home from where you are (kept on the phone), and no stop within 150 m of it is sent. `StopDetectorTest` covers it; not yet set on a real phone through a day |
 | 🔍 | A photo's small copy on Log, and `notes:all` on a real account | The dev server's fixture photo has no small copy, so the thumbnail path ran only in a unit test; the whole-account list was seen on the dev server with a `notes:all` token, not on production |
+| 🔍 | Waiting writes go only to their own account, as the iPhone app's | Each write is stamped with `/v1/me`'s `account`; one from another account (or queued by an earlier build with no token signed in) waits on Log with "Send to this account" and Discard; signing in to another account than the last one forgets the last one's home, sent words, tags and next dates. `OutboxTest` covers the queue; not yet signed in to a second account on the emulator |
 
 ## Built
 

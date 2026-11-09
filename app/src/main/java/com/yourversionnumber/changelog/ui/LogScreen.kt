@@ -83,7 +83,7 @@ fun LogScreen(model: AppModel) {
             now = System.currentTimeMillis()
         }
     }
-    val held = waiting.filter { it.refusal != null || it.attempts > 0 || now - queuedAt(it) > HELD_AFTER_MILLIS }
+    val shown = waiting.filter { it.refusal != null || it.attempts > 0 || model.isHeld(it) || now - queuedAt(it) > HELD_AFTER_MILLIS }
     val player = rememberFilePlayer()
     LaunchedEffect(model.writeNow) {
         if (model.writeNow) {
@@ -131,10 +131,15 @@ fun LogScreen(model: AppModel) {
                     }
                 }
             }
-            if (held.isNotEmpty()) {
+            if (shown.isNotEmpty()) {
                 item(key = "waiting") { Heading(say(R.string.waiting_to_send), Modifier.padding(top = 16.dp)) }
-                items(held, key = { it.id }) { item ->
-                    WaitingRow(item, onDiscard = { model.discard(item.id) }, onFix = { fixing = item })
+                items(shown, key = { it.id }) { item ->
+                    if (model.isHeld(item)) {
+                        // Written under another account: nothing goes until the owner chooses.
+                        WaitingRow(item, onDiscard = { model.discard(item.id) }, onSendHere = { model.sendHere(item) })
+                    } else {
+                        WaitingRow(item, onDiscard = { model.discard(item.id) }, onFix = { fixing = item })
+                    }
                 }
             }
             val notes = model.dayNotes
@@ -280,8 +285,13 @@ private fun TagRowView(model: AppModel) {
     }
 }
 
+/**
+ * A write waiting to send, with what's holding it and Discard, and Fix for a refused note. With [onSendHere], one
+ * written under another account, or before this one signed in: it says so in place of its status, and offers
+ * "Send to this account" where it can go to another account.
+ */
 @Composable
-private fun WaitingRow(item: OutboxItem, onDiscard: () -> Unit, onFix: () -> Unit) {
+private fun WaitingRow(item: OutboxItem, onDiscard: () -> Unit, onFix: () -> Unit = {}, onSendHere: (() -> Unit)? = null) {
     val summary = when (val op = item.operation) {
         is OutboxOperation.Note -> op.text
         is OutboxOperation.Edit -> say(R.string.edit_2, op.text)
@@ -295,14 +305,24 @@ private fun WaitingRow(item: OutboxItem, onDiscard: () -> Unit, onFix: () -> Uni
     Column {
         Text(summary, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
         if (item.files.isNotEmpty() && item.text?.isNotBlank() == true) Caption(MediaType.count(item.files))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Caption(
-                item.refusal ?: if (item.attempts > 0) say(R.string.will_try_again) else say(R.string.waiting_for_a_connection),
-                Modifier.weight(1f),
-                color = if (item.refusal != null) paper.orangeInk else paper.ink3,
-            )
-            if (item.refusal != null && item.isNote) QuietButton(say(R.string.fix), onFix)
-            QuietButton(say(R.string.discard), onDiscard, color = paper.ink2)
+        if (onSendHere != null) {
+            val whose = say(if (item.account == null) R.string.held_before_signing_in else R.string.held_for_another_account)
+            Caption(if (item.canMove) whose else whose + " " + say(R.string.held_changes_a_note_there))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Spacer(Modifier.weight(1f))
+                if (item.canMove) QuietButton(say(R.string.send_to_this_account), onSendHere)
+                QuietButton(say(R.string.discard), onDiscard, color = paper.ink2)
+            }
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Caption(
+                    item.refusal ?: if (item.attempts > 0) say(R.string.will_try_again) else say(R.string.waiting_for_a_connection),
+                    Modifier.weight(1f),
+                    color = if (item.refusal != null) paper.orangeInk else paper.ink3,
+                )
+                if (item.refusal != null && item.isNote) QuietButton(say(R.string.fix), onFix)
+                QuietButton(say(R.string.discard), onDiscard, color = paper.ink2)
+            }
         }
         Rule()
     }

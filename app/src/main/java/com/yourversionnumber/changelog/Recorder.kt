@@ -20,10 +20,33 @@ class Recorder(private val context: Context, val file: File) {
     /** How loud it has been since the last reading, 0 to 1 (`VoiceLevel`); 0 when not recording. */
     fun level(): Double = VoiceLevel.fromAmplitude(runCatching { recorder?.maxAmplitude ?: 0 }.getOrDefault(0))
 
-    /** Starts recording; false if the microphone couldn't be had. */
-    fun start(onLongest: () -> Unit): Boolean = try {
-        recorder = MediaRecorder(context).apply {
-            setAudioSource(MediaRecorder.AudioSource.MIC)
+    /**
+     * Starts recording; false if the microphone couldn't be had. It asks for
+     * the voice microphone first, as a call has it: noise suppression and
+     * gain control, Android's counterpart to the voice processing the
+     * iPhone app records through and a browser's noise suppression on the
+     * web, so a room's hum stays out of the bars and the memo. A phone that
+     * won't give it records from the plain microphone.
+     */
+    fun start(onLongest: () -> Unit): Boolean {
+        for (source in SOURCES) {
+            try {
+                recorder = begin(source, onLongest)
+                startedAt = System.currentTimeMillis()
+                return true
+            } catch (e: Exception) {
+                release()
+                file.delete()
+            }
+        }
+        return false
+    }
+
+    private fun begin(source: Int, onLongest: () -> Unit): MediaRecorder {
+        val made = MediaRecorder(context)
+        recorder = made
+        return made.apply {
+            setAudioSource(source)
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
             setAudioChannels(1)
@@ -35,12 +58,6 @@ class Recorder(private val context: Context, val file: File) {
             prepare()
             start()
         }
-        startedAt = System.currentTimeMillis()
-        true
-    } catch (e: Exception) {
-        release()
-        file.delete()
-        false
     }
 
     /** Stops and answers the memo, or null if nothing usable was recorded. The memo is the caller's from here. */
@@ -68,5 +85,8 @@ class Recorder(private val context: Context, val file: File) {
 
     companion object {
         const val LONGEST_MS = 100 * 60 * 1000
+
+        /** The voice microphone, then the plain one. */
+        private val SOURCES = listOf(MediaRecorder.AudioSource.VOICE_COMMUNICATION, MediaRecorder.AudioSource.MIC)
     }
 }

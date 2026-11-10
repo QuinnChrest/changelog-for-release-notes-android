@@ -2,6 +2,7 @@ package com.yourversionnumber.changelog
 
 import android.content.Context
 import android.media.MediaRecorder
+import com.yourversionnumber.changelog.kit.VoiceLevel
 import java.io.File
 
 /**
@@ -15,6 +16,9 @@ class Recorder(private val context: Context, val file: File) {
     private var finished = false
 
     val elapsedMillis: Long get() = if (recorder == null) 0 else System.currentTimeMillis() - startedAt
+
+    /** How loud it has been since the last reading, 0 to 1 (`VoiceLevel`); 0 when not recording. */
+    fun level(): Double = VoiceLevel.fromAmplitude(runCatching { recorder?.maxAmplitude ?: 0 }.getOrDefault(0))
 
     /** Starts recording; false if the microphone couldn't be had. */
     fun start(onLongest: () -> Unit): Boolean = try {

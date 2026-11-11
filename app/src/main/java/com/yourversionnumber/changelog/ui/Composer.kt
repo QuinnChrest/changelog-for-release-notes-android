@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
@@ -35,6 +37,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -42,6 +45,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -62,6 +68,7 @@ import com.yourversionnumber.changelog.Locator
 import com.yourversionnumber.changelog.R
 import com.yourversionnumber.changelog.Recorder
 import com.yourversionnumber.changelog.kit.QueuedFile
+import com.yourversionnumber.changelog.kit.VoiceLevel
 import com.yourversionnumber.changelog.say
 import java.io.File
 import kotlinx.coroutines.delay
@@ -178,6 +185,7 @@ private fun RecorderDialog(model: AppModel, edit: Boolean, onDone: () -> Unit) {
     val recorder = remember { Recorder(context, model.scratch("m4a")) }
     var failed by remember { mutableStateOf(false) }
     var elapsed by remember { mutableLongStateOf(0L) }
+    val levels = remember { mutableStateListOf<Double>() }
 
     fun stop() {
         recorder.stop()?.let { model.addRecording(it, edit) } ?: model.graph.report(say(R.string.that_recording_didnt_work_try))
@@ -191,7 +199,9 @@ private fun RecorderDialog(model: AppModel, edit: Boolean, onDone: () -> Unit) {
         }
         while (true) {
             elapsed = recorder.elapsedMillis
-            delay(250)
+            levels.add(recorder.level())
+            if (levels.size > VoiceLevel.KEPT) levels.removeRange(0, levels.size - VoiceLevel.KEPT)
+            delay(VoiceLevel.EVERY_MS)
         }
     }
     // Left any other way (the screen turned off, say): nothing keeps the microphone on.
@@ -205,17 +215,50 @@ private fun RecorderDialog(model: AppModel, edit: Boolean, onDone: () -> Unit) {
                 Text(say(R.string.another_app_may_be_using))
             } else {
                 val s = elapsed / 1000
-                Text(
-                    "%d:%02d".format(s / 60, s % 60),
-                    style = MaterialTheme.typography.displaySmall.copy(fontFamily = Mono, color = paper.blue),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.semantics { contentDescription = say(R.string.recorded_minutes_seconds, s / 60, s % 60) },
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(
+                        "%d:%02d".format(s / 60, s % 60),
+                        style = MaterialTheme.typography.displaySmall.copy(fontFamily = Mono, color = paper.blue),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().semantics { contentDescription = say(R.string.recorded_minutes_seconds, s / 60, s % 60) },
+                    )
+                    Waveform(levels, Modifier.fillMaxWidth().height(56.dp))
+                }
             }
         },
         confirmButton = { if (!failed) GoButton(say(R.string.stop), ::stop) },
         dismissButton = { QuietButton(if (failed) say(R.string.ok) else say(R.string.cancel), { recorder.cancel(); onDone() }, color = paper.ink2) },
     )
+}
+
+/**
+ * The memo's sound as it comes in: a bar for each recent level, the newest
+ * at the right edge, older ones moving off to the left, as the iPhone app
+ * draws it. Silence is a row of dots, so a flat line says the microphone
+ * hears nothing, not that recording stopped. The clock already says it's
+ * recording, so this says nothing to TalkBack.
+ */
+@Composable
+private fun Waveform(levels: List<Double>, modifier: Modifier = Modifier) {
+    val on = paper.blue
+    val off = paper.ink.copy(alpha = 0.15f)
+    Canvas(modifier) {
+        val step = 5.dp.toPx()
+        val bar = 3.dp.toPx()
+        val count = (size.width / step).toInt()
+        val shown = levels.takeLast(count)
+        val gap = count - shown.size
+        for (i in 0 until count) {
+            val heard = i >= gap
+            val h = maxOf(bar, size.height * (if (heard) shown[i - gap] else 0.0).toFloat())
+            drawRoundRect(
+                color = if (heard) on else off,
+                topLeft = Offset(i * step + (step - bar) / 2, (size.height - h) / 2),
+                size = Size(bar, h),
+                cornerRadius = CornerRadius(bar / 2),
+            )
+        }
+    }
 }
 
 /** The draft's files (or those picked for a note being edited), each with a way to take it off. */

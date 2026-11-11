@@ -313,6 +313,8 @@ class AppGraph(private val context: Context) {
         tokens.clear()
         _signedIn.value = false
         _problem.value = message
+        // Fixes would be dropped anyway ([Stops.heard]); don't have Android wake the app for them.
+        Stops.pause(context)
     }
 
     /** Signing out keeps whatever is still waiting: it goes when this account signs in again, and is held for any other. */

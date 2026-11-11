@@ -40,6 +40,7 @@ says how every client behaves.
   build). `kit`'s tests use `English`, in its test sources: call
   `English.use()` before reading a sentence. A new sentence in `kit` is a
   new `Phrase`, its `kit_` string, and a line in `AppPhrases` and `English`.
+- Writes made by one Save (an edit and its files) share an `OutboxItem.group`: one refused holds the rest back, and Discard takes the group. Lists read a page at a time go through `everyPage` (`Pages.kt`), which ends on a repeated cursor.
 - `SendWorker` sends the Outbox through WorkManager with a network
   constraint, oldest first, backing off while Release Notes can't be reached
   and waiting out `Retry-After`.

@@ -137,13 +137,7 @@ class Api(
      */
     suspend fun checkInsTagged(tag: String): List<CheckIn> {
         val stays = mutableListOf<CheckIn>()
-        val seen = mutableSetOf<String>()
-        var before: String? = null
-        do {
-            val page = checkIns(before = before, tag = tag)
-            stays += page.items
-            before = page.next?.takeIf { seen.add(it) }
-        } while (before != null)
+        everyPage({ checkIns(before = it, tag = tag) }, { it.next }) { stays += it.items }
         return stays
     }
 
@@ -343,8 +337,10 @@ class Api(
             val status = connection.responseCode
             if (status !in 200..299) {
                 // A storage refusal (the form expired, the size was wrong) is worth one
-                // more try with a new form; its body is storage's, never shown.
-                throw ApiException(if (status >= 500) status else 0, "upload_failed", Words.say(Phrase.UploadFailed))
+                // more try with a new form (the Outbox makes the uploads again once, for the field), then
+                // it is refused for good; only a storage outage is retried. Its body is storage's, never
+                // shown. 422 so a 401 or 429 from storage isn't taken for Release Notes'.
+                throw ApiException(if (status >= 500) status else 422, "upload_failed", Words.say(Phrase.UploadFailed), field = "uploads")
             }
         } catch (e: IOException) {
             throw ApiException(0, "network", Words.say(Phrase.NetworkDown))

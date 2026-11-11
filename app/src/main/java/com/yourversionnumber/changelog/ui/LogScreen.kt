@@ -148,7 +148,12 @@ fun LogScreen(model: AppModel) {
                         // Written under another account: nothing goes until the owner chooses.
                         WaitingRow(item, onDiscard = { model.discard(item.id) }, onSendHere = { model.sendHere(item) })
                     } else {
-                        WaitingRow(item, onDiscard = { model.discard(item.id) }, onFix = { fixing = item })
+                        WaitingRow(
+                            item,
+                            onDiscard = { model.discard(item.id) },
+                            onFix = { fixing = item },
+                            behindRefusal = model.graph.outbox.isBehindRefusal(item),
+                        )
                     }
                 }
             }
@@ -300,10 +305,11 @@ private fun TagRowView(model: AppModel) {
 /**
  * A write waiting to send, with what's holding it and Discard, and Fix for a refused note. With [onSendHere], one
  * written under another account, or before this one signed in: it says so in place of its status, and offers
- * "Send to this account" where it can go to another account.
+ * "Send to this account" where it can go to another account. [behindRefusal]: it waits for a refused write
+ * made with it (an edit's files), which Discard takes along.
  */
 @Composable
-private fun WaitingRow(item: OutboxItem, onDiscard: () -> Unit, onFix: () -> Unit = {}, onSendHere: (() -> Unit)? = null) {
+private fun WaitingRow(item: OutboxItem, onDiscard: () -> Unit, onFix: () -> Unit = {}, onSendHere: (() -> Unit)? = null, behindRefusal: Boolean = false) {
     val summary = when (val op = item.operation) {
         is OutboxOperation.Note -> op.text
         is OutboxOperation.Edit -> say(R.string.edit_2, op.text)
@@ -328,7 +334,7 @@ private fun WaitingRow(item: OutboxItem, onDiscard: () -> Unit, onFix: () -> Uni
         } else {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Caption(
-                    item.refusal ?: if (item.attempts > 0) say(R.string.will_try_again) else say(R.string.waiting_for_a_connection),
+                    item.refusal ?: if (behindRefusal) say(R.string.waiting_for_the_change_before_it) else if (item.attempts > 0) say(R.string.will_try_again) else say(R.string.waiting_for_a_connection),
                     Modifier.weight(1f),
                     color = if (item.refusal != null) paper.orangeInk else paper.ink3,
                 )

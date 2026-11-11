@@ -1,7 +1,11 @@
-# Keeps the pinned actions in .github/workflows up to date.
+# Keeps the pinned actions in .github/workflows, and the Gradle dependencies, up to date.
 version: 2
 updates:
   - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: gradle
     directory: /
     schedule:
       interval: weekly

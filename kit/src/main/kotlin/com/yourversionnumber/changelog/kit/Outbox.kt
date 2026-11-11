@@ -128,6 +128,12 @@ data class OutboxItem(
      * (`Outbox.stamp`), or for one written with no account known.
      */
     val account: String? = null,
+    /**
+     * Writes made by one Save share a group: an edit and the files added with it. While one of the group is
+     * refused, the rest wait behind it, so files never land on a note whose words were turned away, and
+     * discarding one discards the group. Null for a lone write, or one an earlier build queued.
+     */
+    val group: String? = null,
 ) {
     val idempotencyKey: String get() = id
 
@@ -225,10 +231,10 @@ class Outbox(private val file: File?, files: File? = null, private val account: 
     val items: StateFlow<List<OutboxItem>> = _items.asStateFlow()
 
     /** Queues a write under the account signed in, answering only once it is on disk. */
-    suspend fun enqueue(operation: OutboxOperation, now: OffsetDateTime = OffsetDateTime.now()): OutboxItem {
+    suspend fun enqueue(operation: OutboxOperation, now: OffsetDateTime = OffsetDateTime.now(), group: String? = null): OutboxItem {
         val writer = account()
         return mutex.withLock {
-            val item = OutboxItem(UUID.randomUUID().toString(), operation, Timestamp.format(now), account = writer)
+            val item = OutboxItem(UUID.randomUUID().toString(), operation, Timestamp.format(now), account = writer, group = group)
             commit(_items.value + item)
             item
         }
@@ -288,12 +294,19 @@ class Outbox(private val file: File?, files: File? = null, private val account: 
         Unit
     }
 
-    /** Drops a write the owner gave up on, with its files. */
+    /** Drops a write the owner gave up on, with its files, and with it the rest of its [OutboxItem.group]. */
     suspend fun discard(id: String) = mutex.withLock {
-        val gone = _items.value.firstOrNull { it.id == id }?.files.orEmpty()
-        runCatching { commit(_items.value.filterNot { it.id == id }) }
+        val group = _items.value.firstOrNull { it.id == id }?.group
+        val dropped = _items.value.filter { it.id == id || (group != null && it.group == group) }
+        val ids = dropped.map { it.id }.toSet()
+        val gone = dropped.flatMap { it.files }
+        runCatching { commit(_items.value.filterNot { it.id in ids }) }
         removeFiles(gone)
     }
+
+    /** Waiting behind a refused write of its own group. */
+    fun isBehindRefusal(item: OutboxItem, list: List<OutboxItem> = _items.value): Boolean =
+        item.refusal == null && item.group != null && list.any { it.group == item.group && it.refusal != null }
 
     /**
      * Stamps every item with no account with [account]: items an earlier build queued, which were written under
@@ -368,7 +381,9 @@ class Outbox(private val file: File?, files: File? = null, private val account: 
             val refused = mutableListOf<OutboxItem>()
             val tried = mutableSetOf<String>()
             while (true) {
-                var item = _items.value.firstOrNull { it.refusal == null && it.id !in tried && !it.isHeld(recipient) } ?: break
+                var item = _items.value.firstOrNull {
+                    it.refusal == null && it.id !in tried && !it.isHeld(recipient) && !isBehindRefusal(it)
+                } ?: break
                 tried += item.id
                 try {
                     val post = item.operation as? OutboxOperation.Post

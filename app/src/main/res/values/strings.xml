@@ -5,6 +5,8 @@
     <string name="widget_coming_up_description">Today\'s version beside the next dates in Upcoming.</string>
     <string name="coming_up">Coming up</string>
     <string name="nothing_coming_up">Nothing ahead yet.</string>
+    <string name="widget_catch_up">Open Changelog to catch up</string>
+    <string name="tile_catch_up">Open to catch up</string>
     <string name="a_month_before">A month before</string>
     <string name="a_note_holds_up_to">A note holds up to %1$s files.</string>
     <string name="a_week_before">A week before</string>

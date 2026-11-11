@@ -59,11 +59,12 @@ fun sayCount(@PluralsRes id: Int, count: Int, vararg args: Any): String =
 val Context.graph: AppGraph get() = (applicationContext as ChangelogApp).graph
 
 /**
- * One of the next dates in Upcoming, kept for the Coming up widget: its next day, its status and its title. A
- * title is the owner's words, kept on the phone as a reminder's line is, never logged; signing out drops them.
+ * One of the next dates in Upcoming, kept for the Coming up widget: its next day, its status, its title and a
+ * trip's last day (`through`, so the widget knows when it's over). A title is the owner's words, kept on the phone
+ * as a reminder's line is, never logged; signing out drops them.
  */
 @Serializable
-data class Soon(val date: String, val status: String, val title: String, val line: String = "") {
+data class Soon(val date: String, val status: String, val title: String, val line: String = "", val through: String? = null) {
     /** The server's own line ("Robin turns 42."), as Upcoming shows it; the title for one kept before lines were. */
     val words: String get() = line.ifBlank { title }
 }
@@ -243,7 +244,7 @@ class AppGraph(private val context: Context) {
 
     /** Keeps the next dates from a read of Upcoming, for the widget. */
     fun keepSoon(list: com.yourversionnumber.changelog.kit.UpcomingList) {
-        soon = list.entries.filter { it.status != "past" }.take(4).map { Soon(it.next, it.status, it.title, it.line) }
+        soon = list.entries.filter { it.status != "past" }.take(4).map { Soon(it.next, it.status, it.title, it.line, it.through) }
     }
 
     /**

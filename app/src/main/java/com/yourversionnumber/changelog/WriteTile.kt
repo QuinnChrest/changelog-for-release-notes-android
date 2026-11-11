@@ -6,11 +6,15 @@ import android.content.Intent
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
+import com.yourversionnumber.changelog.kit.shownAt
+import java.time.Instant
 
 /**
  * A Quick Settings tile: "Changelog", today's version under it, and a tap
  * that opens Log with the note box ready, from anywhere the shade comes down.
- * The version is the server's, from the last `/v1/me` the app read.
+ * The version is the server's, from the last `/v1/me` the app read: the one
+ * for the day it is now in the account's time zone, from the days it listed
+ * ahead, worked out each time the shade comes down (as the widgets do).
  */
 class WriteTile : TileService() {
     override fun onStartListening() {
@@ -18,8 +22,14 @@ class WriteTile : TileService() {
         val graph = applicationContext.graph
         tile.state = if (graph.signedIn.value) Tile.STATE_INACTIVE else Tile.STATE_UNAVAILABLE
         tile.label = say(R.string.changelog)
-        tile.subtitle = graph.me?.version ?: say(R.string.sign_in_first)
-        tile.contentDescription = graph.me?.version?.let { say(R.string.changelog_version_write_what_changed, it) } ?: say(R.string.changelog)
+        val me = graph.me
+        val version = me?.shownAt(Instant.now())?.version
+        tile.subtitle = when {
+            me == null -> say(R.string.sign_in_first)
+            version == null -> say(R.string.tile_catch_up)
+            else -> version
+        }
+        tile.contentDescription = version?.let { say(R.string.changelog_version_write_what_changed, it) } ?: say(R.string.changelog)
         tile.updateTile()
     }
 

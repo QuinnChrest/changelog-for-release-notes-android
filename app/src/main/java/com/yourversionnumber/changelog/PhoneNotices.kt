@@ -287,6 +287,8 @@ class RestoreReceiver : BroadcastReceiver() {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
             PhoneNotices.restore(context)
             Stops.start(context)
+            // A restart or an update takes the widgets' midnight alarm away: drawn again, they set it again.
+            VersionWidget.refresh(context)
         }
     }
 }

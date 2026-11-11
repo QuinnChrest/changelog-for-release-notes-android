@@ -581,6 +581,18 @@ are kept on the phone (`AppGraph.soon`; a date's line is the owner's words,
 as a reminder's is), refreshed whenever the app reads Upcoming, as it
 opens, and in the 12-hourly refresh; signing out drops them.
 
+The widgets and the Quick Settings tile never read `/v1/me` themselves, and
+the 12-hourly refresh runs only while reminders or the daily prompt are on,
+so each drawing picks the day it is now in the account's time zone and that
+day's version from the days `/v1/me` listed ahead (`kit`'s `shownAt`, as the
+iPhone app's `WidgetSnapshot.timeline`): past midnight nothing is written
+yet, today's notes in numbers are gone, and Coming up counts from the new
+day (`upcomingStatusOn`). Past the last listed day, they say "Open Changelog
+to catch up". `TodayWidgets.redrawAtMidnight` sets one inexact alarm (`RTC`,
+no wake-up, no exact-alarm permission) for the account's next midnight, set
+again by each drawing and by `RestoreReceiver`; the tile is drawn each time
+the shade comes down.
+
 Log, Notes, Upcoming, Activity and Settings are the five tabs along the bottom.
 Settings' Appearance (`ThemeMode`: same as the phone, light or dark) is about
 the phone, so it's kept in `AppGraph` and signing out leaves it. The widget

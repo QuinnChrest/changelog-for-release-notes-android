@@ -283,6 +283,9 @@ private data class Spot(val id: String, val lat: Double, val lon: Double, val no
 private const val STOP = "stop:"
 private const val NOTE = "note:"
 
+/** How many of a place's notes are read for their photos as its sheet opens. */
+private const val PIN_READS = 8
+
 /**
  * The notes written at one place, newest first: the day, the opening words, and its photos' small copies, with Open
  * in blue so each row reads as one to tap. A pin carries only the words, so each note is read as the sheet opens
@@ -292,7 +295,9 @@ private const val NOTE = "note:"
 private fun NotesSheet(model: AppModel, pin: NotePin, modifier: Modifier, onOpen: (NoteTarget) -> Unit, onClose: () -> Unit) {
     val details = remember(pin.id) { mutableStateMapOf<String, NoteDetail>() }
     LaunchedEffect(pin.id) {
-        pin.notes.forEach { note -> model.readNote(note.date, note.id)?.let { details[note.id] = it } }
+        // Only the newest few: each read is one of the day's 2,000, and a busy place holds many. The rest still
+        // show their words and Open.
+        pin.notes.take(PIN_READS).forEach { note -> model.readNote(note.date, note.id)?.let { details[note.id] = it } }
     }
     Column(
         modifier

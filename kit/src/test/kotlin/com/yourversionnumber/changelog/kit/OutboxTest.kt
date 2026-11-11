@@ -71,6 +71,45 @@ class OutboxTest {
     }
 
     @Test
+    fun filesAddedWithARefusedEditWaitBehindItAndGoWhenItIsGone() = runTest {
+        val outbox = Outbox(null, folder())
+        val photo = QueuedFile(type = "image/jpeg", name = "a.jpg", size = 3)
+        outbox.enqueue(OutboxOperation.Edit("2026-11-07", "note_1", "new words", "r1"), group = "save-1")
+        outbox.enqueue(OutboxOperation.Attach("2026-11-07", "note_1", listOf(photo)), group = "save-1")
+        val other = outbox.enqueueNote("unrelated")
+        val sent = mutableListOf<String>()
+        val report = outbox.flush(prepareAttach = { it.copy(files = it.files.map { f -> f.copy(upload = "u1") }) }) {
+            if (it.operation is OutboxOperation.Edit) throw ApiException(409, "revision_mismatch", "Changed elsewhere.")
+            sent += it.id
+            receipt(it.id)
+        }
+        // The lone note goes; the files stay behind the refused edit, unsent and unprepared.
+        assertEquals(listOf(other.id), sent)
+        assertEquals(listOf(other.id), report.sent.map { it.item.id })
+        val left = outbox.items.value
+        assertEquals(2, left.size)
+        assertTrue(outbox.isBehindRefusal(left[1]))
+        assertNull((left[1].operation as OutboxOperation.Attach).files.single().upload)
+
+        // Discarding the edit discards the files that went with it.
+        outbox.discard(left[0].id)
+        assertTrue(outbox.items.value.isEmpty())
+    }
+
+    @Test
+    fun aStorageRefusalOfAnUploadIsTriedOnceMoreWithANewFormThenRefused() = runTest {
+        val outbox = Outbox(null, folder())
+        val photo = QueuedFile(type = "image/jpeg", name = "a.jpg", size = 3)
+        val note = outbox.enqueue(OutboxOperation.Post("with a photo", writtenAt = "2026-11-07T08:00:00-06:00", files = listOf(photo)))
+        var forms = 0
+        val report = outbox.flush(prepare = { forms++; throw ApiException(422, "upload_failed", "Upload failed.", field = "uploads") }) { receipt(it.id) }
+        assertNull(report.stopped)
+        assertEquals(2, forms)
+        assertEquals("Upload failed.", outbox.items.value.single().refusal)
+        assertNotEquals(note.id, outbox.items.value.single().id)
+    }
+
+    @Test
     fun aFixedNoteGoesAgainUnderANewKey() = runTest {
         val outbox = Outbox(null)
         val a = outbox.enqueueNote("")

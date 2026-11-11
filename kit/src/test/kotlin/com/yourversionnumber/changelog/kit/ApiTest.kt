@@ -9,6 +9,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** The client against a stand-in server on localhost, never Release Notes itself. */
@@ -124,14 +125,16 @@ class ApiTest {
     }
 
     @Test
-    fun aStorageRefusalIsWorthAnotherForm() = runTest {
+    fun aStorageRefusalIsWorthOneMoreFormAndIsNotRetriedForever() = runTest {
         answer = { 403 to "<Error>AccessDenied</Error>" }
         val file = java.io.File.createTempFile("photo", ".jpg").apply { writeBytes(byteArrayOf(1)) }
         val e = assertFailsWith<ApiException> {
             api.postFile(file, "Photo 1.jpg", UploadForm("up-1", "image/jpeg", "/dev-upload/", emptyMap(), 300))
         }
         assertEquals("upload_failed", e.code)
-        assertTrue(e.retryable)
+        assertEquals("uploads", e.field)
+        assertFalse(e.retryable)
+        assertFalse(e.signedOut)
     }
 
     private val placeJson =

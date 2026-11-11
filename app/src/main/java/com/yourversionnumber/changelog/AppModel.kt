@@ -17,6 +17,7 @@ import com.yourversionnumber.changelog.kit.ApiException
 import com.yourversionnumber.changelog.kit.DayDetail
 import com.yourversionnumber.changelog.kit.DaySummary
 import com.yourversionnumber.changelog.kit.Hashtags
+import com.yourversionnumber.changelog.kit.everyPage
 import com.yourversionnumber.changelog.kit.Here
 import com.yourversionnumber.changelog.kit.HomeMove
 import com.yourversionnumber.changelog.kit.MediaType
@@ -686,8 +687,10 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         editFiles.clear()
         viewModelScope.launch {
             try {
-                if (changed) graph.outbox.enqueue(OutboxOperation.Edit(note.date, note.id, text, note.revision, tags))
-                if (files.isNotEmpty()) graph.outbox.enqueue(OutboxOperation.Attach(note.date, note.id, files))
+                // One Save: should the edit be refused, its files wait behind it rather than land on their own.
+                val save = java.util.UUID.randomUUID().toString()
+                if (changed) graph.outbox.enqueue(OutboxOperation.Edit(note.date, note.id, text, note.revision, tags), group = save)
+                if (files.isNotEmpty()) graph.outbox.enqueue(OutboxOperation.Attach(note.date, note.id, files), group = save)
                 graph.send()
             } catch (e: OutboxNotKept) {
                 graph.report(e.message)
@@ -953,14 +956,11 @@ class AppModel(application: Application) : AndroidViewModel(application) {
             checkInsLoading = true
             checkInsProblem = null
             val read = mutableListOf<com.yourversionnumber.changelog.kit.CheckIn>()
-            var before: String? = null
             try {
-                do {
-                    val page = api.checkIns(before = before)
+                everyPage({ api.checkIns(before = it) }, { it.next }) { page ->
                     read += page.items
                     if (read.size > (checkIns?.size ?: 0)) checkIns = read.toList()
-                    before = page.next
-                } while (before != null)
+                }
                 checkIns = read.toList()
             } catch (e: ApiException) {
                 checkInsProblem = e.message
@@ -1220,14 +1220,11 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         notePinsJob?.cancel()
         notePinsJob = viewModelScope.launch {
             val read = mutableListOf<com.yourversionnumber.changelog.kit.MapPin>()
-            var after: String? = null
             try {
-                do {
-                    val page = api.mapPins(after)
+                everyPage({ api.mapPins(it) }, { it.next }) { page ->
                     read += page.pins
                     if (read.size > (notePins?.size ?: 0)) notePins = read.toList()
-                    after = page.next
-                } while (after != null)
+                }
                 notePins = read.toList()
             } catch (e: ApiException) {
                 if (e.signedOut) handle(e)

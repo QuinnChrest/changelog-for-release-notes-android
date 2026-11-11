@@ -4,7 +4,7 @@ What Changelog for Android does, what's left, and what's built but not yet
 checked. The iPhone app (`jthingelstad/changelog-ios`) is the reference;
 `AGENTS.md` says how each built piece works.
 
-**At a glance:** 53 built · 4 to do · 2 waiting on someone else · 25 to check
+**At a glance:** 53 built · 4 to do · 2 waiting on someone else · 28 to check
 
 Key: ✅ built and tested · 🔲 to do · ⏳ waiting on someone else · 🔍 built, not yet checked
 
@@ -31,6 +31,9 @@ These are written and built; something about them couldn't be seen on the emulat
 |---|---|---|
 | 🔍 | HEIC photos become JPEG | `MediaTest` runs a BMP through the same path (it comes out a JPEG); no real HEIC to hand |
 | 🔍 | Reminders and the daily prompt fire at 6 a.m. | The emulator can't jump its clock; scheduled times were checked, not the firing |
+| 🔍 | A refused edit holds its files back | One Save's edit and files share an `OutboxItem.group`: if the edit is refused (`revision_mismatch`), the files wait ("Waiting for the change above") and Discard takes both. Tested in `OutboxTest`; not tried on the emulator |
+| 🔍 | A storage refusal of an upload is tried once more, then refused | `postFile` answers a storage 4xx as 422 with `field` `uploads`, so the Outbox makes the uploads again once and then sets the note aside with the reason, instead of retrying forever. Tested in `ApiTest` and `OutboxTest`; no real storage 4xx seen |
+| 🔍 | A map pin reads at most 8 of its notes, and token loss takes back Record my stops' requests | `PIN_READS` in `CheckInMap.kt`; `Stops.pause` on `tokenLost` (the stop in progress is kept). Not seen on a phone |
 | 🔍 | Reminders survive a phone restart | Not rebooted with alarms waiting |
 | 🔍 | The whole pass on a real phone | `docs/PHONE-TEST.md`, by hand, on a real account |
 | 🔍 | UI test cycle in CI | Runs on emulators here; CI runs the unit tests and lint only |
@@ -80,7 +83,7 @@ These are written and built; something about them couldn't be seen on the emulat
 | ✅ | Edit as the box on Log is: words, the tag row, and Photos, Camera and Record (files added to the note after the edit, `OutboxOperation.Attach`, `POST /v1/notes/{date}/{id}/media`); no Here, a note keeps its place |
 | ✅ | Log shows today's notes with their words and files (photos by their small copy, voice memos to play, PDFs to open), oldest first (`GET /v1/notes?from=&to=`, API 1.9.0); offline, it falls back to what this phone sent. Days before are in Notes |
 | ✅ | Notes, a tab as the iPhone app's: today's notes, then the days before, newest first and paged (`GET /v1/days`, API 1.15.0), each with its version, counts, place and Paused; a day opens with its version, place, weather and every note (`GET /v1/days/{date}`); a note opens full screen to read, edit or delete, as on Log. Needs `notes:all` or `notes:read`, and says how to get it otherwise. Seen on the emulator against the dev server |
-| 🔲 | Notes: search, on this day, and a way to upgrade the token in the app | The API has search and on this day (1.15.0); the iPhone app upgrades an old token by OAuth from the tab, and can lock reading behind Face ID |
+| 🔲 | Notes: a way to upgrade the token in the app, and a lock on reading | Search and on this day are built (above). The iPhone app upgrades an old token by OAuth from the tab, and can lock reading behind Face ID |
 | ✅ | A photo on a note opens in the app, full screen, to pinch or double-tap to zoom and drag (`PhotoViewer`); a photo the phone can't read offers to open it outside |
 | ✅ | Every note, from any channel, with a token that has `notes:all` (API 1.10.0, 1.11.0): each says where it came from, and Edit and Delete work on any of them; without it, only this token's own |
 | ✅ | Log shows notes only, never activity rows: activity is on its own tab. Today shows nothing until its first read is back, so nothing stands in and is swapped out |

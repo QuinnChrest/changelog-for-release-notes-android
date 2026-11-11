@@ -95,12 +95,20 @@ object Stops {
         } > 0
     }
 
-    /** Stops recording and forgets the stop in progress (signing out, or the switch off). Sent stops stay. */
-    fun stop(context: Context) {
+    /**
+     * Takes Android's requests back, so nothing wakes the app for a fix while no token is signed in. The stop in
+     * progress is kept: signing in again (opening the app asks again, [start]) carries on from it.
+     */
+    fun pause(context: Context) {
         context.getSystemService(LocationManager::class.java)?.let { manager ->
             // 0 is the one request of an earlier build.
             for (code in listOf(0) + sources.map { it.code }) runCatching { manager.removeUpdates(pending(context, code)) }
         }
+    }
+
+    /** Stops recording and forgets the stop in progress (signing out, or the switch off). Sent stops stay. */
+    fun stop(context: Context) {
+        pause(context)
         stateFile(context).delete()
     }
 

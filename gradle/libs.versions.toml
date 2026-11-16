@@ -12,7 +12,7 @@ exifinterface = "1.4.2"
 testRunner = "1.8.0-alpha03"
 espresso = "3.8.0-alpha03"
 testJunit = "1.3.0"
-serialization = "1.12.0"
+serialization = "1.13.0"
 coroutines = "1.11.0"
 # The check-in map (Quinn's call, 2026-11-07: the one dependency outside AndroidX
 # and Kotlin), drawing OpenStreetMap's tiles. It brings OkHttp and Timber.

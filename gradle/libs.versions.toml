@@ -10,7 +10,7 @@ exifinterface = "1.4.2"
 # Android 17 removed InputManager.getInstance, which Espresso 3.7 (under
 # Compose's UI tests) calls; 3.8 is the first that runs there. Tests only.
 testRunner = "1.8.0-alpha03"
-espresso = "3.8.0-alpha03"
+espresso = "3.8.0-alpha04"
 testJunit = "1.3.0"
 serialization = "1.12.0"
 coroutines = "1.11.0"
